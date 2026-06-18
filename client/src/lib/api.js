@@ -1,0 +1,51 @@
+// Thin fetch wrapper. Stores the JWT in localStorage and attaches it to every request.
+const TOKEN_KEY = 'ketolog:token';
+
+export function getToken() {
+  return localStorage.getItem(TOKEN_KEY);
+}
+export function setToken(t) {
+  if (t) localStorage.setItem(TOKEN_KEY, t);
+  else localStorage.removeItem(TOKEN_KEY);
+}
+
+async function request(method, path, body) {
+  const headers = { 'Content-Type': 'application/json' };
+  const token = getToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(`/api${path}`, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    if (res.status === 401) setToken(null);
+    throw new Error(data.error || 'שגיאה');
+  }
+  return data;
+}
+
+export const api = {
+  // auth
+  register: (email, password) => request('POST', '/auth/register', { email, password }),
+  login: (email, password) => request('POST', '/auth/login', { email, password }),
+  me: () => request('GET', '/auth/me'),
+
+  // days + meals
+  getDays: () => request('GET', '/days'),
+  upsertDay: (date, fields) => request('PUT', `/days/${date}`, fields),
+  setMetric: (date, field, value) => request('PATCH', `/days/${date}/metrics`, { field, value }),
+  addMeal: (date, meal) => request('POST', `/days/${date}/meals`, meal),
+  deleteMeal: (date, mealId) => request('DELETE', `/days/${date}/meals/${mealId}`),
+
+  // products
+  getProducts: () => request('GET', '/products'),
+  addProduct: (p) => request('POST', '/products', p),
+  deleteProduct: (id) => request('DELETE', `/products/${id}`),
+
+  // ai
+  estimateMeal: (desc) => request('POST', '/ai/estimate-meal', { desc }),
+  estimateImage: (image, mediaType, unit) =>
+    request('POST', '/ai/estimate-image', { image, mediaType, unit }),
+};
