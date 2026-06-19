@@ -1,14 +1,14 @@
 import Anthropic from '@anthropic-ai/sdk';
 
 let client = null;
-function getClient() {
+export function getClient() {
   if (!process.env.ANTHROPIC_API_KEY) {
     throw new Error('ANTHROPIC_API_KEY is not set');
   }
   if (!client) client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   return client;
 }
-const MODEL = () => process.env.CLAUDE_MODEL || 'claude-sonnet-4-6';
+export const MODEL = () => process.env.CLAUDE_MODEL || 'claude-sonnet-4-6';
 
 // ---- system prompt (ported from keto-log.html, products injected as context) ----
 function buildSys(products = [], withName = false) {

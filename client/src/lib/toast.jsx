@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback, useRef } from 'react';
+import './toast.scss';
 
 const ToastContext = createContext(() => {});
 

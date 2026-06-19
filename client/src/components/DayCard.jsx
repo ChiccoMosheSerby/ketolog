@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   dayTotal, dayMacroGrams, macroPct, hasMacros, fmt, heDate, zoneInfo,
 } from '../lib/helpers.js';
+import './DayCard.scss';
 
 export default function DayCard({ iso, day, open, onToggle, onDeleteMeal, onSetMetric }) {
   const mt = day.metrics || {};

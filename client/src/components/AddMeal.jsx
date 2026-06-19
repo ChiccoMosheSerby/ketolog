@@ -1,16 +1,17 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { useToast } from '../lib/toast.jsx';
-import { fmt, macroPct, todayISO, nowHM } from '../lib/helpers.js';
+import { useSpeech } from '../lib/useSpeech.js';
+import { fmt, macroPct, nowHM } from '../lib/helpers.js';
+import './AddMeal.scss';
 
 const CATS = [
   'ארוחת בוקר', 'ארוחת צהריים', 'ארוחת ערב',
   'נשנוש / ביניים', 'קפה / משקה', 'קינוח', 'פינוק לילה',
 ];
 
-export default function AddMeal({ products, onLogged }) {
+export default function AddMeal({ products, onLogged, date, onDateChange }) {
   const toast = useToast();
-  const [date, setDate] = useState(todayISO());
   const [time, setTime] = useState(nowHM());
   const [cat, setCat] = useState(CATS[0]);
   const [carb, setCarb] = useState('');
@@ -18,6 +19,27 @@ export default function AddMeal({ products, onLogged }) {
   const [pendingMacro, setPendingMacro] = useState({ fat: null, protein: null });
   const [note, setNote] = useState(null); // { html } via structured fields
   const [busy, setBusy] = useState(false);
+
+  // Voice dictation: append the recognized speech to whatever was typed before recording.
+  const baseDescRef = useRef('');
+  const speech = useSpeech({
+    onTranscript: (text) => {
+      const base = baseDescRef.current;
+      setDesc(base + (base && text ? ' ' : '') + text);
+      clearNote();
+    },
+    onError: (err) =>
+      toast(err === 'not-allowed' ? 'אין הרשאה למיקרופון' : 'ההקלטה נכשלה — נסה/י שוב'),
+  });
+
+  function toggleMic() {
+    if (speech.listening) {
+      speech.stop();
+    } else {
+      baseDescRef.current = desc.trim();
+      speech.start();
+    }
+  }
 
   function clearNote() {
     setNote(null);
@@ -97,7 +119,7 @@ export default function AddMeal({ products, onLogged }) {
       <div className="row">
         <div className="fld">
           <label>תאריך</label>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <input type="date" value={date} onChange={(e) => onDateChange(e.target.value)} />
         </div>
         <div className="fld">
           <label>שעה</label>
@@ -125,7 +147,20 @@ export default function AddMeal({ products, onLogged }) {
       </div>
       <div className="row" style={{ marginTop: 10 }}>
         <div className="fld wide">
-          <label>פירוט (מה אכלת) — תיאור חופשי, המערכת תחשב לבד</label>
+          <label className="desc-label">
+            <span>פירוט (מה אכלת) — תיאור חופשי, המערכת תחשב לבד</span>
+            {speech.supported && (
+              <button
+                type="button"
+                className={'mic' + (speech.listening ? ' rec' : '')}
+                onClick={toggleMic}
+                title={speech.listening ? 'עצור הקלטה' : 'הקלט במקום להקליד'}
+              >
+                <span className="mic-dot">🎤</span>
+                {speech.listening ? 'מקליט… הקש/י לעצירה' : 'הקלטה קולית'}
+              </button>
+            )}
+          </label>
           <textarea
             placeholder="לדוגמה: חביתה מ-3 ביצים, פרוסת גאודה, מלפפון לא קלוף, חופן שרי"
             value={desc}

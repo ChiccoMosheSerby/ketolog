@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../lib/auth.jsx';
+import './Login.scss';
 
 export default function Login() {
   const { login, register } = useAuth();

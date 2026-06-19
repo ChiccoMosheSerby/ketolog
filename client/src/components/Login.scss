@@ -1,0 +1,47 @@
+/* ---------- Auth screen ---------- */
+.auth-wrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.auth-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-md);
+  padding: 36px 32px;
+  width: 100%;
+  max-width: 380px;
+  h1 {
+    font-size: 28px;
+  }
+  .sub {
+    margin: 6px 0 24px;
+    display: block;
+  }
+}
+.auth-err {
+  margin-top: 14px;
+  font-size: 12.5px;
+  color: var(--red);
+  background: #fbeae8;
+  border: 1px solid #f1cfc9;
+  border-radius: var(--r-sm);
+  padding: 9px 12px;
+}
+.auth-switch {
+  margin-top: 18px;
+  background: none;
+  border: none;
+  color: var(--olive-dark);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 0;
+  &:hover {
+    text-decoration: underline;
+  }
+}

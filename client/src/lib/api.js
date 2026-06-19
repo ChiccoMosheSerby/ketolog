@@ -48,4 +48,11 @@ export const api = {
   estimateMeal: (desc) => request('POST', '/ai/estimate-meal', { desc }),
   estimateImage: (image, mediaType, unit) =>
     request('POST', '/ai/estimate-image', { image, mediaType, unit }),
+
+  // assistant chat
+  getChat: () => request('GET', '/ai/chat'),
+  sendChat: ({ conversationId, text, image }) =>
+    request('POST', '/ai/chat', { conversationId, text, image }),
+  resolveAction: (conversationId, actionId, decision) =>
+    request('POST', `/ai/chat/${conversationId}/actions/${actionId}`, { decision }),
 };

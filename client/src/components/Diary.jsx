@@ -1,32 +1,51 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
-import { useAuth } from '../lib/auth.jsx';
 import { useToast } from '../lib/toast.jsx';
 import { dayTotal, fmt, todayISO, dayHebrewName } from '../lib/helpers.js';
 import AddMeal from './AddMeal.jsx';
 import Products from './Products.jsx';
 import DayCard from './DayCard.jsx';
+import Header from './Header.jsx';
+import TabShell from './TabShell.jsx';
+import './Diary.scss';
 
 export default function Diary() {
-  const { user, logout } = useAuth();
   const toast = useToast();
   const [days, setDays] = useState([]); // array of day docs, newest first
   const [products, setProducts] = useState([]);
   const [expanded, setExpanded] = useState(new Set());
-  const [viewDate, setViewDate] = useState(''); // '' = show all
+  const [viewDate, setViewDate] = useState(''); // '' = show all (history filter)
   const [jump, setJump] = useState(todayISO());
+  const [activeDate, setActiveDate] = useState(todayISO()); // the day the "Today" tab + AddMeal point at
   const [loaded, setLoaded] = useState(false);
 
+  const reload = useCallback(
+    (firstLoad = false) =>
+      Promise.all([api.getDays(), api.getProducts()])
+        .then(([d, p]) => {
+          setDays(d);
+          setProducts(p);
+          if (firstLoad && d.length) setExpanded(new Set([d[0].date])); // newest open by default
+        })
+        .catch((e) => toast(e.message)),
+    [toast]
+  );
+
   useEffect(() => {
-    Promise.all([api.getDays(), api.getProducts()])
-      .then(([d, p]) => {
-        setDays(d);
-        setProducts(p);
-        if (d.length) setExpanded(new Set([d[0].date])); // newest open by default
-      })
-      .catch((e) => toast(e.message))
-      .finally(() => setLoaded(true));
-  }, [toast]);
+    reload(true).finally(() => setLoaded(true));
+  }, [reload]);
+
+  // the assistant commits meals/products straight to the DB — refresh when it does
+  useEffect(() => {
+    const onChange = () => reload();
+    window.addEventListener('ketolog:dataChanged', onChange);
+    return () => window.removeEventListener('ketolog:dataChanged', onChange);
+  }, [reload]);
+
+  // keep the active day's card open on the Today tab
+  useEffect(() => {
+    setExpanded((s) => (s.has(activeDate) ? s : new Set(s).add(activeDate)));
+  }, [activeDate]);
 
   function mergeDay(day) {
     setDays((prev) => {
@@ -46,7 +65,6 @@ export default function Diary() {
     const day = await api.addMeal(date, payload);
     mergeDay(day);
     setExpanded((s) => new Set(s).add(date));
-    setViewDate('');
   }
 
   async function deleteMeal(date, mealId) {
@@ -89,64 +107,41 @@ export default function Diary() {
     }
   }
 
-  // ---- summary ----
+  // ---- summary (persistent header) ----
   const totals = days.map(dayTotal);
   const avg = totals.length ? totals.reduce((a, b) => a + b, 0) / totals.length : 0;
   const t = todayISO();
   const today = days.find((d) => d.date === t);
+  const stats = {
+    avg: totals.length ? fmt(avg) : '–',
+    days: days.length || '–',
+    today: today ? fmt(dayTotal(today)) : '0',
+  };
 
+  const activeDay = days.find((d) => d.date === activeDate) || {
+    date: activeDate,
+    meals: [],
+    metrics: {},
+  };
   const shown = viewDate ? days.filter((d) => d.date === viewDate) : days;
 
-  return (
-    <div className="wrap">
-      <header className="top">
-        <div className="headrow">
-          <div className="stats">
-            <div className="stat">
-              <span className="num">{totals.length ? fmt(avg) : '–'}</span>
-              <span className="lab">ממוצע יומי (גרם נטו)</span>
-            </div>
-            <div className="stat">
-              <span className="num">{days.length || '–'}</span>
-              <span className="lab">ימים מתועדים</span>
-            </div>
-            <div className="stat">
-              <span className="num">{today ? fmt(dayTotal(today)) : '0'}</span>
-              <span className="lab">היום עד כה</span>
-            </div>
-          </div>
-          <div className="target target-mini">
-            <div className="tt">היעד המאוזן בקיטו</div>
-            <div className="target-bar">
-              <i style={{ width: '72%', background: 'var(--olive)' }}></i>
-              <i style={{ width: '23%', background: 'var(--protein)' }}></i>
-              <i style={{ width: '5%', background: 'var(--amber)' }}></i>
-            </div>
-            <div className="target-legend">
-              <span className="it">
-                <span className="dot" style={{ background: 'var(--olive)' }}></span>שומן <b>70–75%</b>
-              </span>
-              <span className="it">
-                <span className="dot" style={{ background: 'var(--protein)' }}></span>חלבון{' '}
-                <b>20–25%</b>
-              </span>
-              <span className="it">
-                <span className="dot" style={{ background: 'var(--amber)' }}></span>פחמ' <b>5–10%</b>
-              </span>
-            </div>
-          </div>
-        </div>
-        <div className="userbar">
-          <span className="uemail">{user?.email}</span>
-          <button className="btn ghost mini" onClick={logout}>
-            התנתק
-          </button>
-        </div>
-      </header>
+  // ---- tab contents ----
+  const todayTab = (
+    <>
+      <AddMeal products={products} onLogged={addMeal} date={activeDate} onDateChange={setActiveDate} />
+      <DayCard
+        iso={activeDate}
+        day={activeDay}
+        open={expanded.has(activeDate)}
+        onToggle={() => toggle(activeDate)}
+        onDeleteMeal={deleteMeal}
+        onSetMetric={setMetric}
+      />
+    </>
+  );
 
-      <AddMeal products={products} onLogged={addMeal} />
-      <Products products={products} onAdd={addProduct} onDelete={deleteProduct} />
-
+  const historyTab = (
+    <>
       <div className="toolbar">
         <label style={{ fontSize: 12, color: 'var(--ink-soft)' }}>קפיצה ליום:</label>
         <input type="date" value={jump} onChange={(e) => setJump(e.target.value)} />
@@ -156,16 +151,11 @@ export default function Diary() {
         <button className="btn ghost mini" onClick={() => setViewDate('')}>
           כל הימים
         </button>
-        <span className="spacer"></span>
-        <button className="btn ghost mini" onClick={copyData}>
-          העתק נתונים
-        </button>
       </div>
-
       <div id="days">
         {!loaded ? null : shown.length === 0 ? (
           <div className="empty">
-            {viewDate ? 'אין רישום ליום שנבחר.' : 'עדיין אין ימים מתועדים. הוסף ארוחה למעלה.'}
+            {viewDate ? 'אין רישום ליום שנבחר.' : 'עדיין אין ימים מתועדים. הוסף ארוחה בלשונית "היום".'}
           </div>
         ) : (
           shown.map((d) => (
@@ -181,6 +171,22 @@ export default function Diary() {
           ))
         )}
       </div>
+    </>
+  );
+
+  const productsTab = <Products products={products} onAdd={addProduct} onDelete={deleteProduct} />;
+
+  const tabs = [
+    { id: 'today', label: 'היום', content: todayTab },
+    { id: 'history', label: 'יומן', content: historyTab },
+    { id: 'products', label: 'המוצרים שלי', content: productsTab },
+  ];
+
+  return (
+    <div className="wrap">
+      <Header stats={stats} onCopyData={copyData} />
+
+      <TabShell tabs={tabs} />
 
       <div className="foot">
         הנתונים נשמרים בענן (MongoDB) ומסונכרנים לחשבון שלך בכל מכשיר.

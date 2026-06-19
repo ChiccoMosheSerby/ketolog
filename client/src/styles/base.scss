@@ -1,0 +1,246 @@
+/* ============================================================
+   KetoLog — base: design tokens, reset & shared primitives
+   The carb count is the hero; everything else stays quiet.
+   Variable names --olive/--amber/--protein/--ink/--ink-soft are
+   referenced inline from JSX + helpers.js, so they are preserved.
+   Per-component rules live in each component's own .scss file.
+   ============================================================ */
+
+:root {
+  /* surfaces */
+  --paper: #f6f8f5; /* cool near-white ground */
+  --card: #ffffff;
+  --tint: #f0f3ef; /* neutral fill (inputs, tracks) */
+  --green-tint: #e7f4ec; /* accent wash */
+
+  /* ink */
+  --ink: #15181a;
+  --ink-soft: #6c736e;
+  --line: #e9ece7;
+
+  /* accent + macro hues (kept names for inline JSX) */
+  --olive: #149a5e; /* primary green — "under the line" */
+  --olive-soft: #6fc298;
+  --olive-dark: #0f7d4b;
+  --protein: #3a7ca5; /* muted blue */
+  --amber: #e08a2b; /* carb caution */
+  --red: #d6493b;
+
+  /* shape + depth */
+  --r-lg: 20px;
+  --r-md: 14px;
+  --r-sm: 10px;
+  --shadow-xs: 0 1px 2px rgba(18, 28, 22, 0.05);
+  --shadow-sm: 0 1px 2px rgba(18, 28, 22, 0.04), 0 4px 14px -8px rgba(18, 28, 22, 0.12);
+  --shadow-md: 0 2px 6px rgba(18, 28, 22, 0.05), 0 12px 32px -14px rgba(18, 28, 22, 0.18);
+  --ring: 0 0 0 3px rgba(20, 154, 94, 0.18);
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'Heebo', system-ui, -apple-system, sans-serif;
+  font-weight: 400;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+::selection {
+  background: var(--green-tint);
+}
+h1 {
+  font-family: 'Heebo', sans-serif;
+  font-weight: 800;
+  font-size: 32px;
+  line-height: 1.05;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+/* ---------- Panels (shared shell for AddMeal / Products) ---------- */
+.panel {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 20px;
+  margin: 18px 0;
+  h2 {
+    font-family: 'Heebo', sans-serif;
+    font-weight: 700;
+    font-size: 16px;
+    letter-spacing: -0.01em;
+    margin: 0 0 16px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    &::before {
+      content: '';
+      width: 7px;
+      height: 7px;
+      background: var(--olive);
+      display: inline-block;
+      border-radius: 999px;
+      box-shadow: 0 0 0 4px var(--green-tint);
+    }
+  }
+}
+
+/* ---------- Form primitives (shared) ---------- */
+.row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.fld {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1;
+  min-width: 120px;
+  &.wide {
+    flex-basis: 100%;
+    min-width: 100%;
+  }
+  label {
+    font-size: 11px;
+    color: var(--ink-soft);
+    letter-spacing: 0.01em;
+    font-weight: 500;
+  }
+}
+input,
+select,
+textarea {
+  font-family: 'Heebo', sans-serif;
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  width: 100%;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+input::placeholder,
+textarea::placeholder {
+  color: #aab0a9;
+}
+input[type='number'] {
+  font-family: 'IBM Plex Mono', monospace;
+  font-variant-numeric: tabular-nums;
+}
+textarea {
+  resize: vertical;
+  min-height: 46px;
+}
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  background: var(--card);
+  border-color: var(--olive);
+  box-shadow: var(--ring);
+}
+
+/* ---------- Buttons (shared) ---------- */
+.btn {
+  font-family: 'Heebo', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  background: var(--olive);
+  color: #fff;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  padding: 11px 20px;
+  box-shadow: var(--shadow-xs);
+  transition: background 0.15s ease, transform 0.06s ease, box-shadow 0.15s ease, color 0.15s ease;
+  &:hover {
+    background: var(--olive-dark);
+    box-shadow: var(--shadow-sm);
+  }
+  &:active {
+    transform: translateY(1px);
+  }
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--ring);
+  }
+  &.ghost {
+    background: var(--card);
+    color: var(--olive-dark);
+    border: 1px solid var(--line);
+    box-shadow: none;
+    &:hover {
+      background: var(--green-tint);
+      border-color: var(--olive-soft);
+    }
+  }
+  &.mini {
+    padding: 7px 13px;
+    font-size: 12px;
+    border-radius: 999px;
+  }
+  &:disabled {
+    opacity: 0.45;
+    cursor: default;
+    transform: none;
+    box-shadow: none;
+  }
+}
+
+/* ---------- Chevron (shared: DayCard + Products toggle) ---------- */
+.chev {
+  width: 10px;
+  height: 10px;
+  border-right: 2px solid var(--ink-soft);
+  border-bottom: 2px solid var(--ink-soft);
+  transform: rotate(45deg);
+  transition: transform 0.25s ease;
+  flex: none;
+  margin-bottom: 3px;
+}
+
+/* ---------- AI calc note (shared: AddMeal + Products) ---------- */
+.calc-note {
+  margin-top: 14px;
+  font-size: 13.5px;
+  color: var(--olive-dark);
+  background: var(--green-tint);
+  border: 1px solid #cfe9da;
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  line-height: 1.55;
+  .bd {
+    color: var(--ink-soft);
+    font-size: 12.5px;
+    font-weight: 400;
+  }
+}
+
+/* ---------- Misc shared ---------- */
+.empty {
+  text-align: center;
+  color: var(--ink-soft);
+  padding: 48px 20px;
+  font-size: 14px;
+}
+.hidden {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

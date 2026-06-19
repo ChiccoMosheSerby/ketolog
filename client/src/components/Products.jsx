@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { useToast } from '../lib/toast.jsx';
 import { fmt } from '../lib/helpers.js';
+import './Products.scss';
 
 export default function Products({ products, onAdd, onDelete }) {
   const toast = useToast();
