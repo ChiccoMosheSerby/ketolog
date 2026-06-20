@@ -61,6 +61,7 @@ export function useSpeech({ onTranscript, onError, debug = false } = {}) {
   const streamRef = useRef(null);
   const chunksRef = useRef([]);
   const timerRef = useRef(null);
+  const startedAtRef = useRef(0);
   const cbRef = useRef({ onTranscript, onError });
   cbRef.current = { onTranscript, onError };
 
@@ -120,7 +121,8 @@ export function useSpeech({ onTranscript, onError, debug = false } = {}) {
         const clean = (text || '').trim();
         if (debug) {
           const kb = Math.round(blob.size / 1024);
-          cbRef.current.onError?.(`הוקלט ${kb}KB · התקבל: ${clean || '(ריק)'}`);
+          const sec = ((Date.now() - startedAtRef.current) / 1000).toFixed(1);
+          cbRef.current.onError?.(`הוקלט ${kb}KB · ${sec}s · התקבל: ${clean || '(ריק)'}`);
         }
         if (clean) cbRef.current.onTranscript?.(clean);
         else cbRef.current.onError?.('no-speech');
@@ -135,6 +137,7 @@ export function useSpeech({ onTranscript, onError, debug = false } = {}) {
 
     try {
       rec.start();
+      startedAtRef.current = Date.now();
     } catch {
       release();
       cbRef.current.onError?.('default');
