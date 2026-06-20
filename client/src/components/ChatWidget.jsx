@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { useToast } from '../lib/toast.jsx';
-import { useSpeech } from '../lib/useSpeech.js';
+import { useSpeech, speechErrorMessage } from '../lib/useSpeech.js';
 import { fmt } from '../lib/helpers.js';
 import './ChatWidget.scss';
 
@@ -79,7 +79,7 @@ export default function ChatWidget() {
       const base = baseDescRef.current;
       setInput(base + (base && text ? ' ' : '') + text);
     },
-    onError: (err) => toast(err === 'not-allowed' ? 'אין הרשאה למיקרופון' : 'ההקלטה נכשלה'),
+    onError: (err) => toast(speechErrorMessage(err)),
   });
 
   // load the most recent thread the first time the panel opens

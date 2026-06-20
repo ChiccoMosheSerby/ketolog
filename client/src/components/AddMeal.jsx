@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { useToast } from '../lib/toast.jsx';
-import { useSpeech } from '../lib/useSpeech.js';
+import { useSpeech, speechErrorMessage } from '../lib/useSpeech.js';
 import { fmt, macroPct, nowHM } from '../lib/helpers.js';
 import './AddMeal.scss';
 
@@ -28,8 +28,7 @@ export default function AddMeal({ products, onLogged, date, onDateChange }) {
       setDesc(base + (base && text ? ' ' : '') + text);
       clearNote();
     },
-    onError: (err) =>
-      toast(err === 'not-allowed' ? 'אין הרשאה למיקרופון' : 'ההקלטה נכשלה — נסה/י שוב'),
+    onError: (err) => toast(speechErrorMessage(err)),
   });
 
   function toggleMic() {

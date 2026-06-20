@@ -6,6 +6,7 @@ import './Products.scss';
 
 // Scanner pulls in ZXing (large) — load it only when the user opens the camera.
 const BarcodeScanner = lazy(() => import('./BarcodeScanner.jsx'));
+const CameraCapture = lazy(() => import('./CameraCapture.jsx'));
 
 export default function Products({ products, onAdd, onDelete }) {
   const toast = useToast();
@@ -17,7 +18,8 @@ export default function Products({ products, onAdd, onDelete }) {
   const [imgBusy, setImgBusy] = useState(false);
   const [barBusy, setBarBusy] = useState(false);
   const [scanning, setScanning] = useState(false);
-  const fileRef = useRef(null);
+  const [capturing, setCapturing] = useState(false); // live camera photo modal
+  const fileRef = useRef(null); // gallery / file upload
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
@@ -41,6 +43,12 @@ export default function Products({ products, onAdd, onDelete }) {
 
   function pickImage() {
     fileRef.current?.click();
+  }
+
+  // A frame captured from the live camera — same pipeline as an uploaded file.
+  function onCapture(b64, mt) {
+    setCapturing(false);
+    runImage(b64, mt);
   }
 
   function onFile(e) {
@@ -150,6 +158,15 @@ export default function Products({ products, onAdd, onDelete }) {
           <BarcodeScanner onResult={runBarcode} onClose={() => setScanning(false)} />
         </Suspense>
       )}
+      {capturing && (
+        <Suspense fallback={null}>
+          <CameraCapture
+            onCapture={onCapture}
+            onClose={() => setCapturing(false)}
+            onUpload={pickImage}
+          />
+        </Suspense>
+      )}
       <h2>המוצרים שלי</h2>
       <div style={{ fontSize: 12, color: 'var(--ink-soft)', margin: '-8px 0 12px' }}>
         מוצרים קבועים שלך. הם מופיעים כתגיות מתחת לתיבת הפירוט — קליק מוסיף אותם לתיאור הארוחה, ואז
@@ -198,8 +215,11 @@ export default function Products({ products, onAdd, onDelete }) {
           >
             {barBusy ? 'מחפש…' : 'סריקת ברקוד'}
           </button>
+          <button className="btn ghost" disabled={busy} onClick={() => setCapturing(true)}>
+            {imgBusy ? 'מזהה…' : '📷 צלם מוצר'}
+          </button>
           <button className="btn ghost" disabled={busy} onClick={pickImage}>
-            {imgBusy ? 'מזהה…' : 'זיהוי מוצר מתמונה'}
+            {imgBusy ? 'מזהה…' : '🖼️ העלה תמונה'}
           </button>
           <input
             type="file"
@@ -209,7 +229,7 @@ export default function Products({ products, onAdd, onDelete }) {
             onChange={onFile}
           />
           <span style={{ fontSize: 11.5, color: 'var(--ink-soft)' }}>
-            ברקוד מושך ערכים ממסד נתונים (מדויק לפי מנה). לתמונה — כתוב יחידה + כמה יש באריזה.
+            ברקוד מושך ערכים ממסד נתונים (מדויק לפי מנה). לזיהוי מתמונה — כתוב יחידה + כמה יש באריזה.
           </span>
         </div>
 
