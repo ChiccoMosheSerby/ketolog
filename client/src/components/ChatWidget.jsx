@@ -3,6 +3,7 @@ import { api } from '../lib/api.js';
 import { useToast } from '../lib/toast.jsx';
 import { useSpeech, speechErrorMessage } from '../lib/useSpeech.js';
 import { fmt } from '../lib/helpers.js';
+import Logo from './Logo.jsx';
 import './ChatWidget.scss';
 
 const GREETING =
@@ -213,14 +214,14 @@ export default function ChatWidget() {
         aria-label="פתח/י את העוזר הקטוגני"
         title="העוזר הקטוגני"
       >
-        🥑
+        <Logo size={58} />
       </button>
 
       {open && (
         <div className="chat-panel" role="dialog" aria-label="העוזר הקטוגני">
           <header className="chat-head">
             <div className="chat-title">
-              <span className="chat-ava">🥑</span>
+              <span className="chat-ava"><Logo size={36} /></span>
               <div>
                 <b>קֶטוֹ</b>
                 <span className="chat-sub">העוזר הקטוגני שלך</span>
