@@ -8,12 +8,20 @@ export function getClient() {
   if (!client) client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   return client;
 }
-export const MODEL = () => process.env.CLAUDE_MODEL || 'claude-sonnet-4-6';
+// Estimators (meal/image/barcode → JSON) run on the strongest model with
+// adaptive thinking, so the logged numbers are at expert level.
+export const MODEL = () => process.env.CLAUDE_MODEL || 'claude-opus-4-8';
+// The conversational keto assistant runs on the strongest model with thinking,
+// so it reasons at the level of the general Claude chat.
+export const CHAT_MODEL = () => process.env.CHAT_MODEL || 'claude-opus-4-8';
 
 // ---- system prompt (ported from keto-log.html, products injected as context) ----
 function buildSys(products = [], withName = false) {
   let base =
-    'אתה מחשבון תזונה קטוגנית מדויק. העריך עבור הכמויות המתוארות: (1) פחמימות נטו בגרמים, (2) שומן בגרמים, (3) חלבון בגרמים. ' +
+    'אתה מומחה/ית התזונה הקטוגנית הטוב/ה בעולם — דיאטן/ית קליני/ת עם דיוק של מעבדה. ' +
+    'העריך/י בדיוק הגבוה ביותר האפשרי עבור הכמויות המתוארות: (1) פחמימות נטו בגרמים, (2) שומן בגרמים, (3) חלבון בגרמים. ' +
+    'בסס/י על ידע תזונתי מעמיק (כמו USDA ותוויות יצרן ישראליות), חשב/י לפי המרכיבים והכמויות בפועל, ושקלל/י את שיטת ההכנה. ' +
+    'אם הכמות לא ברורה — הנח/י מנה בינונית סבירה, ועדיף לדייק בהיגיון מאשר להמציא דיוק מזויף. ' +
     'פחמימות נטו = סך הפחמימות, פחות סיבים תזונתיים (אינם הופכים לגלוקוז), פחות אריתריטול ואלולוז (אינם מעלים סוכר בדם). ' +
     'ממתיקים סטיביה/טרוביה = 0 פחמימות. מלטיטול או כוהל סוכר אחר שמעלה סוכר חלקית — ספור כמחצית מערכו. ' +
     'בשר/דג/ביצים = 0 פחמימות; שמן וחמאה = 0 פחמימות וגם 0 חלבון; גבינות קשות מיושנות ≈ 0 פחמימות; ' +
@@ -44,17 +52,30 @@ function buildSys(products = [], withName = false) {
 }
 
 function parseJsonReply(message) {
+  // Only the visible text blocks carry the JSON; thinking blocks are ignored.
   const text = (message.content || [])
     .filter((b) => b.type === 'text')
     .map((b) => b.text)
-    .join('\n');
-  return JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim());
+    .join('\n')
+    .replace(/```json/g, '')
+    .replace(/```/g, '')
+    .trim();
+  try {
+    return JSON.parse(text);
+  } catch {
+    // A strong model may wrap the JSON in a sentence — grab the outermost object.
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    if (start !== -1 && end > start) return JSON.parse(text.slice(start, end + 1));
+    throw new Error('Model did not return parseable JSON');
+  }
 }
 
 export async function estimateMeal(desc, products = []) {
   const message = await getClient().messages.create({
     model: MODEL(),
-    max_tokens: 1000,
+    max_tokens: 5000,
+    thinking: { type: 'adaptive' },
     system: buildSys(products, false),
     messages: [{ role: 'user', content: desc }],
   });
@@ -76,7 +97,8 @@ export async function estimateImage(b64, mediaType, unit, products = []) {
 
   const message = await getClient().messages.create({
     model: MODEL(),
-    max_tokens: 1000,
+    max_tokens: 5000,
+    thinking: { type: 'adaptive' },
     system: sys,
     messages: [
       {
@@ -133,7 +155,8 @@ export async function interpretBarcode(off, unit, products = []) {
 
   const message = await getClient().messages.create({
     model: MODEL(),
-    max_tokens: 700,
+    max_tokens: 5000,
+    thinking: { type: 'adaptive' },
     system: sys,
     messages: [{ role: 'user', content: facts }],
   });
