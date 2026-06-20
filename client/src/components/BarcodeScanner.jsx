@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import { DecodeHintType, BarcodeFormat } from '@zxing/library';
 import './BarcodeScanner.scss';
@@ -80,7 +81,10 @@ export default function BarcodeScanner({ onResult, onClose }) {
 
   const manualValid = manual.replace(/\D/g, '').length >= 6;
 
-  return (
+  // Portal to <body> so the fixed overlay escapes the mobile carousel's CSS
+  // transform (a transformed ancestor makes position:fixed anchor to it, which
+  // would render the modal over the wrong tab).
+  return createPortal(
     <div className="bc-overlay" role="dialog" aria-modal="true" onClick={onClose}>
       <div className="bc-modal" onClick={(e) => e.stopPropagation()}>
         <div className="bc-head">
@@ -114,6 +118,7 @@ export default function BarcodeScanner({ onResult, onClose }) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

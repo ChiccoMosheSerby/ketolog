@@ -144,7 +144,7 @@ export default function Products({ products, onAdd, onDelete }) {
   const busy = imgBusy || barBusy;
 
   return (
-    <div className="panel">
+    <div className="panel" data-tour="products">
       {scanning && (
         <Suspense fallback={null}>
           <BarcodeScanner onResult={runBarcode} onClose={() => setScanning(false)} />

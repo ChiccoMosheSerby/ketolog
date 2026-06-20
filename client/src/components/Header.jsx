@@ -113,6 +113,7 @@ function TargetSetting() {
   return (
     <button
       className="btn ghost mini"
+      data-tour="target"
       onClick={() => {
         setVal(String(target));
         setEditing(true);
@@ -184,6 +185,7 @@ export default function Header({ stats, onCopyData }) {
           className="hamburger"
           aria-label="תפריט"
           aria-expanded={drawerOpen}
+          data-tour="menu"
           onClick={() => setDrawerOpen(true)}
         >
           <span></span>
