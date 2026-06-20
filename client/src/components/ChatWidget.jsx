@@ -190,6 +190,7 @@ export default function ChatWidget() {
     <>
       <button
         className={'chat-fab' + (open ? ' hidden' : '')}
+        data-tour="chat"
         onClick={() => setOpen(true)}
         aria-label="פתח/י את העוזר הקטוגני"
         title="העוזר הקטוגני"

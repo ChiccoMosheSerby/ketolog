@@ -114,7 +114,7 @@ export default function AddMeal({ products, onLogged, date, onDateChange }) {
   }
 
   return (
-    <div className="panel">
+    <div className="panel" data-tour="add-meal">
       <h2>הוספת ארוחה</h2>
       <div className="row">
         <div className="fld">

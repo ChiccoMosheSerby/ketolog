@@ -18,7 +18,7 @@ function Stats({ stats, mini }) {
         <span className="num">{stats.days}</span>
         <span className="lab">ימים מתועדים</span>
       </div>
-      <div className="stat stat-today">
+      <div className="stat stat-today" data-tour="carb-ring">
         <CarbRing
           consumed={stats.todayNum}
           target={stats.target}
@@ -123,12 +123,19 @@ function TargetSetting() {
   );
 }
 
-function AccountActions({ onCopyData }) {
-  const { user, logout } = useAuth();
+function AccountActions({ onCopyData, onAction }) {
+  const { user, logout, startOnboarding } = useAuth();
+  const replay = () => {
+    startOnboarding();
+    onAction?.(); // close the mobile drawer if open
+  };
   return (
     <div className="userbar">
       <span className="uemail">{user?.email}</span>
       <TargetSetting />
+      <button className="btn ghost mini" onClick={replay}>
+        סיור מודרך
+      </button>
       <button className="btn ghost mini" onClick={onCopyData}>
         העתק נתונים
       </button>
@@ -191,7 +198,7 @@ export default function Header({ stats, onCopyData }) {
         <button className="drawer-close" aria-label="סגור" onClick={() => setDrawerOpen(false)}>
           ✕
         </button>
-        <AccountActions onCopyData={onCopyData} />
+        <AccountActions onCopyData={onCopyData} onAction={() => setDrawerOpen(false)} />
         <TargetLegend />
       </aside>
     </header>

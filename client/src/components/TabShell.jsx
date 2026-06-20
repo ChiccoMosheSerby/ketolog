@@ -17,12 +17,13 @@ export default function TabShell({ tabs }) {
 
   return (
     <div className="tabshell">
-      <div className="tabbar" role="tablist">
+      <div className="tabbar" role="tablist" data-tour="tabs">
         {tabs.map((t, i) => (
           <button
             key={t.id}
             role="tab"
             aria-selected={i === active}
+            data-tour-tab={t.id}
             className={'tabbtn' + (i === active ? ' active' : '')}
             onClick={() => setActive(i)}
           >
@@ -54,12 +55,13 @@ function Carousel({ tabs, active, setActive }) {
 
   return (
     <div className="carousel">
-      <div className="dots" role="tablist">
+      <div className="dots" role="tablist" data-tour="tabs">
         {tabs.map((t, i) => (
           <button
             key={t.id}
             role="tab"
             aria-selected={i === active}
+            data-tour-tab={t.id}
             className={'dot' + (i === active ? ' active' : '')}
             onClick={() => goTo(i)}
           >

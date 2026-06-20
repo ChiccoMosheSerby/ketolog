@@ -5,7 +5,7 @@ import './MealShortcuts.scss';
 // template with one click. Templates are created from the day card ("שמור כתבנית").
 export default function MealShortcuts({ templates, onApply, onDelete, onRepeatYesterday, canRepeat }) {
   return (
-    <div className="panel shortcuts">
+    <div className="panel shortcuts" data-tour="shortcuts">
       <div className="sc-head">
         <h2>תבניות וקיצורים</h2>
         <button

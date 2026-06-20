@@ -190,7 +190,12 @@ export default function Products({ products, onAdd, onDelete }) {
 
       <div className="prod-add">
         <div className="row" style={{ alignItems: 'center', marginBottom: 10 }}>
-          <button className="btn ghost" disabled={busy} onClick={() => setScanning(true)}>
+          <button
+            className="btn ghost"
+            disabled={busy}
+            data-tour="barcode"
+            onClick={() => setScanning(true)}
+          >
             {barBusy ? 'מחפש…' : 'סריקת ברקוד'}
           </button>
           <button className="btn ghost" disabled={busy} onClick={pickImage}>
