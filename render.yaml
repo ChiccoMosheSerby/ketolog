@@ -1,6 +1,7 @@
 # Render Blueprint — deploy KetoLog as a single web service.
-# In Render: New + → Blueprint → connect this repo. Then set the two secret
-# env vars (MONGODB_URI, ANTHROPIC_API_KEY) in the dashboard.
+# In Render: New + → Blueprint → connect this repo. Then set the secret env
+# vars (MONGODB_URI, ANTHROPIC_API_KEY, and OPENAI_API_KEY for voice input)
+# in the dashboard.
 services:
   - type: web
     name: ketolog
@@ -16,6 +17,10 @@ services:
         sync: false # set in dashboard (MongoDB Atlas connection string)
       - key: ANTHROPIC_API_KEY
         sync: false # set in dashboard (sk-ant-...)
+      - key: OPENAI_API_KEY
+        sync: false # set in dashboard (sk-...) — voice-input transcription
+      - key: TRANSCRIBE_MODEL
+        value: gpt-4o-transcribe # speech-to-text model for the mic button
       - key: JWT_SECRET
         generateValue: true # Render generates a secure random value
       - key: CLAUDE_MODEL

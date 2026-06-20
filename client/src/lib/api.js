@@ -55,6 +55,7 @@ export const api = {
   estimateImage: (image, mediaType, unit) =>
     request('POST', '/ai/estimate-image', { image, mediaType, unit }),
   scanBarcode: (barcode, unit) => request('POST', '/ai/barcode', { barcode, unit }),
+  transcribe: (audio, mimeType) => request('POST', '/ai/transcribe', { audio, mimeType }),
 
   // assistant chat
   getChat: () => request('GET', '/ai/chat'),

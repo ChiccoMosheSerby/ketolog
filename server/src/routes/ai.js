@@ -6,9 +6,27 @@ import { requireAuth } from '../middleware/auth.js';
 import { estimateMeal, estimateImage, interpretBarcode, aiConfigured } from '../lib/anthropic.js';
 import { fetchProductByBarcode, rawKeto } from '../lib/openfoodfacts.js';
 import { runChatTurn } from '../lib/chatAgent.js';
+import { transcribeAudio, transcribeConfigured } from '../lib/transcribe.js';
 
 const router = Router();
 router.use(requireAuth);
+
+// POST /api/ai/transcribe { audio (base64), mimeType } -> { text }
+// Server-side speech-to-text for the voice-input mic (mobile-reliable).
+router.post('/transcribe', async (req, res) => {
+  if (!transcribeConfigured()) return res.status(503).json({ error: 'תמלול קולי לא הוגדר בשרת' });
+  const { audio, mimeType } = req.body || {};
+  if (!audio) return res.status(400).json({ error: 'חסר אודיו' });
+  try {
+    const buffer = Buffer.from(audio, 'base64');
+    if (!buffer.length) return res.status(400).json({ error: 'אודיו ריק' });
+    const text = await transcribeAudio(buffer, mimeType || 'audio/webm', 'he');
+    res.json({ text });
+  } catch (err) {
+    console.error('transcribe failed:', err.message);
+    res.status(502).json({ error: 'התמלול נכשל כרגע' });
+  }
+});
 
 // POST /api/ai/estimate-meal { desc } -> { net_carbs, fat, protein, breakdown }
 router.post('/estimate-meal', async (req, res) => {

@@ -1,174 +1,144 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
+import { api } from './api';
 
-// Thin wrapper around the browser's Web Speech API (Chrome/Edge/Safari).
-// Streams an interim + final transcript via onTranscript(textSinceStart).
-// No backend, no API key — runs entirely in the browser.
-const SR =
+// Voice input: record audio with MediaRecorder and transcribe it server-side
+// (OpenAI Whisper). We moved off the browser Web Speech API because it's
+// unreliable on mobile — many Android devices open the mic, hear speech, then
+// return no result for any language ('nomatch'). Recording + server transcription
+// works the same on every device, including iOS.
+const SUPPORTED =
   typeof window !== 'undefined' &&
-  (window.SpeechRecognition || window.webkitSpeechRecognition);
+  typeof window.MediaRecorder !== 'undefined' &&
+  !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
 
-// Mobile (esp. iOS Safari) doesn't support continuous recognition or restarting
-// outside a user gesture — so there we use single-utterance mode and don't
-// auto-restart. Desktop keeps continuous dictation with auto-restart.
-const IS_TOUCH =
-  typeof navigator !== 'undefined' && /Mobi|Android|iP(hone|ad|od)/i.test(navigator.userAgent);
+// Stop runaway recordings (e.g. user walks away) — also keeps the upload small.
+const MAX_MS = 60_000;
 
-// Human-readable Hebrew message for a SpeechRecognition error code.
+// Human-readable Hebrew message for a voice-input error code.
 export function speechErrorMessage(code) {
   switch (code) {
     case 'not-allowed':
-    case 'service-not-allowed':
       return 'אין הרשאה למיקרופון — אשר/י גישה בהגדרות הדפדפן';
-    case 'audio-capture':
-      return 'לא נמצא מיקרופון זמין';
-    case 'network':
-      return 'הזיהוי דורש חיבור אינטרנט — בדוק/י את החיבור ונסה/י שוב';
-    case 'language-not-supported':
-      return 'השפה אינה נתמכת לזיהוי קולי בדפדפן זה';
     case 'no-speech':
       return 'לא זוהה דיבור — קרב/י את המיקרופון ונסה/י שוב';
+    case 'network':
+      return 'התמלול נכשל — בדוק/י את החיבור ונסה/י שוב';
     default:
       return 'ההקלטה נכשלה — נסה/י שוב';
   }
 }
 
-export function useSpeech({ lang = 'he-IL', onTranscript, onError, debug = false } = {}) {
+// Choose a recording MIME type the browser actually supports.
+function pickMime() {
+  const types = [
+    'audio/webm;codecs=opus',
+    'audio/webm',
+    'audio/ogg;codecs=opus',
+    'audio/mp4',
+  ];
+  for (const t of types) {
+    if (window.MediaRecorder?.isTypeSupported?.(t)) return t;
+  }
+  return '';
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(String(reader.result).split(',')[1] || '');
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+export function useSpeech({ onTranscript, onError } = {}) {
   const [listening, setListening] = useState(false);
-  const [log, setLog] = useState([]);
+  const [transcribing, setTranscribing] = useState(false);
   const recRef = useRef(null);
-  const finalRef = useRef(''); // accumulated finalized chunks for this session
-  const wantRef = useRef(false); // user intends to keep listening
-  const gotRef = useRef(false); // did this session produce any transcript?
-  const errRef = useRef(false); // did this session already surface an error?
+  const streamRef = useRef(null);
+  const chunksRef = useRef([]);
+  const timerRef = useRef(null);
   const cbRef = useRef({ onTranscript, onError });
   cbRef.current = { onTranscript, onError };
 
-  // Append a line to the on-screen diagnostic log (only when ?debug is on).
-  function trace(line) {
-    if (!debug) return;
-    setLog((l) => [...l.slice(-11), line]);
+  function release() {
+    clearTimeout(timerRef.current);
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
   }
 
-  // Build a FRESH recognition instance per session. Android Chrome reuses a
-  // single instance poorly — after the first start/stop it often stops emitting
-  // results entirely — so we never reuse one across sessions.
-  function build() {
-    const rec = new SR();
-    rec.lang = lang;
-    rec.continuous = !IS_TOUCH;
-    rec.interimResults = true;
-    rec.maxAlternatives = 1;
-
-    // Lifecycle probes — tell us how far the engine gets on this device.
-    rec.onstart = () => trace('start');
-    rec.onaudiostart = () => trace('audiostart (mic open)');
-    rec.onsoundstart = () => trace('soundstart');
-    rec.onspeechstart = () => trace('speechstart (heard speech)');
-    rec.onspeechend = () => trace('speechend');
-    rec.onaudioend = () => trace('audioend');
-    rec.onnomatch = () => trace('nomatch');
-
-    rec.onresult = (e) => {
-      gotRef.current = true;
-      trace('result: ' + (e.results?.[e.resultIndex]?.[0]?.transcript || '').slice(0, 24));
-      let interim = '';
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const chunk = e.results[i][0].transcript;
-        if (e.results[i].isFinal) finalRef.current += chunk + ' ';
-        else interim += chunk;
-      }
-      cbRef.current.onTranscript?.((finalRef.current + interim).trim());
-    };
-
-    rec.onerror = (e) => {
-      // 'aborted' is normal when the user taps stop — ignore it. 'no-speech'
-      // is normal mid-pause on desktop (continuous restarts), but on mobile
-      // it's the whole session failing, so surface it there.
-      trace('error: ' + e.error);
-      if (e.error === 'aborted') return;
-      if (e.error === 'no-speech' && !IS_TOUCH) return;
-      console.warn('speech error:', e.error);
-      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
-        wantRef.current = false; // hard stop — don't fight the permission
-      }
-      errRef.current = true;
-      cbRef.current.onError?.(e.error);
-    };
-
-    // Chrome ends each recognition session after a short window.
-    rec.onend = () => {
-      // Desktop: Chrome ends each session after a window — restart to keep
-      // dictating. Mobile: a restart isn't a user gesture and tends to fail,
-      // so just stop after the utterance.
-      if (wantRef.current && !IS_TOUCH) {
-        try {
-          rec.start();
-          return;
-        } catch {
-          /* couldn't restart — fall through to stop */
-        }
-      }
-      trace('end' + (gotRef.current ? '' : ' (no result)'));
-      const wasRecording = wantRef.current;
-      wantRef.current = false;
-      setListening(false);
-      // Mobile: if we intended to record but captured nothing and no error
-      // already explained why, the button just went red-then-grey silently.
-      // Tell the user instead of leaving them guessing.
-      if (wasRecording && IS_TOUCH && !gotRef.current && !errRef.current) {
-        cbRef.current.onError?.('no-speech');
-      }
-    };
-
-    return rec;
-  }
-
-  // Clean up any live instance on unmount.
-  useEffect(
-    () => () => {
-      wantRef.current = false;
-      const rec = recRef.current;
-      if (rec) {
-        rec.onresult = rec.onerror = rec.onend = null;
-        try {
-          rec.abort();
-        } catch {
-          /* ignore */
-        }
-      }
-    },
-    [],
-  );
-
-  function start() {
-    if (!SR || wantRef.current) return;
-    finalRef.current = '';
-    gotRef.current = false;
-    errRef.current = false;
-    wantRef.current = true;
-    if (debug) setLog([`env: touch=${IS_TOUCH} lang=${lang} cont=${!IS_TOUCH}`]);
-    const rec = build();
+  async function start() {
+    if (!SUPPORTED || listening || transcribing) return;
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      cbRef.current.onError?.('not-allowed');
+      return;
+    }
+    streamRef.current = stream;
+    chunksRef.current = [];
+    const mime = pickMime();
+    let rec;
+    try {
+      rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+    } catch {
+      rec = new MediaRecorder(stream);
+    }
     recRef.current = rec;
+
+    rec.ondataavailable = (e) => {
+      if (e.data && e.data.size) chunksRef.current.push(e.data);
+    };
+
+    rec.onstop = async () => {
+      release();
+      const type = rec.mimeType || mime || 'audio/webm';
+      const blob = new Blob(chunksRef.current, { type });
+      chunksRef.current = [];
+      if (!blob.size) {
+        cbRef.current.onError?.('no-speech');
+        return;
+      }
+      setTranscribing(true);
+      try {
+        const audio = await blobToBase64(blob);
+        const { text } = await api.transcribe(audio, type);
+        const clean = (text || '').trim();
+        if (clean) cbRef.current.onTranscript?.(clean);
+        else cbRef.current.onError?.('no-speech');
+      } catch {
+        cbRef.current.onError?.('network');
+      } finally {
+        setTranscribing(false);
+      }
+    };
+
     try {
       rec.start();
-      setListening(true);
-    } catch (err) {
-      // 'already started' — reflect listening state anyway
-      trace('start threw: ' + (err?.message || err));
-      setListening(true);
+    } catch {
+      release();
+      cbRef.current.onError?.('default');
+      return;
     }
+    setListening(true);
+    timerRef.current = setTimeout(() => stop(), MAX_MS);
   }
 
   function stop() {
-    wantRef.current = false;
-    if (!recRef.current) return;
-    try {
-      recRef.current.stop();
-    } catch {
-      /* ignore */
-    }
     setListening(false);
+    clearTimeout(timerRef.current);
+    const rec = recRef.current;
+    if (rec && rec.state !== 'inactive') {
+      try {
+        rec.stop(); // fires onstop → transcribe
+      } catch {
+        release();
+      }
+    } else {
+      release();
+    }
   }
 
-  return { supported: Boolean(SR), listening, start, stop, log };
+  return { supported: SUPPORTED, listening, transcribing, start, stop };
 }
