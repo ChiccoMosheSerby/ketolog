@@ -27,3 +27,15 @@ services:
         value: claude-opus-4-8 # log calculator (meal/image/barcode estimation)
       - key: CHAT_MODEL
         value: claude-opus-4-8 # conversational keto assistant
+      # New-user approval: emails an approval link to ADMIN_EMAIL. APP_URL is
+      # intentionally omitted so the code defaults to the deployed Render URL.
+      - key: ADMIN_EMAIL
+        value: chiccomoshe@gmail.com
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "465"
+      - key: SMTP_USER
+        value: chiccomoshe@gmail.com
+      - key: SMTP_PASS
+        sync: false # set in dashboard (Gmail 16-char App Password)

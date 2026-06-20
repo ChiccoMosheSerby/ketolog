@@ -9,15 +9,21 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [err, setErr] = useState('');
+  const [info, setInfo] = useState('');
   const [busy, setBusy] = useState(false);
 
   async function submit(e) {
     e.preventDefault();
     setErr('');
+    setInfo('');
     setBusy(true);
     try {
       if (mode === 'login') await login(email, password);
-      else await register(email, password);
+      else {
+        const r = await register(email, password);
+        // Pending accounts aren't signed in — show the "awaiting approval" note.
+        if (r?.pending) setInfo(r.message || 'החשבון שלך ממתין לאישור מנהל.');
+      }
     } catch (e2) {
       setErr(e2.message);
     } finally {
@@ -53,6 +59,7 @@ export default function Login() {
             />
           </div>
           {err && <div className="auth-err">{err}</div>}
+          {info && <div className="auth-info">{info}</div>}
           <button className="btn" type="submit" disabled={busy} style={{ marginTop: 16, width: '100%' }}>
             {busy ? '…' : mode === 'login' ? 'התחבר' : 'הירשם'}
           </button>

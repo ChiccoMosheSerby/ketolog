@@ -52,10 +52,14 @@ export function AuthProvider({ children }) {
   }
   async function register(email, password) {
     const r = await api.register(email, password);
+    // Non-admin sign-ups come back without a token — the account is created but
+    // awaits admin approval. Surface the message instead of logging them in.
+    if (!r.token) return { pending: true, message: r.message };
     setToken(r.token);
     setUser(r.user);
     writeOnb(r.user?.email, 'pending');
     setNeedsOnboarding(true);
+    return { pending: false };
   }
   // Replay the tour on demand (e.g. from the menu). Doesn't touch the
   // saved 'done'/'pending' flag — dismissing it will settle that again.
