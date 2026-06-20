@@ -24,7 +24,12 @@ router.post('/transcribe', async (req, res) => {
     res.json({ text });
   } catch (err) {
     console.error('transcribe failed:', err.message);
-    res.status(502).json({ error: 'התמלול נכשל כרגע' });
+    const m = err.message || '';
+    let error = 'התמלול נכשל כרגע';
+    if (m.includes('401') || m.includes('invalid_api_key')) error = 'מפתח ה-OpenAI שגוי בשרת';
+    else if (m.includes('429') || m.includes('quota') || m.includes('billing'))
+      error = 'אין מכסה/קרדיט בחשבון ה-OpenAI — הוסף/י אמצעי תשלום';
+    res.status(502).json({ error });
   }
 });
 

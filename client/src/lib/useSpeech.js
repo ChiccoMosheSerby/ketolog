@@ -24,7 +24,10 @@ export function speechErrorMessage(code) {
     case 'network':
       return 'התמלול נכשל — בדוק/י את החיבור ונסה/י שוב';
     default:
-      return 'ההקלטה נכשלה — נסה/י שוב';
+      // A server-provided message (has spaces) — show it as-is.
+      return typeof code === 'string' && code.trim().includes(' ')
+        ? code
+        : 'ההקלטה נכשלה — נסה/י שוב';
   }
 }
 
@@ -107,8 +110,10 @@ export function useSpeech({ onTranscript, onError } = {}) {
         const clean = (text || '').trim();
         if (clean) cbRef.current.onTranscript?.(clean);
         else cbRef.current.onError?.('no-speech');
-      } catch {
-        cbRef.current.onError?.('network');
+      } catch (err) {
+        // Surface the server's actual reason (e.g. missing key, no quota)
+        // rather than a blanket "check connection".
+        cbRef.current.onError?.(err?.message || 'network');
       } finally {
         setTranscribing(false);
       }
