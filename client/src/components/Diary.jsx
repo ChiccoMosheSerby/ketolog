@@ -6,7 +6,6 @@ import { dayTotal, fmt, todayISO, dayHebrewName, prevISO, TARGET } from '../lib/
 import AddMeal from './AddMeal.jsx';
 import Products from './Products.jsx';
 import DayCard from './DayCard.jsx';
-import MealShortcuts from './MealShortcuts.jsx';
 import Header from './Header.jsx';
 import TabShell from './TabShell.jsx';
 import './Diary.scss';
@@ -33,7 +32,6 @@ export default function Diary() {
   const [jump, setJump] = useState(todayISO());
   const [activeDate, setActiveDate] = useState(todayISO()); // the day the "Today" tab + AddMeal point at
   const [loaded, setLoaded] = useState(false);
-  const [inject, setInject] = useState(null); // template → AddMeal description (bump .n to re-fire)
 
   const reload = useCallback(
     (firstLoad = false) =>
@@ -142,17 +140,6 @@ export default function Diary() {
     toast('הארוחה שוכפלה ליום הנבחר');
   }
 
-  // Clicking a template now loads it into the AddMeal form (description +
-  // known macros) so the user can review/edit before logging — instead of
-  // writing it straight to the day.
-  function applyTemplate(t) {
-    const c = cleanMeal(t);
-    const text = (t.desc || t.name || '').trim();
-    if (!text && c.carbs == null) return;
-    setInject((prev) => ({ ...c, text, n: (prev?.n || 0) + 1 }));
-    toast('התבנית נוספה לפירוט — אפשר לערוך ואז "חשב ורשום"');
-  }
-
   async function saveMealAsTemplate(meal) {
     const def = (meal.desc || meal.cat || 'תבנית').slice(0, 30);
     const name = window.prompt('שם לתבנית:', def);
@@ -228,19 +215,15 @@ export default function Diary() {
   // ---- tab contents ----
   const todayTab = (
     <>
-      <MealShortcuts
-        templates={templates}
-        onApply={applyTemplate}
-        onDelete={deleteTemplate}
-        onRepeatYesterday={repeatYesterday}
-        canRepeat={canRepeat}
-      />
       <AddMeal
-        products={products}
         onLogged={addMeal}
         date={activeDate}
         onDateChange={setActiveDate}
-        inject={inject}
+        products={products}
+        templates={templates}
+        onDeleteTemplate={deleteTemplate}
+        onRepeatYesterday={repeatYesterday}
+        canRepeat={canRepeat}
       />
       <DayCard
         iso={activeDate}

@@ -1,19 +1,23 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { useToast } from '../lib/toast.jsx';
 import { useSpeech, speechErrorMessage } from '../lib/useSpeech.js';
 import { fmt, macroPct, nowHM } from '../lib/helpers.js';
+import MealShortcuts from './MealShortcuts.jsx';
 import './AddMeal.scss';
 
-const CATS = [
-  'ארוחת בוקר', 'ארוחת צהריים', 'ארוחת ערב',
-  'נשנוש / ביניים', 'קפה / משקה', 'קינוח', 'פינוק לילה',
-];
-
-export default function AddMeal({ products, onLogged, date, onDateChange, inject }) {
+export default function AddMeal({
+  onLogged,
+  date,
+  onDateChange,
+  products,
+  templates,
+  onDeleteTemplate,
+  onRepeatYesterday,
+  canRepeat,
+}) {
   const toast = useToast();
   const [time, setTime] = useState(nowHM());
-  const [cat, setCat] = useState(CATS[0]);
   const [carb, setCarb] = useState('');
   const [desc, setDesc] = useState('');
   const [pendingMacro, setPendingMacro] = useState({ fat: null, protein: null });
@@ -45,31 +49,33 @@ export default function AddMeal({ products, onLogged, date, onDateChange, inject
     setPendingMacro({ fat: null, protein: null });
   }
 
-  // A template clicked in the shortcuts panel loads into the form (description
-  // + its known macros) for review, rather than logging immediately. Combining
-  // with existing text clears the carbs so the total gets recalculated.
-  useEffect(() => {
-    if (!inject) return;
-    const had = desc.trim();
-    if (had) {
-      setDesc(had + ', ' + inject.text);
-      setCarb('');
-      setPendingMacro({ fat: null, protein: null });
-    } else {
-      setDesc(inject.text);
-      setCarb(inject.carbs != null && inject.carbs !== '' ? String(inject.carbs) : '');
-      setPendingMacro({ fat: inject.fat ?? null, protein: inject.protein ?? null });
-    }
-    setNote(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inject?.n]);
-
-  function addProductToDesc(p) {
+  // A product chip (ingredient) is appended to the description; the carbs reset
+  // so the whole meal gets recalculated.
+  function applyProduct(p) {
     const chunk = p.unit + ' ' + p.key;
     setDesc((d) => (d.trim() ? d.trim() + ', ' + chunk : chunk));
     setCarb('');
     clearNote();
     toast(p.key + ' נוסף לפירוט');
+  }
+
+  // A template (full meal) fills the form with its saved macros when the
+  // description is empty (ready to log); if combined with text, it appends and
+  // forces a recalc.
+  function applyTemplate(t) {
+    const text = (t.desc || t.name || '').trim();
+    const had = desc.trim();
+    if (had) {
+      setDesc(had + ', ' + text);
+      setCarb('');
+      setPendingMacro({ fat: null, protein: null });
+    } else {
+      setDesc(text);
+      setCarb(t.carbs != null && t.carbs !== '' ? String(t.carbs) : '');
+      setPendingMacro({ fat: t.fat ?? null, protein: t.protein ?? null });
+    }
+    setNote(null);
+    toast('התבנית נוספה לפירוט');
   }
 
   async function doAdd(carbsValue, macro) {
@@ -79,7 +85,6 @@ export default function AddMeal({ products, onLogged, date, onDateChange, inject
     }
     const meal = {
       time,
-      cat,
       desc: desc.trim(),
       carbs: Number(carbsValue) || 0,
       fat: macro?.fat ?? null,
@@ -144,14 +149,6 @@ export default function AddMeal({ products, onLogged, date, onDateChange, inject
           <input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
         </div>
         <div className="fld">
-          <label>סוג</label>
-          <select value={cat} onChange={(e) => setCat(e.target.value)}>
-            {CATS.map((c) => (
-              <option key={c}>{c}</option>
-            ))}
-          </select>
-        </div>
-        <div className="fld">
           <label>פחמימות נטו (גרם)</label>
           <input
             type="number"
@@ -190,21 +187,15 @@ export default function AddMeal({ products, onLogged, date, onDateChange, inject
         </div>
       </div>
 
-      <div className="tags-hint">
-        קליק על מוצר מוסיף אותו לפירוט למעלה (אפשר כמה פעמים), ואז "חשב ורשום ארוחה":
-      </div>
-      <div className="tags">
-        {products.length === 0 ? (
-          <span className="tags-empty">— הוסף מוצרים בפאנל "המוצרים שלי" כדי שיופיעו כאן</span>
-        ) : (
-          products.map((p) => (
-            <button className="tag" key={p._id} onClick={() => addProductToDesc(p)}>
-              <span className="plus">+</span>
-              {p.unit} {p.key}
-            </button>
-          ))
-        )}
-      </div>
+      <MealShortcuts
+        products={products}
+        templates={templates}
+        onApplyProduct={applyProduct}
+        onApplyTemplate={applyTemplate}
+        onDeleteTemplate={onDeleteTemplate}
+        onRepeatYesterday={onRepeatYesterday}
+        canRepeat={canRepeat}
+      />
 
       {note && (
         <div className="calc-note">

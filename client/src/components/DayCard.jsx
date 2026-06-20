@@ -93,40 +93,33 @@ export default function DayCard({
                 <div className="meal" key={m._id}>
                   <div className="time">{m.time || '--:--'}</div>
                   <div className="body">
-                    <div className="cat">{m.cat}</div>
-                    <div className="desc">{m.desc}</div>
+                    <div className="desc">{m.desc || m.cat}</div>
                   </div>
                   <div className="carb">{fmt(Number(m.carbs) || 0)} ג'</div>
-                  {onSaveTemplate && (
-                    <button
-                      className="mact"
-                      title="שמור כתבנית"
-                      onClick={() => onSaveTemplate(m)}
-                    >
-                      ★
+                  <div className="meal-acts">
+                    {onSaveTemplate && (
+                      <button className="mact" title="שמור כתבנית" onClick={() => onSaveTemplate(m)}>
+                        ★
+                      </button>
+                    )}
+                    {onSaveProduct && (
+                      <button
+                        className="mact"
+                        title="הוסף למוצרים שלי"
+                        onClick={() => onSaveProduct(m)}
+                      >
+                        📦
+                      </button>
+                    )}
+                    {onCopyMeal && (
+                      <button className="mact" title="שכפל ליום הנבחר" onClick={() => onCopyMeal(m)}>
+                        ⧉
+                      </button>
+                    )}
+                    <button className="del" title="מחק" onClick={() => onDeleteMeal(iso, m._id)}>
+                      ✕
                     </button>
-                  )}
-                  {onSaveProduct && (
-                    <button
-                      className="mact"
-                      title="הוסף למוצרים שלי"
-                      onClick={() => onSaveProduct(m)}
-                    >
-                      📦
-                    </button>
-                  )}
-                  {onCopyMeal && (
-                    <button
-                      className="mact"
-                      title="שכפל ליום הנבחר"
-                      onClick={() => onCopyMeal(m)}
-                    >
-                      ⧉
-                    </button>
-                  )}
-                  <button className="del" title="מחק" onClick={() => onDeleteMeal(iso, m._id)}>
-                    ✕
-                  </button>
+                  </div>
                 </div>
               ))
             )}
