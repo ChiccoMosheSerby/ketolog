@@ -25,22 +25,33 @@ header.top {
 
 .stats {
   display: flex;
+  align-items: flex-start;
   gap: 10px;
   flex-wrap: wrap;
 }
 .stat {
   flex: 1;
   min-width: 96px;
-  background: var(--card);
-  border: 1px solid var(--line);
+  // background: var(--card);
+  // border: 1px solid var(--line);
   border-radius: var(--r-md);
-  box-shadow: var(--shadow-xs);
+  // box-shadow: var(--shadow-xs);
   padding: 13px 15px;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+}
+/* value zone: number OR ring share one height so all labels line up */
+.stat .num,
+.stat .ring {
+  height: 50px;
 }
 .stat .num {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-family: 'IBM Plex Mono', monospace;
   font-weight: 600;
   font-size: 26px;
@@ -79,15 +90,15 @@ header.top {
   flex-wrap: wrap;
 }
 .headrow .stats {
-  flex: 2;
+  flex: 1;
 }
 .target {
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: var(--r-md);
   box-shadow: var(--shadow-xs);
-  padding: 14px 16px;
-  margin: 20px 0;
+  padding: 7px 8px;
+  margin: 10px 0;
 }
 .target-mini {
   margin: 0;
@@ -96,17 +107,29 @@ header.top {
   display: flex;
   flex-direction: column;
   justify-content: center;
-}
-.target-mini .tt {
-  font-size: 12px;
-}
-.target-mini .target-bar {
-  height: 8px;
-}
-.target-mini .target-legend {
-  margin-top: 9px;
-  gap: 12px;
-  font-size: 10.5px;
+  padding: 9px 10px;
+
+  .tt {
+    font-size: 10px;
+    margin-bottom: 7px;
+  }
+
+  /* One continuous rounded track: segments butt together, only the outer
+     ends are rounded (via the container's overflow:hidden). */
+  .target-bar {
+    height: 12px;
+    gap: 0;
+    background: transparent;
+    > i {
+      border-radius: 0;
+    }
+  }
+
+  .target-legend {
+    margin-top: 10px;
+    gap: 16px;
+    font-size: 10px;
+  }
 }
 .target .tt {
   font-family: 'Heebo', sans-serif;

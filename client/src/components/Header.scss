@@ -1,25 +1,21 @@
 /* ---------- Header: desktop bar reuses .stats/.target/.userbar (Diary.scss).
    This file adds the mobile sticky bar + hamburger drawer. ---------- */
 
-/* unwrap the header box so .mbar's sticky containing block becomes the tall
-   .wrap (a sticky element only stays pinned while its parent is on screen). */
+/* unwrap the header box so the mobile bar sits in .wrap's flow alongside the
+   carousel (the sticky pinning now lives on the carousel dots, not here). */
 .top-mobile {
   display: contents;
 }
 
-/* sticky top bar: hamburger + shrunken day summaries, always visible */
+/* top bar: hamburger + shrunken day summaries. Scrolls away with the page so
+   the carousel dots can pin in its place. */
 .mbar {
-  position: sticky;
-  top: 0;
-  z-index: 30;
   display: flex;
   align-items: center;
   gap: 10px;
   /* bleed to the screen edges past .wrap's side padding */
   margin: -30px -18px 0;
   padding: 10px 14px;
-  background: color-mix(in srgb, var(--paper) 92%, transparent);
-  backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--line);
 }
 
@@ -32,12 +28,48 @@
     border-radius: var(--r-sm);
     gap: 2px;
   }
+  /* mini value zone matches the 40px mini ring so labels line up */
+  .stat .num,
+  .stat .ring {
+    height: 40px;
+  }
   .num {
     font-size: 17px;
   }
   .lab {
     font-size: 9px;
     line-height: 1.2;
+  }
+  .stat-today .ring-num {
+    font-size: 13px;
+  }
+}
+
+/* "today so far" circular gauge stat */
+.stat-today .ring-num {
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--olive);
+  font-variant-numeric: tabular-nums;
+}
+
+/* inline daily-target editor in the account bar */
+.target-set {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink-soft);
+
+  input {
+    width: 58px;
+    padding: 4px 8px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    background: var(--card);
+    font: inherit;
+    text-align: center;
   }
 }
 

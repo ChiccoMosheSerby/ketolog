@@ -1,16 +1,27 @@
 import { useState } from 'react';
 import {
-  dayTotal, dayMacroGrams, macroPct, hasMacros, fmt, heDate, zoneInfo,
+  dayTotal, dayMacroGrams, macroPct, hasMacros, fmt, heDate, zoneInfo, maxRange, TARGET,
 } from '../lib/helpers.js';
 import './DayCard.scss';
 
-export default function DayCard({ iso, day, open, onToggle, onDeleteMeal, onSetMetric }) {
+export default function DayCard({
+  iso,
+  day,
+  open,
+  onToggle,
+  onDeleteMeal,
+  onSetMetric,
+  onCopyMeal,
+  onSaveTemplate,
+  target = TARGET,
+}) {
   const mt = day.metrics || {};
   const [weight, setWeight] = useState(mt.weight || '');
   const [status, setStatus] = useState(mt.status || '');
 
   const total = dayTotal(day);
-  const zi = zoneInfo(total);
+  const zi = zoneInfo(total, target);
+  const maxr = maxRange(target);
   const meals = [...(day.meals || [])].sort((a, b) => (a.time || '').localeCompare(b.time || ''));
   const g = dayMacroGrams(day);
   const mp = macroPct(g);
@@ -32,12 +43,12 @@ export default function DayCard({ iso, day, open, onToggle, onDeleteMeal, onSetM
 
       <div className="meter">
         <span style={{ width: zi.pct + '%', background: zi.color }}></span>
-        <i className="meter-mark" title="גבול היעד: 20 גרם"></i>
+        <i className="meter-mark" title={'גבול היעד: ' + fmt(target) + ' גרם'}></i>
       </div>
       <div className="meter-scale">
         <span className="s0">0</span>
-        <span className="s20">יעד 20</span>
-        <span className="s50">50</span>
+        <span className="s20">יעד {fmt(target)}</span>
+        <span className="s50">{fmt(maxr)}</span>
       </div>
       <div className="meter-cap">{zi.cap}</div>
 
@@ -84,6 +95,24 @@ export default function DayCard({ iso, day, open, onToggle, onDeleteMeal, onSetM
                     <div className="desc">{m.desc}</div>
                   </div>
                   <div className="carb">{fmt(Number(m.carbs) || 0)} ג'</div>
+                  {onSaveTemplate && (
+                    <button
+                      className="mact"
+                      title="שמור כתבנית"
+                      onClick={() => onSaveTemplate(m)}
+                    >
+                      ★
+                    </button>
+                  )}
+                  {onCopyMeal && (
+                    <button
+                      className="mact"
+                      title="שכפל ליום הנבחר"
+                      onClick={() => onCopyMeal(m)}
+                    >
+                      ⧉
+                    </button>
+                  )}
                   <button className="del" title="מחק" onClick={() => onDeleteMeal(iso, m._id)}>
                     ✕
                   </button>

@@ -29,9 +29,13 @@ export function AuthProvider({ children }) {
     setToken(null);
     setUser(null);
   }
+  async function updateCarbTarget(dailyCarbTarget) {
+    const r = await api.updateProfile({ dailyCarbTarget });
+    setUser(r.user);
+  }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, updateCarbTarget }}>
       {children}
     </AuthContext.Provider>
   );

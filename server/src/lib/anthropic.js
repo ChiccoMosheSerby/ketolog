@@ -94,6 +94,52 @@ export async function estimateImage(b64, mediaType, unit, products = []) {
   return parseJsonReply(message);
 }
 
+// Turn raw Open Food Facts numbers into keto net carbs. OFF gives total carbs +
+// (sometimes) fiber/polyols per 100g; Claude applies the app's keto rules and
+// normalizes the messy entry into our product shape. When fiber is missing it
+// estimates it from the known product, so the scan still produces a usable value.
+export async function interpretBarcode(off, unit, products = []) {
+  const fmtNum = (v) => (v == null ? 'לא ידוע' : String(v));
+  const facts = [
+    off.name && `שם: ${off.name}`,
+    off.brands && `מותג: ${off.brands}`,
+    off.quantity && `גודל אריזה: ${off.quantity}`,
+    off.servingSize && `גודל מנה: ${off.servingSize}`,
+    `ערכים ל-100 גרם — פחמימות: ${fmtNum(off.per100.carbs)}, סיבים: ${fmtNum(
+      off.per100.fiber
+    )}, סוכרים: ${fmtNum(off.per100.sugars)}, כוהלי סוכר (פוליאולים): ${fmtNum(
+      off.per100.polyols
+    )}, שומן: ${fmtNum(off.per100.fat)}, חלבון: ${fmtNum(off.per100.protein)}`,
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const fiberNote =
+    off.per100.fiber == null
+      ? ' שים לב: ערך הסיבים חסר במסד הנתונים — הערך אותו לפי סוג המוצר הידוע, וציין בפירוט שהסיבים הוערכו.'
+      : '';
+  const unitRule = unit ? ` היחידה המבוקשת היא "${unit}".` : '';
+
+  const sys =
+    buildSys(products, false).replace(/ השב אך ורק.*$/, '') +
+    ' להלן נתוני מוצר ארוז שנסרק לפי ברקוד, מתוך מסד הנתונים Open Food Facts.' +
+    ' חשב פחמימות נטו לפי הכללים הקטוגניים שלמעלה (החסר סיבים; אריתריטול/אלולוז = 0; מלטיטול = חצי).' +
+    fiberNote +
+    ' החזר ערכים ל-100 גרם אלא אם המשתמש ביקש יחידה אחרת.' +
+    unitRule +
+    ' השב אך ורק ב-JSON תקין: {"name": "<כינוי קצר>", "label": "<תיאור מלא כולל מותג>", ' +
+    '"unit": "<היחידה, ברירת מחדל \\"100 גרם\\">", "net_carbs": <מספר>, "fat": <מספר>, ' +
+    '"protein": <מספר>, "breakdown": "<פירוט קצר בעברית>"} ללא טקסט נוסף וללא markdown.';
+
+  const message = await getClient().messages.create({
+    model: MODEL(),
+    max_tokens: 700,
+    system: sys,
+    messages: [{ role: 'user', content: facts }],
+  });
+  return parseJsonReply(message);
+}
+
 export function aiConfigured() {
   return Boolean(process.env.ANTHROPIC_API_KEY);
 }

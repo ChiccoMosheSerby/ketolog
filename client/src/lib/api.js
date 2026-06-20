@@ -31,6 +31,7 @@ export const api = {
   register: (email, password) => request('POST', '/auth/register', { email, password }),
   login: (email, password) => request('POST', '/auth/login', { email, password }),
   me: () => request('GET', '/auth/me'),
+  updateProfile: (fields) => request('PATCH', '/auth/me', fields),
 
   // days + meals
   getDays: () => request('GET', '/days'),
@@ -44,10 +45,16 @@ export const api = {
   addProduct: (p) => request('POST', '/products', p),
   deleteProduct: (id) => request('DELETE', `/products/${id}`),
 
+  // meal templates
+  getTemplates: () => request('GET', '/templates'),
+  addTemplate: (t) => request('POST', '/templates', t),
+  deleteTemplate: (id) => request('DELETE', `/templates/${id}`),
+
   // ai
   estimateMeal: (desc) => request('POST', '/ai/estimate-meal', { desc }),
   estimateImage: (image, mediaType, unit) =>
     request('POST', '/ai/estimate-image', { image, mediaType, unit }),
+  scanBarcode: (barcode, unit) => request('POST', '/ai/barcode', { barcode, unit }),
 
   // assistant chat
   getChat: () => request('GET', '/ai/chat'),

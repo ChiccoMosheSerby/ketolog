@@ -1,18 +1,33 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import { useToast } from '../lib/toast.jsx';
-import { dayTotal, fmt, todayISO, dayHebrewName } from '../lib/helpers.js';
+import { useAuth } from '../lib/auth.jsx';
+import { dayTotal, fmt, todayISO, dayHebrewName, prevISO, nowHM, TARGET } from '../lib/helpers.js';
 import AddMeal from './AddMeal.jsx';
 import Products from './Products.jsx';
 import DayCard from './DayCard.jsx';
+import MealShortcuts from './MealShortcuts.jsx';
 import Header from './Header.jsx';
 import TabShell from './TabShell.jsx';
 import './Diary.scss';
 
+// strip subdoc id / extras → a clean meal payload for the API
+const cleanMeal = (m) => ({
+  time: m.time || '',
+  cat: m.cat || '',
+  desc: m.desc || '',
+  carbs: Number(m.carbs) || 0,
+  fat: m.fat ?? null,
+  protein: m.protein ?? null,
+});
+
 export default function Diary() {
   const toast = useToast();
+  const { user } = useAuth();
+  const target = user?.dailyCarbTarget ?? TARGET;
   const [days, setDays] = useState([]); // array of day docs, newest first
   const [products, setProducts] = useState([]);
+  const [templates, setTemplates] = useState([]);
   const [expanded, setExpanded] = useState(new Set());
   const [viewDate, setViewDate] = useState(''); // '' = show all (history filter)
   const [jump, setJump] = useState(todayISO());
@@ -21,10 +36,11 @@ export default function Diary() {
 
   const reload = useCallback(
     (firstLoad = false) =>
-      Promise.all([api.getDays(), api.getProducts()])
-        .then(([d, p]) => {
+      Promise.all([api.getDays(), api.getProducts(), api.getTemplates()])
+        .then(([d, p, t]) => {
           setDays(d);
           setProducts(p);
+          setTemplates(t);
           if (firstLoad && d.length) setExpanded(new Set([d[0].date])); // newest open by default
         })
         .catch((e) => toast(e.message)),
@@ -89,6 +105,55 @@ export default function Diary() {
     toast('המוצר נמחק');
   }
 
+  // Add one or more meals to a day (used by copy-meal, repeat-yesterday, templates).
+  // Loops the meals API; label is only honored on insert, so passing it is safe.
+  async function applyMeals(date, meals) {
+    if (!meals?.length) return;
+    const existing = days.find((d) => d.date === date);
+    const label = existing ? undefined : nextLabel(date);
+    for (const m of meals) {
+      await api.addMeal(date, { ...cleanMeal(m), ...(label ? { label } : {}) });
+    }
+    await reload();
+    setExpanded((s) => new Set(s).add(date));
+  }
+
+  async function repeatYesterday() {
+    const yISO = prevISO(activeDate);
+    const yday = days.find((d) => d.date === yISO);
+    if (!yday || !(yday.meals || []).length) {
+      toast('אין ארוחות מאתמול לשכפול');
+      return;
+    }
+    await applyMeals(activeDate, yday.meals);
+    toast('הארוחות מאתמול שוכפלו');
+  }
+
+  async function copyMealToActive(meal) {
+    await applyMeals(activeDate, [meal]);
+    toast('הארוחה שוכפלה ליום הנבחר');
+  }
+
+  async function applyTemplate(t) {
+    await applyMeals(activeDate, [{ ...cleanMeal(t), time: t.time || nowHM() }]);
+    toast('התבנית נוספה');
+  }
+
+  async function saveMealAsTemplate(meal) {
+    const def = (meal.desc || meal.cat || 'תבנית').slice(0, 30);
+    const name = window.prompt('שם לתבנית:', def);
+    if (name == null || !name.trim()) return;
+    const created = await api.addTemplate({ name: name.trim(), ...cleanMeal(meal) });
+    setTemplates((prev) => [...prev, created]);
+    toast('התבנית נשמרה');
+  }
+
+  async function deleteTemplate(id) {
+    await api.deleteTemplate(id);
+    setTemplates((prev) => prev.filter((t) => t._id !== id));
+    toast('התבנית נמחקה');
+  }
+
   function toggle(date) {
     setExpanded((prev) => {
       const s = new Set(prev);
@@ -116,6 +181,8 @@ export default function Diary() {
     avg: totals.length ? fmt(avg) : '–',
     days: days.length || '–',
     today: today ? fmt(dayTotal(today)) : '0',
+    todayNum: today ? dayTotal(today) : 0,
+    target,
   };
 
   const activeDay = days.find((d) => d.date === activeDate) || {
@@ -125,9 +192,18 @@ export default function Diary() {
   };
   const shown = viewDate ? days.filter((d) => d.date === viewDate) : days;
 
+  const canRepeat = (days.find((d) => d.date === prevISO(activeDate))?.meals || []).length > 0;
+
   // ---- tab contents ----
   const todayTab = (
     <>
+      <MealShortcuts
+        templates={templates}
+        onApply={applyTemplate}
+        onDelete={deleteTemplate}
+        onRepeatYesterday={repeatYesterday}
+        canRepeat={canRepeat}
+      />
       <AddMeal products={products} onLogged={addMeal} date={activeDate} onDateChange={setActiveDate} />
       <DayCard
         iso={activeDate}
@@ -136,6 +212,9 @@ export default function Diary() {
         onToggle={() => toggle(activeDate)}
         onDeleteMeal={deleteMeal}
         onSetMetric={setMetric}
+        onCopyMeal={copyMealToActive}
+        onSaveTemplate={saveMealAsTemplate}
+        target={target}
       />
     </>
   );
@@ -167,6 +246,9 @@ export default function Diary() {
               onToggle={() => toggle(d.date)}
               onDeleteMeal={deleteMeal}
               onSetMetric={setMetric}
+              onCopyMeal={copyMealToActive}
+              onSaveTemplate={saveMealAsTemplate}
+              target={target}
             />
           ))
         )}
@@ -191,7 +273,7 @@ export default function Diary() {
       <div className="foot">
         הנתונים נשמרים בענן (MongoDB) ומסונכרנים לחשבון שלך בכל מכשיר.
         <br />
-        הערכים הם הערכות (±2–3 גרם למנות בית). היעד הקטוגני הוא מתחת ל-20 גרם פחמימות נטו ביום.
+        הערכים הם הערכות (±2–3 גרם למנות בית). היעד היומי שלך הוא מתחת ל-{fmt(target)} גרם פחמימות נטו ביום.
       </div>
     </div>
   );

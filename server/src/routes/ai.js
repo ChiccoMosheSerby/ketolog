@@ -3,7 +3,8 @@ import Product from '../models/Product.js';
 import Day from '../models/Day.js';
 import Conversation from '../models/Conversation.js';
 import { requireAuth } from '../middleware/auth.js';
-import { estimateMeal, estimateImage, aiConfigured } from '../lib/anthropic.js';
+import { estimateMeal, estimateImage, interpretBarcode, aiConfigured } from '../lib/anthropic.js';
+import { fetchProductByBarcode, rawKeto } from '../lib/openfoodfacts.js';
 import { runChatTurn } from '../lib/chatAgent.js';
 
 const router = Router();
@@ -36,6 +37,66 @@ router.post('/estimate-image', async (req, res) => {
   } catch (err) {
     console.error('estimate-image failed:', err.message);
     res.status(502).json({ error: 'זיהוי התמונה נכשל כרגע' });
+  }
+});
+
+// POST /api/ai/barcode { barcode, unit? } -> product fields for the confirm/edit form.
+// Open Food Facts does the barcode->product lookup; Claude turns the raw numbers
+// into keto net carbs. Returns 404 { found: false } when the barcode isn't in the
+// database — a number alone can't be mapped to a product reliably, so the UI then
+// falls back to the photo flow or manual entry.
+router.post('/barcode', async (req, res) => {
+  const barcode = String(req.body.barcode || '').replace(/\D/g, '');
+  const unit = (req.body.unit || '').trim();
+  if (!barcode) return res.status(400).json({ error: 'ברקוד לא תקין' });
+
+  let off = null;
+  try {
+    off = await fetchProductByBarcode(barcode);
+  } catch (err) {
+    console.error('off lookup failed:', err.message);
+    return res.status(502).json({ error: 'חיפוש המוצר במסד הנתונים נכשל כרגע' });
+  }
+  if (!off) {
+    return res
+      .status(404)
+      .json({ found: false, barcode, error: 'המוצר לא נמצא במסד הנתונים' });
+  }
+
+  const hadFiber = off.per100.fiber != null;
+  const baseLabel = [off.name, off.brands].filter(Boolean).join(' · ');
+
+  // No AI key: return the coarse raw computation so the scan still works.
+  if (!aiConfigured()) {
+    const raw = rawKeto(off);
+    return res.json({
+      found: true,
+      barcode,
+      source: 'off',
+      name: off.name || 'מוצר',
+      label: baseLabel || off.name || '',
+      unit: unit || '100 גרם',
+      net_carbs: raw.net_carbs,
+      fat: raw.fat,
+      protein: raw.protein,
+      breakdown: hadFiber
+        ? 'חישוב גולמי ממסד הנתונים (פחמ\' פחות סיבים).'
+        : 'חישוב גולמי — ערך הסיבים חסר, ייתכן שהפחמימות גבוהות מהאמת.',
+    });
+  }
+
+  try {
+    const products = await Product.find({ user: req.userId }).lean();
+    const result = await interpretBarcode(off, unit, products);
+    res.json({
+      ...result,
+      found: true,
+      barcode,
+      source: hadFiber ? 'off' : 'off+ai',
+    });
+  } catch (err) {
+    console.error('barcode interpret failed:', err.message);
+    res.status(502).json({ error: 'עיבוד נתוני הברקוד נכשל כרגע' });
   }
 });
 

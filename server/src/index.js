@@ -5,6 +5,7 @@ import { connectDB } from './db.js';
 import authRoutes from './routes/auth.js';
 import dayRoutes from './routes/days.js';
 import productRoutes from './routes/products.js';
+import templateRoutes from './routes/templates.js';
 import aiRoutes from './routes/ai.js';
 import { aiConfigured } from './lib/anthropic.js';
 
@@ -20,6 +21,7 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/days', dayRoutes);
 app.use('/api/products', productRoutes);
+app.use('/api/templates', templateRoutes);
 app.use('/api/ai', aiRoutes);
 
 // fallback error handler

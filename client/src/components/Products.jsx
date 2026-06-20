@@ -1,8 +1,11 @@
-import { useRef, useState } from 'react';
+import { lazy, Suspense, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { useToast } from '../lib/toast.jsx';
 import { fmt } from '../lib/helpers.js';
 import './Products.scss';
+
+// Scanner pulls in ZXing (large) — load it only when the user opens the camera.
+const BarcodeScanner = lazy(() => import('./BarcodeScanner.jsx'));
 
 export default function Products({ products, onAdd, onDelete }) {
   const toast = useToast();
@@ -12,6 +15,8 @@ export default function Products({ products, onAdd, onDelete }) {
   });
   const [note, setNote] = useState(null);
   const [imgBusy, setImgBusy] = useState(false);
+  const [barBusy, setBarBusy] = useState(false);
+  const [scanning, setScanning] = useState(false);
   const fileRef = useRef(null);
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -91,8 +96,60 @@ export default function Products({ products, onAdd, onDelete }) {
     }
   }
 
+  // Barcode -> Open Food Facts lookup -> keto net carbs. Returns per-unit values
+  // already (Claude divided), so we fill the form fields directly — no per-pack
+  // division like the image flow needs.
+  async function runBarcode(code) {
+    setScanning(false);
+    if (!code) return;
+    const typedUnit = form.unit.trim();
+    setBarBusy(true);
+    setNote({ loading: true, loadingText: `מחפש ברקוד ${code} במסד הנתונים…` });
+    try {
+      const r = await api.scanBarcode(code, typedUnit);
+      const c = Number(r.net_carbs),
+        f = Number(r.fat),
+        p = Number(r.protein);
+      const next = {
+        ...form,
+        key: r.name || form.key,
+        label: r.label || r.name || form.label,
+        unit: typedUnit || r.unit || '100 גרם',
+        carb: isNaN(c) ? '' : fmt(c),
+        fat: isNaN(f) ? '' : fmt(f),
+        prot: isNaN(p) ? '' : fmt(p),
+      };
+      setForm(next);
+      const src =
+        r.source === 'off'
+          ? 'ממסד הנתונים'
+          : r.source === 'off+ai'
+          ? 'מסד נתונים + השלמת AI (סיבים חסרו)'
+          : 'הערכה';
+      setNote({
+        name: r.name || 'מוצר',
+        line: `ל${next.unit} (${src}): ${next.carb || '?'} פחמ' · ${next.fat || '?'} שומן · ${
+          next.prot || '?'
+        } חלבון`,
+        breakdown: r.breakdown,
+      });
+    } catch (err) {
+      const msg = err?.message && err.message !== 'שגיאה' ? err.message : 'הסריקה נכשלה';
+      setNote({ error: `${msg} — אפשר לצלם את האריזה או להזין ידנית.` });
+    } finally {
+      setBarBusy(false);
+    }
+  }
+
+  const busy = imgBusy || barBusy;
+
   return (
     <div className="panel">
+      {scanning && (
+        <Suspense fallback={null}>
+          <BarcodeScanner onResult={runBarcode} onClose={() => setScanning(false)} />
+        </Suspense>
+      )}
       <h2>המוצרים שלי</h2>
       <div style={{ fontSize: 12, color: 'var(--ink-soft)', margin: '-8px 0 12px' }}>
         מוצרים קבועים שלך. הם מופיעים כתגיות מתחת לתיבת הפירוט — קליק מוסיף אותם לתיאור הארוחה, ואז
@@ -133,7 +190,10 @@ export default function Products({ products, onAdd, onDelete }) {
 
       <div className="prod-add">
         <div className="row" style={{ alignItems: 'center', marginBottom: 10 }}>
-          <button className="btn ghost" disabled={imgBusy} onClick={pickImage}>
+          <button className="btn ghost" disabled={busy} onClick={() => setScanning(true)}>
+            {barBusy ? 'מחפש…' : 'סריקת ברקוד'}
+          </button>
+          <button className="btn ghost" disabled={busy} onClick={pickImage}>
             {imgBusy ? 'מזהה…' : 'זיהוי מוצר מתמונה'}
           </button>
           <input
@@ -144,13 +204,15 @@ export default function Products({ products, onAdd, onDelete }) {
             onChange={onFile}
           />
           <span style={{ fontSize: 11.5, color: 'var(--ink-soft)' }}>
-            כתוב יחידה (למשל "שורה") + כמה יחידות יש באריזה — והחישוב יהיה ליחידה אחת
+            ברקוד מושך ערכים ממסד נתונים (מדויק לפי מנה). לתמונה — כתוב יחידה + כמה יש באריזה.
           </span>
         </div>
 
         {note && (
           <div className="calc-note">
-            {note.loading && (note.unit ? `מזהה ומחשב ל"${note.unit}"…` : 'מזהה את המוצר בתמונה…')}
+            {note.loading &&
+              (note.loadingText ||
+                (note.unit ? `מזהה ומחשב ל"${note.unit}"…` : 'מזהה את המוצר בתמונה…'))}
             {note.error}
             {note.name && (
               <>

@@ -11,21 +11,28 @@
 import { getClient, MODEL } from './anthropic.js';
 import Day from '../models/Day.js';
 import Product from '../models/Product.js';
+import User from '../models/User.js';
 
 const MAX_TURNS = 6; // safety cap on the tool-use loop per user message
+const DEFAULT_TARGET = 20;
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
-const SYSTEM = `אתה "קֶטוֹ", העוזר/ת האישי/ת של המשתמש/ת באפליקציית KetoLog — יומן תזונה קטוגנית בעברית.
+async function getCarbTarget(userId) {
+  const u = await User.findById(userId).select('dailyCarbTarget').lean();
+  return u?.dailyCarbTarget ?? DEFAULT_TARGET;
+}
+
+const buildSystem = (target) => `אתה "קֶטוֹ", העוזר/ת האישי/ת של המשתמש/ת באפליקציית KetoLog — יומן תזונה קטוגנית בעברית.
 אתה מומחה/ית לדיאטה קטוגנית: אתה יודע אילו מוצרים מתאימים לקיטו ואילו לא, מציע חלופות טובות יותר, מסביר ערכים תזונתיים, וקורא תמונות של מוצרים ותוויות.
 
 כללי חישוב פחמימות נטו (זהים ליומן):
 - פחמימות נטו = סך הפחמימות, פחות סיבים תזונתיים, פחות אריתריטול ואלולוז.
 - סטיביה/טרוביה = 0 פחמימות. מלטיטול/כוהל סוכר אחר — ספור כמחצית מערכו.
 - בשר/דג/ביצים = 0 פחמימות; שמן וחמאה = 0 פחמ' וגם 0 חלבון; גבינות קשות מיושנות ≈ 0 פחמ'.
-- היעד היומי הקטוגני: מתחת ל-20 גרם פחמימות נטו.
+- היעד היומי האישי של המשתמש/ת: מתחת ל-${target} גרם פחמימות נטו ביום. התייחס תמיד ליעד הזה (לא לערך כללי) כשאתה מחשב כמה נשאר או אם חרגו.
 
 עבודה עם היומן:
 - כדי לראות מה תועד — השתמש בכלים get_today_log, get_log, get_recent_days, list_products. תמיד בדוק בפועל לפני שאתה עונה על "מה אכלתי" או "כמה נשאר לי היום".
@@ -104,11 +111,21 @@ const TOOLS = [
 const sumCarbs = (meals = []) => meals.reduce((s, m) => s + (Number(m.carbs) || 0), 0);
 
 // Run a READ tool against the DB; return a plain object fed back to the model.
-async function runReadTool(name, input, userId) {
+async function runReadTool(name, input, userId, target) {
   if (name === 'get_today_log' || name === 'get_log') {
     const date = name === 'get_today_log' ? todayISO() : input.date;
     const day = await Day.findOne({ user: userId, date }).lean();
-    if (!day) return { date, exists: false, meals: [], net_carbs_total: 0 };
+    if (!day) {
+      return {
+        date,
+        exists: false,
+        meals: [],
+        net_carbs_total: 0,
+        daily_target: target,
+        net_carbs_remaining: target,
+      };
+    }
+    const total = sumCarbs(day.meals);
     return {
       date,
       exists: true,
@@ -121,7 +138,9 @@ async function runReadTool(name, input, userId) {
         fat: m.fat,
         protein: m.protein,
       })),
-      net_carbs_total: sumCarbs(day.meals),
+      net_carbs_total: total,
+      daily_target: target,
+      net_carbs_remaining: target - total,
       metrics: day.metrics,
     };
   }
@@ -198,6 +217,8 @@ function buildAction(toolUseId, name, input) {
  */
 export async function runChatTurn(messages, userId) {
   const client = getClient();
+  const target = await getCarbTarget(userId);
+  const system = buildSystem(target);
   const actions = [];
   let finalText = '';
 
@@ -205,7 +226,7 @@ export async function runChatTurn(messages, userId) {
     const resp = await client.messages.create({
       model: MODEL(),
       max_tokens: 1500,
-      system: SYSTEM,
+      system,
       tools: TOOLS,
       messages,
     });
@@ -235,7 +256,7 @@ export async function runChatTurn(messages, userId) {
       } else {
         let out;
         try {
-          out = await runReadTool(tu.name, tu.input || {}, userId);
+          out = await runReadTool(tu.name, tu.input || {}, userId, target);
         } catch (err) {
           out = { error: err.message };
         }

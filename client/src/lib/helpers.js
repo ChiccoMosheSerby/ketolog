@@ -52,6 +52,19 @@ export function todayISO() {
   );
 }
 
+// ISO date of the day before `iso` (YYYY-MM-DD).
+export function prevISO(iso) {
+  const [y, m, d] = iso.split('-').map(Number);
+  const dt = new Date(y, m - 1, d - 1);
+  return (
+    dt.getFullYear() +
+    '-' +
+    String(dt.getMonth() + 1).padStart(2, '0') +
+    '-' +
+    String(dt.getDate()).padStart(2, '0')
+  );
+}
+
 export function nowHM() {
   const now = new Date();
   return String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
@@ -86,24 +99,33 @@ const COL_RED1 = [192, 73, 47],
   COL_RED2 = [126, 42, 32],
   COL_REDX = [96, 28, 20];
 
-export function zoneInfo(total) {
-  const pct = Math.min((total / MAXR) * 100, 100);
+// Upper bound of the meter for a given target. At target=20 this is 50, keeping
+// the original zones (green ≤20, amber ≤45, red ≤50) exactly. The target line
+// always sits at 1/2.5 = 40% of the bar, so the scale scales cleanly.
+export function maxRange(target = TARGET) {
+  return target * 2.5;
+}
+
+export function zoneInfo(total, target = TARGET) {
+  const maxr = maxRange(target);
+  const redStart = maxr * 0.9; // 45 when target=20
+  const pct = Math.min((total / maxr) * 100, 100);
   let color, cap;
-  if (total <= TARGET - 4) {
+  if (total <= target - 4) {
     color = 'var(--olive)';
-    cap = 'ביעד — נשארו ' + fmt(TARGET - total) + ' גרם עד הגבול (20)';
-  } else if (total <= TARGET) {
+    cap = 'ביעד — נשארו ' + fmt(target - total) + ' גרם עד הגבול (' + fmt(target) + ')';
+  } else if (total <= target) {
     color = 'var(--olive)';
-    cap = 'ביעד, אך מתקרב לגבול — נשארו ' + fmt(TARGET - total) + ' גרם עד 20';
-  } else if (total <= 45) {
+    cap = 'ביעד, אך מתקרב לגבול — נשארו ' + fmt(target - total) + ' גרם עד ' + fmt(target);
+  } else if (total <= redStart) {
     color = 'var(--amber)';
-    cap = 'מעל היעד (20) — אזור זהירות, עדיין בטווח קיטו';
-  } else if (total <= MAXR) {
-    color = mix(COL_RED1, COL_RED2, (total - 45) / 5);
-    cap = 'אזור אדום — נשארו ' + fmt(MAXR - total) + ' גרם עד חריגה (50)';
+    cap = 'מעל היעד (' + fmt(target) + ') — אזור זהירות, עדיין בטווח קיטו';
+  } else if (total <= maxr) {
+    color = mix(COL_RED1, COL_RED2, (total - redStart) / (maxr - redStart));
+    cap = 'אזור אדום — נשארו ' + fmt(maxr - total) + ' גרם עד חריגה (' + fmt(maxr) + ')';
   } else {
     color = hex(COL_REDX);
-    cap = 'חריגה — מעל 50 גרם פחמימות נטו';
+    cap = 'חריגה — מעל ' + fmt(maxr) + ' גרם פחמימות נטו';
   }
   return { pct, color, cap };
 }

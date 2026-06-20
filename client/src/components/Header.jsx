@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../lib/auth.jsx';
+import { useToast } from '../lib/toast.jsx';
 import { useMediaQuery, MOBILE_QUERY } from '../lib/useMediaQuery.js';
+import CarbRing from './CarbRing.jsx';
 import './Header.scss';
 
 // The 3 live day summaries. `mini` shrinks them for the mobile top bar.
+// "Today so far" is a circular gauge of today's net carbs against the budget.
 function Stats({ stats, mini }) {
   return (
     <div className={'stats' + (mini ? ' stats-mini' : '')}>
@@ -15,9 +18,16 @@ function Stats({ stats, mini }) {
         <span className="num">{stats.days}</span>
         <span className="lab">ימים מתועדים</span>
       </div>
-      <div className="stat">
-        <span className="num">{stats.today}</span>
-        <span className="lab">היום עד כה</span>
+      <div className="stat stat-today">
+        <CarbRing
+          consumed={stats.todayNum}
+          target={stats.target}
+          size={mini ? 40 : 50}
+          stroke={mini ? 5 : 6}
+        >
+          <span className="ring-num">{stats.today}</span>
+        </CarbRing>
+        <span className="lab">היום מתוך {stats.target}</span>
       </div>
     </div>
   );
@@ -48,11 +58,77 @@ function TargetLegend() {
   );
 }
 
+// Inline editor for the user's personal daily net-carb target.
+function TargetSetting() {
+  const { user, updateCarbTarget } = useAuth();
+  const toast = useToast();
+  const target = user?.dailyCarbTarget ?? 20;
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(String(target));
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    const t = Number(val);
+    if (!Number.isFinite(t) || t < 5 || t > 200) {
+      toast('יעד יומי לא תקין (5–200 גרם)');
+      return;
+    }
+    if (t !== target) {
+      setSaving(true);
+      try {
+        await updateCarbTarget(t);
+        toast('היעד היומי עודכן');
+      } catch (e) {
+        toast(e.message || 'העדכון נכשל');
+      } finally {
+        setSaving(false);
+      }
+    }
+    setEditing(false);
+  }
+
+  if (editing) {
+    return (
+      <span className="target-set">
+        <span>יעד יומי:</span>
+        <input
+          type="number"
+          min="5"
+          max="200"
+          step="1"
+          value={val}
+          autoFocus
+          onChange={(e) => setVal(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') save();
+            if (e.key === 'Escape') setEditing(false);
+          }}
+        />
+        <button className="btn ghost mini" disabled={saving} onClick={save}>
+          {saving ? '…' : 'שמור'}
+        </button>
+      </span>
+    );
+  }
+  return (
+    <button
+      className="btn ghost mini"
+      onClick={() => {
+        setVal(String(target));
+        setEditing(true);
+      }}
+    >
+      יעד יומי: {target} ג' ✎
+    </button>
+  );
+}
+
 function AccountActions({ onCopyData }) {
   const { user, logout } = useAuth();
   return (
     <div className="userbar">
       <span className="uemail">{user?.email}</span>
+      <TargetSetting />
       <button className="btn ghost mini" onClick={onCopyData}>
         העתק נתונים
       </button>
