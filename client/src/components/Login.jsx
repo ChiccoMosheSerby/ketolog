@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../lib/auth.jsx';
+import Logo from './Logo.jsx';
 import './Login.scss';
 
 export default function Login() {
@@ -27,7 +28,8 @@ export default function Login() {
   return (
     <div className="auth-wrap">
       <div className="auth-card">
-        <h1>יומן קטו</h1>
+        <Logo size={72} className="auth-logo" />
+        <h1>KetoLog</h1>
         <p className="sub">{mode === 'login' ? 'התחברות לחשבון' : 'יצירת חשבון חדש'}</p>
         <form onSubmit={submit}>
           <div className="fld wide">
