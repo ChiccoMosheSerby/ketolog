@@ -6,8 +6,20 @@
     <link rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png" />
     <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <meta name="theme-color" content="#149a5e" />
+    <meta name="theme-color" content="#0e1311" />
     <title>KetoLog</title>
+    <script>
+      // Apply the saved theme before first paint (default: dark) to avoid a flash.
+      (function () {
+        var t = 'dark';
+        try {
+          t = localStorage.getItem('ketolog:theme') === 'light' ? 'light' : 'dark';
+        } catch (e) {}
+        document.documentElement.setAttribute('data-theme', t);
+        var m = document.querySelector('meta[name="theme-color"]');
+        if (m) m.setAttribute('content', t === 'light' ? '#149a5e' : '#0e1311');
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../lib/auth.jsx';
 import { useToast } from '../lib/toast.jsx';
 import { useMediaQuery, MOBILE_QUERY } from '../lib/useMediaQuery.js';
+import { useTheme } from '../lib/theme.js';
 import CarbRing from './CarbRing.jsx';
 import './Header.scss';
 
@@ -126,6 +127,7 @@ function TargetSetting() {
 
 function AccountActions({ onCopyData, onAction }) {
   const { user, logout, startOnboarding } = useAuth();
+  const { theme, toggle } = useTheme();
   const replay = () => {
     startOnboarding();
     onAction?.(); // close the mobile drawer if open
@@ -134,6 +136,13 @@ function AccountActions({ onCopyData, onAction }) {
     <div className="userbar">
       <span className="uemail">{user?.email}</span>
       <TargetSetting />
+      <button
+        className="btn ghost mini"
+        onClick={toggle}
+        title={theme === 'dark' ? 'מצב בהיר' : 'מצב כהה'}
+      >
+        {theme === 'dark' ? '☀️ בהיר' : '🌙 כהה'}
+      </button>
       <button className="btn ghost mini" onClick={replay}>
         סיור מודרך
       </button>

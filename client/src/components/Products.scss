@@ -35,7 +35,7 @@
     &:hover {
       opacity: 1;
       color: var(--red);
-      background: #fbeae8;
+      background: var(--danger-tint);
     }
   }
 }
@@ -67,7 +67,7 @@
     margin-inline-start: auto;
     font-family: 'IBM Plex Mono', monospace;
     font-size: 12px;
-    color: var(--olive-dark);
+    color: var(--accent-ink);
     background: var(--green-tint);
     border-radius: 999px;
     padding: 2px 10px;
