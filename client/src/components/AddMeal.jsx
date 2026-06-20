@@ -28,7 +28,13 @@ export default function AddMeal({
   const baseDescRef = useRef('');
   const speechDebug =
     typeof window !== 'undefined' && window.location.search.includes('debug');
+  // ?lang=en-US lets us test whether the recognizer can do a non-Hebrew language.
+  const speechLang =
+    (typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).get('lang')) ||
+    'he-IL';
   const speech = useSpeech({
+    lang: speechLang,
     debug: speechDebug,
     onTranscript: (text) => {
       const base = baseDescRef.current;
