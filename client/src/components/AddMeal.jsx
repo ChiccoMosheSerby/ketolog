@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { useToast } from '../lib/toast.jsx';
 import { useSpeech, speechErrorMessage } from '../lib/useSpeech.js';
@@ -10,7 +10,7 @@ const CATS = [
   'נשנוש / ביניים', 'קפה / משקה', 'קינוח', 'פינוק לילה',
 ];
 
-export default function AddMeal({ products, onLogged, date, onDateChange }) {
+export default function AddMeal({ products, onLogged, date, onDateChange, inject }) {
   const toast = useToast();
   const [time, setTime] = useState(nowHM());
   const [cat, setCat] = useState(CATS[0]);
@@ -44,6 +44,25 @@ export default function AddMeal({ products, onLogged, date, onDateChange }) {
     setNote(null);
     setPendingMacro({ fat: null, protein: null });
   }
+
+  // A template clicked in the shortcuts panel loads into the form (description
+  // + its known macros) for review, rather than logging immediately. Combining
+  // with existing text clears the carbs so the total gets recalculated.
+  useEffect(() => {
+    if (!inject) return;
+    const had = desc.trim();
+    if (had) {
+      setDesc(had + ', ' + inject.text);
+      setCarb('');
+      setPendingMacro({ fat: null, protein: null });
+    } else {
+      setDesc(inject.text);
+      setCarb(inject.carbs != null && inject.carbs !== '' ? String(inject.carbs) : '');
+      setPendingMacro({ fat: inject.fat ?? null, protein: inject.protein ?? null });
+    }
+    setNote(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inject?.n]);
 
   function addProductToDesc(p) {
     const chunk = p.unit + ' ' + p.key;

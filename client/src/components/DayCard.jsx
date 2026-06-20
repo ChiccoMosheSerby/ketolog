@@ -7,12 +7,14 @@ import './DayCard.scss';
 export default function DayCard({
   iso,
   day,
+  title,
   open,
   onToggle,
   onDeleteMeal,
   onSetMetric,
   onCopyMeal,
   onSaveTemplate,
+  onSaveProduct,
   target = TARGET,
 }) {
   const mt = day.metrics || {};
@@ -30,7 +32,7 @@ export default function DayCard({
     <div className={'day' + (open ? ' open' : '')}>
       <button className="day-head" onClick={onToggle} aria-expanded={open}>
         <span className="day-htext">
-          <span className="day-title">{day.label || iso}</span>
+          <span className="day-title">{title || day.label || iso}</span>
           <span className="day-date">{heDate(iso)}</span>
         </span>
         <span className="day-hright">
@@ -102,6 +104,15 @@ export default function DayCard({
                       onClick={() => onSaveTemplate(m)}
                     >
                       ★
+                    </button>
+                  )}
+                  {onSaveProduct && (
+                    <button
+                      className="mact"
+                      title="הוסף למוצרים שלי"
+                      onClick={() => onSaveProduct(m)}
+                    >
+                      📦
                     </button>
                   )}
                   {onCopyMeal && (

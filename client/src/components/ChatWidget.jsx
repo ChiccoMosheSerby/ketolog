@@ -108,9 +108,9 @@ export default function ChatWidget() {
     }
   }
 
-  function pickImage(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // Shared by the 📎 picker and clipboard paste: read an image File/Blob → state.
+  function loadImageFile(file) {
+    if (!file || !file.type?.startsWith('image/')) return;
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = reader.result;
@@ -118,7 +118,25 @@ export default function ChatWidget() {
       setImage({ data, mediaType: file.type, preview: dataUrl });
     };
     reader.readAsDataURL(file);
+  }
+
+  function pickImage(e) {
+    loadImageFile(e.target.files?.[0]);
     e.target.value = '';
+  }
+
+  // Paste an image straight into the chat (e.g. a copied screenshot).
+  function onPaste(e) {
+    for (const item of e.clipboardData?.items || []) {
+      if (item.kind === 'file' && item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) {
+          e.preventDefault();
+          loadImageFile(file);
+          return;
+        }
+      }
+    }
   }
 
   async function send() {
@@ -277,10 +295,11 @@ export default function ChatWidget() {
             )}
             <textarea
               rows={1}
-              placeholder="שאל/י אותי משהו על קיטו…"
+              placeholder="שאל/י אותי משהו על קיטו… (אפשר גם להדביק תמונה)"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={onKeyDown}
+              onPaste={onPaste}
             />
             <button className="send-btn" onClick={send} disabled={busy || (!input.trim() && !image)}>
               ➤

@@ -19,7 +19,7 @@ export default function MealShortcuts({ templates, onApply, onDelete, onRepeatYe
       </div>
 
       <div className="sc-hint">
-        קליק על תבנית מוסיף אותה ליום הנבחר. ליצירת תבנית — בכרטיס היום, ליד ארוחה, "★".
+        קליק על תבנית מוסיף אותה לפירוט הארוחה (אפשר לערוך ואז "חשב ורשום"). ליצירת תבנית — בכרטיס היום, ליד ארוחה, "★".
       </div>
 
       <div className="sc-tags">

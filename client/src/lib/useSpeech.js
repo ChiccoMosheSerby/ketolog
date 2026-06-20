@@ -7,6 +7,12 @@ const SR =
   typeof window !== 'undefined' &&
   (window.SpeechRecognition || window.webkitSpeechRecognition);
 
+// Mobile (esp. iOS Safari) doesn't support continuous recognition or restarting
+// outside a user gesture — so there we use single-utterance mode and don't
+// auto-restart. Desktop keeps continuous dictation with auto-restart.
+const IS_TOUCH =
+  typeof navigator !== 'undefined' && /Mobi|Android|iP(hone|ad|od)/i.test(navigator.userAgent);
+
 // Human-readable Hebrew message for a SpeechRecognition error code.
 export function speechErrorMessage(code) {
   switch (code) {
@@ -36,7 +42,7 @@ export function useSpeech({ lang = 'he-IL', onTranscript, onError } = {}) {
     if (!SR) return undefined;
     const rec = new SR();
     rec.lang = lang;
-    rec.continuous = true;
+    rec.continuous = !IS_TOUCH;
     rec.interimResults = true;
     rec.maxAlternatives = 1;
 
@@ -64,7 +70,10 @@ export function useSpeech({ lang = 'he-IL', onTranscript, onError } = {}) {
     // still recording, restart it — otherwise the speech mid-session is lost
     // and the field looks like "recording but no text appears".
     rec.onend = () => {
-      if (wantRef.current) {
+      // Desktop: Chrome ends each session after a window — restart to keep
+      // dictating. Mobile: a restart isn't a user gesture and tends to fail,
+      // so just stop after the utterance.
+      if (wantRef.current && !IS_TOUCH) {
         try {
           rec.start();
           return;
@@ -72,6 +81,7 @@ export function useSpeech({ lang = 'he-IL', onTranscript, onError } = {}) {
           /* couldn't restart — fall through to stop */
         }
       }
+      wantRef.current = false;
       setListening(false);
     };
 

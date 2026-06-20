@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import { useToast } from '../lib/toast.jsx';
 import { useAuth } from '../lib/auth.jsx';
-import { dayTotal, fmt, todayISO, dayHebrewName, prevISO, nowHM, TARGET } from '../lib/helpers.js';
+import { dayTotal, fmt, todayISO, dayHebrewName, prevISO, TARGET } from '../lib/helpers.js';
 import AddMeal from './AddMeal.jsx';
 import Products from './Products.jsx';
 import DayCard from './DayCard.jsx';
@@ -33,6 +33,7 @@ export default function Diary() {
   const [jump, setJump] = useState(todayISO());
   const [activeDate, setActiveDate] = useState(todayISO()); // the day the "Today" tab + AddMeal point at
   const [loaded, setLoaded] = useState(false);
+  const [inject, setInject] = useState(null); // template → AddMeal description (bump .n to re-fire)
 
   const reload = useCallback(
     (firstLoad = false) =>
@@ -74,6 +75,13 @@ export default function Diary() {
   function nextLabel(date) {
     return 'יום ' + (days.length + 1) + ' · ' + dayHebrewName(date);
   }
+
+  // Chronological day index: the earliest logged date is "יום 1", regardless of
+  // the order days were added. Computed live so it stays correct when a day is
+  // inserted out of order. Counts existing dates earlier than `iso`, plus one
+  // (so a brand-new date that isn't in `days` yet also gets the right number).
+  const dayNumber = (iso) => days.reduce((n, d) => (d.date < iso ? n + 1 : n), 1);
+  const dayTitle = (iso) => 'יום ' + dayNumber(iso) + ' · ' + dayHebrewName(iso);
 
   async function addMeal(date, meal) {
     const existing = days.find((d) => d.date === date);
@@ -134,9 +142,15 @@ export default function Diary() {
     toast('הארוחה שוכפלה ליום הנבחר');
   }
 
-  async function applyTemplate(t) {
-    await applyMeals(activeDate, [{ ...cleanMeal(t), time: t.time || nowHM() }]);
-    toast('התבנית נוספה');
+  // Clicking a template now loads it into the AddMeal form (description +
+  // known macros) so the user can review/edit before logging — instead of
+  // writing it straight to the day.
+  function applyTemplate(t) {
+    const c = cleanMeal(t);
+    const text = (t.desc || t.name || '').trim();
+    if (!text && c.carbs == null) return;
+    setInject((prev) => ({ ...c, text, n: (prev?.n || 0) + 1 }));
+    toast('התבנית נוספה לפירוט — אפשר לערוך ואז "חשב ורשום"');
   }
 
   async function saveMealAsTemplate(meal) {
@@ -146,6 +160,23 @@ export default function Diary() {
     const created = await api.addTemplate({ name: name.trim(), ...cleanMeal(meal) });
     setTemplates((prev) => [...prev, created]);
     toast('התבנית נשמרה');
+  }
+
+  // Turn a logged meal into a reusable personal product (name + description +
+  // macros), the same way "copy to day" / "save as template" work per row.
+  async function saveMealAsProduct(meal) {
+    const def = (meal.desc || meal.cat || 'מוצר').slice(0, 30);
+    const name = window.prompt('שם קצר למוצר חדש:', def);
+    if (name == null || !name.trim()) return;
+    await addProduct({
+      key: name.trim(),
+      label: (meal.desc || meal.cat || name).trim(),
+      unit: 'מנה',
+      carbs: Number(meal.carbs) || 0,
+      fat: Number(meal.fat) || 0,
+      protein: Number(meal.protein) || 0,
+    });
+    toast('המוצר נוסף לרשימה שלך');
   }
 
   async function deleteTemplate(id) {
@@ -204,16 +235,24 @@ export default function Diary() {
         onRepeatYesterday={repeatYesterday}
         canRepeat={canRepeat}
       />
-      <AddMeal products={products} onLogged={addMeal} date={activeDate} onDateChange={setActiveDate} />
+      <AddMeal
+        products={products}
+        onLogged={addMeal}
+        date={activeDate}
+        onDateChange={setActiveDate}
+        inject={inject}
+      />
       <DayCard
         iso={activeDate}
         day={activeDay}
+        title={dayTitle(activeDate)}
         open={expanded.has(activeDate)}
         onToggle={() => toggle(activeDate)}
         onDeleteMeal={deleteMeal}
         onSetMetric={setMetric}
         onCopyMeal={copyMealToActive}
         onSaveTemplate={saveMealAsTemplate}
+        onSaveProduct={saveMealAsProduct}
         target={target}
       />
     </>
@@ -242,12 +281,14 @@ export default function Diary() {
               key={d.date}
               iso={d.date}
               day={d}
+              title={dayTitle(d.date)}
               open={expanded.has(d.date)}
               onToggle={() => toggle(d.date)}
               onDeleteMeal={deleteMeal}
               onSetMetric={setMetric}
               onCopyMeal={copyMealToActive}
               onSaveTemplate={saveMealAsTemplate}
+              onSaveProduct={saveMealAsProduct}
               target={target}
             />
           ))
