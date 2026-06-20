@@ -1,7 +1,17 @@
 // Speech-to-text via OpenAI's audio transcription API. The browser Web Speech
 // API is unreliable on mobile (many Android devices return no result for any
 // language), so we record audio on the client and transcribe it here instead.
-const TRANSCRIBE_MODEL = () => process.env.TRANSCRIBE_MODEL || 'gpt-4o-transcribe';
+// whisper-1 reliably honours the `language` + `prompt` hints, which is what
+// keeps short Hebrew clips (one or two food words) from hallucinating in a
+// random language. gpt-4o-transcribe treats `prompt` as loose instructions and
+// drifts on tiny utterances.
+const TRANSCRIBE_MODEL = () => process.env.TRANSCRIBE_MODEL || 'whisper-1';
+
+// Primes the decoder for Hebrew + the everyday food words this app hears, so a
+// one-word utterance like "שוקולד" stays Hebrew instead of becoming gibberish.
+const FOOD_PROMPT =
+  'תמלול תיאור ארוחה בעברית. מילים נפוצות: פיתה, חומוס, שוקולד, ביצים, גבינה, ' +
+  'אבוקדו, סלט, עוף, בשר, אורז, לחם, חלב, יוגורט, ירקות, אגוזים, חמאה, שמן זית, טחינה.';
 
 export function transcribeConfigured() {
   return Boolean(process.env.OPENAI_API_KEY);
@@ -24,6 +34,8 @@ export async function transcribeAudio(buffer, mimeType = 'audio/webm', lang = 'h
   form.append('file', new Blob([buffer], { type: mimeType }), `audio.${extFor(mimeType)}`);
   form.append('model', TRANSCRIBE_MODEL());
   if (lang) form.append('language', lang);
+  form.append('prompt', FOOD_PROMPT);
+  form.append('temperature', '0'); // deterministic — least likely to hallucinate
 
   const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
     method: 'POST',

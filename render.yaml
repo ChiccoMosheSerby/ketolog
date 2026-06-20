@@ -20,7 +20,7 @@ services:
       - key: OPENAI_API_KEY
         sync: false # set in dashboard (sk-...) — voice-input transcription
       - key: TRANSCRIBE_MODEL
-        value: gpt-4o-transcribe # speech-to-text model for the mic button
+        value: whisper-1 # speech-to-text model for the mic button (best Hebrew short-clip)
       - key: JWT_SECRET
         generateValue: true # Render generates a secure random value
       - key: CLAUDE_MODEL
