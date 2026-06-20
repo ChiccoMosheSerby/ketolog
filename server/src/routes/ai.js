@@ -7,6 +7,7 @@ import { estimateMeal, estimateImage, interpretBarcode, aiConfigured } from '../
 import { fetchProductByBarcode, rawKeto } from '../lib/openfoodfacts.js';
 import { runChatTurn } from '../lib/chatAgent.js';
 import { transcribeAudio, transcribeConfigured } from '../lib/transcribe.js';
+import { asyncHandler } from '../lib/http.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -172,11 +173,11 @@ function deriveView(convo) {
 }
 
 // GET /api/ai/chat -> the user's most recent conversation as a renderable view
-router.get('/chat', async (req, res) => {
+router.get('/chat', asyncHandler(async (req, res) => {
   const convo = await Conversation.findOne({ user: req.userId }).sort({ updatedAt: -1 });
   if (!convo) return res.json({ conversationId: null, title: null, view: [] });
   res.json({ conversationId: convo._id, title: convo.title, view: deriveView(convo) });
-});
+}));
 
 // POST /api/ai/chat { conversationId?, text, image?: { data, mediaType } }
 router.post('/chat', async (req, res) => {
@@ -226,7 +227,7 @@ router.post('/chat', async (req, res) => {
 // POST /api/ai/chat/:id/actions/:actionId { decision: 'add' | 'cancel' }
 // Commits (or dismisses) a proposed meal/product, then records it as resolved
 // so it can't be double-committed and reloads show the right state.
-router.post('/chat/:id/actions/:actionId', async (req, res) => {
+router.post('/chat/:id/actions/:actionId', asyncHandler(async (req, res) => {
   const { id, actionId } = req.params;
   const decision = req.body.decision === 'add' ? 'add' : 'cancel';
   const convo = await Conversation.findOne({ _id: id, user: req.userId });
@@ -309,6 +310,6 @@ router.post('/chat/:id/actions/:actionId', async (req, res) => {
     console.error('commit action failed:', err.message);
     return res.status(502).json({ error: 'השמירה נכשלה' });
   }
-});
+}));
 
 export default router;

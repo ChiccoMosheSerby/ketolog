@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { ADMIN_EMAIL } from './approval.js';
+import { escapeHtml } from './http.js';
 
 // Build an SMTP transport from env, or null if SMTP isn't configured.
 // Supported env: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM.
@@ -35,8 +36,8 @@ export async function sendApprovalRequest({ email, approveUrl }) {
     `כדי לאשר את הגישה, לחץ על הקישור הבא:\n${approveUrl}\n\n` +
     `אם לא ביקשת זאת, אפשר להתעלם מהמייל.`;
   const html =
-    `<p>המשתמש <strong>${email}</strong> מבקש להירשם ל-KetoLog.</p>` +
-    `<p><a href="${approveUrl}">לחץ כאן כדי לאשר את הגישה</a></p>` +
+    `<p>המשתמש <strong>${escapeHtml(email)}</strong> מבקש להירשם ל-KetoLog.</p>` +
+    `<p><a href="${escapeHtml(approveUrl)}">לחץ כאן כדי לאשר את הגישה</a></p>` +
     `<p style="color:#888;font-size:13px">אם לא ביקשת זאת, אפשר להתעלם מהמייל.</p>`;
 
   const t = transport();
