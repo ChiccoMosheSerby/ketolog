@@ -1,0 +1,22 @@
+# Render Blueprint — deploy KetoLog as a single web service.
+# In Render: New + → Blueprint → connect this repo. Then set the two secret
+# env vars (MONGODB_URI, ANTHROPIC_API_KEY) in the dashboard.
+services:
+  - type: web
+    name: ketolog
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: MONGODB_URI
+        sync: false # set in dashboard (MongoDB Atlas connection string)
+      - key: ANTHROPIC_API_KEY
+        sync: false # set in dashboard (sk-ant-...)
+      - key: JWT_SECRET
+        generateValue: true # Render generates a secure random value
+      - key: CLAUDE_MODEL
+        value: claude-sonnet-4-6
