@@ -26,7 +26,10 @@ export default function AddMeal({
 
   // Voice dictation: append the recognized speech to whatever was typed before recording.
   const baseDescRef = useRef('');
+  const speechDebug =
+    typeof window !== 'undefined' && window.location.search.includes('debug');
   const speech = useSpeech({
+    debug: speechDebug,
     onTranscript: (text) => {
       const base = baseDescRef.current;
       setDesc(base + (base && text ? ' ' : '') + text);
@@ -176,6 +179,24 @@ export default function AddMeal({
               </button>
             )}
           </label>
+          {speechDebug && (
+            <pre
+              dir="ltr"
+              style={{
+                background: '#111',
+                color: '#7CFC00',
+                fontSize: 11,
+                padding: 8,
+                borderRadius: 6,
+                margin: '6px 0',
+                whiteSpace: 'pre-wrap',
+                maxHeight: 180,
+                overflow: 'auto',
+              }}
+            >
+              {`supported=${speech.supported}\n` + (speech.log.join('\n') || '(tap the mic and speak…)')}
+            </pre>
+          )}
           <textarea
             placeholder="לדוגמה: חביתה מ-3 ביצים, פרוסת גאודה, מלפפון לא קלוף, חופן שרי"
             value={desc}

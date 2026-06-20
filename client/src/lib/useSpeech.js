@@ -32,8 +32,9 @@ export function speechErrorMessage(code) {
   }
 }
 
-export function useSpeech({ lang = 'he-IL', onTranscript, onError } = {}) {
+export function useSpeech({ lang = 'he-IL', onTranscript, onError, debug = false } = {}) {
   const [listening, setListening] = useState(false);
+  const [log, setLog] = useState([]);
   const recRef = useRef(null);
   const finalRef = useRef(''); // accumulated finalized chunks for this session
   const wantRef = useRef(false); // user intends to keep listening
@@ -41,6 +42,12 @@ export function useSpeech({ lang = 'he-IL', onTranscript, onError } = {}) {
   const errRef = useRef(false); // did this session already surface an error?
   const cbRef = useRef({ onTranscript, onError });
   cbRef.current = { onTranscript, onError };
+
+  // Append a line to the on-screen diagnostic log (only when ?debug is on).
+  function trace(line) {
+    if (!debug) return;
+    setLog((l) => [...l.slice(-11), line]);
+  }
 
   // Build a FRESH recognition instance per session. Android Chrome reuses a
   // single instance poorly — after the first start/stop it often stops emitting
@@ -52,8 +59,18 @@ export function useSpeech({ lang = 'he-IL', onTranscript, onError } = {}) {
     rec.interimResults = true;
     rec.maxAlternatives = 1;
 
+    // Lifecycle probes — tell us how far the engine gets on this device.
+    rec.onstart = () => trace('start');
+    rec.onaudiostart = () => trace('audiostart (mic open)');
+    rec.onsoundstart = () => trace('soundstart');
+    rec.onspeechstart = () => trace('speechstart (heard speech)');
+    rec.onspeechend = () => trace('speechend');
+    rec.onaudioend = () => trace('audioend');
+    rec.onnomatch = () => trace('nomatch');
+
     rec.onresult = (e) => {
       gotRef.current = true;
+      trace('result: ' + (e.results?.[e.resultIndex]?.[0]?.transcript || '').slice(0, 24));
       let interim = '';
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const chunk = e.results[i][0].transcript;
@@ -67,6 +84,7 @@ export function useSpeech({ lang = 'he-IL', onTranscript, onError } = {}) {
       // 'aborted' is normal when the user taps stop — ignore it. 'no-speech'
       // is normal mid-pause on desktop (continuous restarts), but on mobile
       // it's the whole session failing, so surface it there.
+      trace('error: ' + e.error);
       if (e.error === 'aborted') return;
       if (e.error === 'no-speech' && !IS_TOUCH) return;
       console.warn('speech error:', e.error);
@@ -90,6 +108,7 @@ export function useSpeech({ lang = 'he-IL', onTranscript, onError } = {}) {
           /* couldn't restart — fall through to stop */
         }
       }
+      trace('end' + (gotRef.current ? '' : ' (no result)'));
       const wasRecording = wantRef.current;
       wantRef.current = false;
       setListening(false);
@@ -127,13 +146,15 @@ export function useSpeech({ lang = 'he-IL', onTranscript, onError } = {}) {
     gotRef.current = false;
     errRef.current = false;
     wantRef.current = true;
+    if (debug) setLog([`env: touch=${IS_TOUCH} lang=${lang} cont=${!IS_TOUCH}`]);
     const rec = build();
     recRef.current = rec;
     try {
       rec.start();
       setListening(true);
-    } catch {
+    } catch (err) {
       // 'already started' — reflect listening state anyway
+      trace('start threw: ' + (err?.message || err));
       setListening(true);
     }
   }
@@ -149,5 +170,5 @@ export function useSpeech({ lang = 'he-IL', onTranscript, onError } = {}) {
     setListening(false);
   }
 
-  return { supported: Boolean(SR), listening, start, stop };
+  return { supported: Boolean(SR), listening, start, stop, log };
 }
