@@ -25,6 +25,8 @@ export function speechErrorMessage(code) {
       return 'הזיהוי דורש חיבור אינטרנט — בדוק/י את החיבור ונסה/י שוב';
     case 'language-not-supported':
       return 'השפה אינה נתמכת לזיהוי קולי בדפדפן זה';
+    case 'no-speech':
+      return 'לא זוהה דיבור — קרב/י את המיקרופון ונסה/י שוב';
     default:
       return 'ההקלטה נכשלה — נסה/י שוב';
   }
@@ -35,11 +37,15 @@ export function useSpeech({ lang = 'he-IL', onTranscript, onError } = {}) {
   const recRef = useRef(null);
   const finalRef = useRef(''); // accumulated finalized chunks for this session
   const wantRef = useRef(false); // user intends to keep listening
+  const gotRef = useRef(false); // did this session produce any transcript?
+  const errRef = useRef(false); // did this session already surface an error?
   const cbRef = useRef({ onTranscript, onError });
   cbRef.current = { onTranscript, onError };
 
-  useEffect(() => {
-    if (!SR) return undefined;
+  // Build a FRESH recognition instance per session. Android Chrome reuses a
+  // single instance poorly — after the first start/stop it often stops emitting
+  // results entirely — so we never reuse one across sessions.
+  function build() {
     const rec = new SR();
     rec.lang = lang;
     rec.continuous = !IS_TOUCH;
@@ -47,6 +53,7 @@ export function useSpeech({ lang = 'he-IL', onTranscript, onError } = {}) {
     rec.maxAlternatives = 1;
 
     rec.onresult = (e) => {
+      gotRef.current = true;
       let interim = '';
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const chunk = e.results[i][0].transcript;
@@ -57,18 +64,20 @@ export function useSpeech({ lang = 'he-IL', onTranscript, onError } = {}) {
     };
 
     rec.onerror = (e) => {
-      // 'no-speech' / 'aborted' are normal during pauses — ignore them.
-      if (e.error === 'no-speech' || e.error === 'aborted') return;
+      // 'aborted' is normal when the user taps stop — ignore it. 'no-speech'
+      // is normal mid-pause on desktop (continuous restarts), but on mobile
+      // it's the whole session failing, so surface it there.
+      if (e.error === 'aborted') return;
+      if (e.error === 'no-speech' && !IS_TOUCH) return;
       console.warn('speech error:', e.error);
       if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
         wantRef.current = false; // hard stop — don't fight the permission
       }
+      errRef.current = true;
       cbRef.current.onError?.(e.error);
     };
 
-    // Chrome ends each recognition session after a short window. If the user is
-    // still recording, restart it — otherwise the speech mid-session is lost
-    // and the field looks like "recording but no text appears".
+    // Chrome ends each recognition session after a short window.
     rec.onend = () => {
       // Desktop: Chrome ends each session after a window — restart to keep
       // dictating. Mobile: a restart isn't a user gesture and tends to fail,
@@ -81,28 +90,47 @@ export function useSpeech({ lang = 'he-IL', onTranscript, onError } = {}) {
           /* couldn't restart — fall through to stop */
         }
       }
+      const wasRecording = wantRef.current;
       wantRef.current = false;
       setListening(false);
-    };
-
-    recRef.current = rec;
-    return () => {
-      wantRef.current = false;
-      rec.onresult = rec.onerror = rec.onend = null;
-      try {
-        rec.abort();
-      } catch {
-        /* ignore */
+      // Mobile: if we intended to record but captured nothing and no error
+      // already explained why, the button just went red-then-grey silently.
+      // Tell the user instead of leaving them guessing.
+      if (wasRecording && IS_TOUCH && !gotRef.current && !errRef.current) {
+        cbRef.current.onError?.('no-speech');
       }
     };
-  }, [lang]);
+
+    return rec;
+  }
+
+  // Clean up any live instance on unmount.
+  useEffect(
+    () => () => {
+      wantRef.current = false;
+      const rec = recRef.current;
+      if (rec) {
+        rec.onresult = rec.onerror = rec.onend = null;
+        try {
+          rec.abort();
+        } catch {
+          /* ignore */
+        }
+      }
+    },
+    [],
+  );
 
   function start() {
-    if (!recRef.current || wantRef.current) return;
+    if (!SR || wantRef.current) return;
     finalRef.current = '';
+    gotRef.current = false;
+    errRef.current = false;
     wantRef.current = true;
+    const rec = build();
+    recRef.current = rec;
     try {
-      recRef.current.start();
+      rec.start();
       setListening(true);
     } catch {
       // 'already started' — reflect listening state anyway

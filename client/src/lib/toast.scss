@@ -19,4 +19,11 @@
     opacity: 1;
     transform: none;
   }
+  /* On phones, anchor across the bottom so long messages don't overflow. */
+  @media (max-width: 520px) {
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    text-align: center;
+  }
 }
