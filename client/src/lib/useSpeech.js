@@ -54,7 +54,7 @@ function blobToBase64(blob) {
   });
 }
 
-export function useSpeech({ onTranscript, onError } = {}) {
+export function useSpeech({ onTranscript, onError, debug = false } = {}) {
   const [listening, setListening] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
   const recRef = useRef(null);
@@ -74,7 +74,16 @@ export function useSpeech({ onTranscript, onError } = {}) {
     if (!SUPPORTED || listening || transcribing) return;
     let stream;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // autoGainControl boosts quiet speech; echo/noise suppression cleans it —
+      // weak audio is what makes the transcriber hallucinate.
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
     } catch {
       cbRef.current.onError?.('not-allowed');
       return;
@@ -82,9 +91,10 @@ export function useSpeech({ onTranscript, onError } = {}) {
     streamRef.current = stream;
     chunksRef.current = [];
     const mime = pickMime();
+    const opts = { audioBitsPerSecond: 128000, ...(mime ? { mimeType: mime } : {}) };
     let rec;
     try {
-      rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+      rec = new MediaRecorder(stream, opts);
     } catch {
       rec = new MediaRecorder(stream);
     }
@@ -108,6 +118,10 @@ export function useSpeech({ onTranscript, onError } = {}) {
         const audio = await blobToBase64(blob);
         const { text } = await api.transcribe(audio, type);
         const clean = (text || '').trim();
+        if (debug) {
+          const kb = Math.round(blob.size / 1024);
+          cbRef.current.onError?.(`הוקלט ${kb}KB · התקבל: ${clean || '(ריק)'}`);
+        }
         if (clean) cbRef.current.onTranscript?.(clean);
         else cbRef.current.onError?.('no-speech');
       } catch (err) {
