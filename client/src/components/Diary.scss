@@ -205,3 +205,50 @@ header.top {
   text-align: center;
   line-height: 1.7;
 }
+/* desktop: the keto-balance diagram, relocated out of the header */
+.foot-target {
+  max-width: 520px;
+  margin: 0 auto 22px;
+  text-align: start;
+}
+
+/* ---------- Desktop layout (above the mobile breakpoint) ----------
+   Wider shell; stats + compact products share the header; AddMeal and the
+   current day sit side by side. Keep this in sync with MOBILE_QUERY. */
+@media (min-width: 961px) {
+  .wrap {
+    max-width: 1120px;
+    padding-inline: 28px;
+  }
+
+  /* header: stats keep their natural size, the settings/account bar takes the rest */
+  .headrow {
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 18px;
+  }
+  .headrow .stats {
+    flex: 0 1 320px;
+  }
+  .headrow .userbar {
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    margin-top: 0;
+  }
+
+  /* today tab: products spans the full top row; AddMeal (right in RTL) and the
+     current day share the row below */
+  .today-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+    gap: 20px;
+  }
+  .today-grid > * {
+    min-width: 0;
+    margin: 0; /* gap owns the spacing; drop the panels' own margins */
+  }
+  .today-grid > .grid-top {
+    grid-column: 1 / -1;
+  }
+}

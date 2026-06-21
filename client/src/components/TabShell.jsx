@@ -10,9 +10,12 @@ import './TabShell.scss';
 export default function TabShell({ tabs }) {
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const [active, setActive] = useState(0);
+  // The tab list can shrink across breakpoints (products is desktop-header-only),
+  // so clamp to avoid indexing past the end.
+  const idx = Math.min(active, tabs.length - 1);
 
   if (isMobile) {
-    return <Carousel tabs={tabs} active={active} setActive={setActive} />;
+    return <Carousel tabs={tabs} active={idx} setActive={setActive} />;
   }
 
   return (
@@ -22,9 +25,9 @@ export default function TabShell({ tabs }) {
           <button
             key={t.id}
             role="tab"
-            aria-selected={i === active}
+            aria-selected={i === idx}
             data-tour-tab={t.id}
-            className={'tabbtn' + (i === active ? ' active' : '')}
+            className={'tabbtn' + (i === idx ? ' active' : '')}
             onClick={() => setActive(i)}
           >
             {t.label}
@@ -32,7 +35,7 @@ export default function TabShell({ tabs }) {
         ))}
       </div>
       <div className="tabpanel" role="tabpanel">
-        {tabs[active].content}
+        {tabs[idx].content}
       </div>
     </div>
   );

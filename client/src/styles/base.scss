@@ -22,8 +22,8 @@
 
   /* ---------- Dark theme — the default ---------- */
   /* surfaces */
-  --paper: #0e1311; /* deep green-black ground */
-  --card: #161c19;
+  --paper: #060807; /* near-black green ground */
+  --card: #121613;
   --tint: #1f2723; /* neutral fill (inputs, tracks) */
   --green-tint: #16291f; /* accent wash */
 
@@ -112,7 +112,6 @@ h1 {
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-sm);
   padding: 20px;
-  margin: 18px 0;
   h2 {
     font-family: 'Heebo', sans-serif;
     font-weight: 700;

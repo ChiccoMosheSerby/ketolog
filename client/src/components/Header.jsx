@@ -34,8 +34,10 @@ function Stats({ stats, mini }) {
   );
 }
 
-// Static keto ratio target — educational, not live data.
-function TargetLegend() {
+// Static keto ratio target — educational, not live data. On desktop it lives in
+// the footer (its header slot is taken by the compact products panel); on mobile
+// it stays in the drawer.
+export function TargetLegend() {
   return (
     <div className="target target-mini">
       <div className="tt">היעד המאוזן בקיטו</div>
@@ -180,9 +182,8 @@ export default function Header({ stats, onCopyData }) {
       <header className="top">
         <div className="headrow">
           <Stats stats={stats} />
-          <TargetLegend />
+          <AccountActions onCopyData={onCopyData} />
         </div>
-        <AccountActions onCopyData={onCopyData} />
       </header>
     );
   }

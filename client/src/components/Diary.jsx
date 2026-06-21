@@ -6,8 +6,9 @@ import { dayTotal, fmt, todayISO, dayHebrewName, prevISO, TARGET } from '../lib/
 import AddMeal from './AddMeal.jsx';
 import Products from './Products.jsx';
 import DayCard from './DayCard.jsx';
-import Header from './Header.jsx';
+import Header, { TargetLegend } from './Header.jsx';
 import TabShell from './TabShell.jsx';
+import { useMediaQuery, MOBILE_QUERY } from '../lib/useMediaQuery.js';
 import './Diary.scss';
 
 // strip subdoc id / extras → a clean meal payload for the API
@@ -23,6 +24,7 @@ const cleanMeal = (m) => ({
 export default function Diary() {
   const toast = useToast();
   const { user } = useAuth();
+  const isMobile = useMediaQuery(MOBILE_QUERY);
   const target = user?.dailyCarbTarget ?? TARGET;
   const [days, setDays] = useState([]); // array of day docs, newest first
   const [products, setProducts] = useState([]);
@@ -213,8 +215,16 @@ export default function Diary() {
   const canRepeat = (days.find((d) => d.date === prevISO(activeDate))?.meals || []).length > 0;
 
   // ---- tab contents ----
+  const productsPanel = (
+    <Products products={products} onAdd={addProduct} onDelete={deleteProduct} compact={!isMobile} />
+  );
+
+  // Desktop: a 2-col grid — products spans the full top row, then AddMeal (right
+  // in RTL) and the current day sit below. Mobile: a plain block that stacks
+  // AddMeal + day, with products living in its own tab instead.
   const todayTab = (
-    <>
+    <div className="today-grid">
+      {!isMobile && <div className="grid-top">{productsPanel}</div>}
       <AddMeal
         onLogged={addMeal}
         date={activeDate}
@@ -238,7 +248,7 @@ export default function Diary() {
         onSaveProduct={saveMealAsProduct}
         target={target}
       />
-    </>
+    </div>
   );
 
   const historyTab = (
@@ -280,12 +290,11 @@ export default function Diary() {
     </>
   );
 
-  const productsTab = <Products products={products} onAdd={addProduct} onDelete={deleteProduct} />;
-
+  // Products lives at the top of the today grid on desktop, so it's only a tab on mobile.
   const tabs = [
     { id: 'today', label: 'היום', content: todayTab },
     { id: 'history', label: 'יומן', content: historyTab },
-    { id: 'products', label: 'המוצרים שלי', content: productsTab },
+    ...(isMobile ? [{ id: 'products', label: 'המוצרים שלי', content: productsPanel }] : []),
   ];
 
   return (
@@ -295,6 +304,12 @@ export default function Diary() {
       <TabShell tabs={tabs} />
 
       <div className="foot">
+        {/* Desktop: the keto-balance diagram moves out of the header to here. */}
+        {!isMobile && (
+          <div className="foot-target">
+            <TargetLegend />
+          </div>
+        )}
         הנתונים נשמרים בענן (MongoDB) ומסונכרנים לחשבון שלך בכל מכשיר.
         <br />
         הערכים הם הערכות (±2–3 גרם למנות בית). היעד היומי שלך הוא מתחת ל-{fmt(target)} גרם פחמימות נטו ביום.

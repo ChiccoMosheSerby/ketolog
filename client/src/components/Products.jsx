@@ -1,4 +1,4 @@
-import { lazy, Suspense, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { useToast } from '../lib/toast.jsx';
 import { fmt } from '../lib/helpers.js';
@@ -8,7 +8,7 @@ import './Products.scss';
 const BarcodeScanner = lazy(() => import('./BarcodeScanner.jsx'));
 const CameraCapture = lazy(() => import('./CameraCapture.jsx'));
 
-export default function Products({ products, onAdd, onDelete }) {
+export default function Products({ products, onAdd, onDelete, compact }) {
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
@@ -20,6 +20,17 @@ export default function Products({ products, onAdd, onDelete }) {
   const [scanning, setScanning] = useState(false);
   const [capturing, setCapturing] = useState(false); // live camera photo modal
   const fileRef = useRef(null); // gallery / file upload
+  const ddRef = useRef(null); // product-list dropdown, for outside-click close
+
+  // Close the floating product list when clicking outside it (regular dropdown).
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e) => {
+      if (ddRef.current && !ddRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [open]);
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
@@ -152,7 +163,7 @@ export default function Products({ products, onAdd, onDelete }) {
   const busy = imgBusy || barBusy;
 
   return (
-    <div className="panel" data-tour="products">
+    <div className={'panel' + (compact ? ' compact' : '')} data-tour="products">
       {scanning && (
         <Suspense fallback={null}>
           <BarcodeScanner onResult={runBarcode} onClose={() => setScanning(false)} />
@@ -168,58 +179,58 @@ export default function Products({ products, onAdd, onDelete }) {
         </Suspense>
       )}
       <h2>המוצרים שלי</h2>
-      <div style={{ fontSize: 12, color: 'var(--ink-soft)', margin: '-8px 0 12px' }}>
+      <div className="phelp" style={{ fontSize: 12, color: 'var(--ink-soft)', margin: '-8px 0 12px' }}>
         מוצרים קבועים שלך. הם מופיעים כתגיות מתחת לתיבת הפירוט — קליק מוסיף אותם לתיאור הארוחה, ואז
         מחשבים ורושמים. גם כשתכתוב אותם בפירוט, החישוב יזהה אותם.
       </div>
 
-      <button className={'prod-toggle' + (open ? ' open' : '')} onClick={() => setOpen(!open)}>
-        <span className="chev"></span>
-        <span>{open ? 'הסתר את רשימת המוצרים' : 'הצג את רשימת המוצרים'}</span>
-        <span className="pcount">{products.length}</span>
-      </button>
-
-      {open && (
-        <div id="prodList">
-          {products.length === 0 ? (
-            <div style={{ fontSize: 12, color: 'var(--ink-soft)', padding: '6px 0' }}>
-              אין מוצרים שמורים עדיין.
-            </div>
-          ) : (
-            products.map((p) => (
-              <div className="prod" key={p._id}>
-                <div className="pinfo">
-                  <div className="pname">
-                    {p.key} — <span style={{ fontWeight: 300 }}>{p.label}</span>
-                  </div>
-                  <div className="pmeta">
-                    ל{p.unit}: {fmt(p.carbs)} פחמ' · {fmt(p.fat)} שומן · {fmt(p.protein)} חלבון
-                  </div>
+      <div className="prod-actions">
+        <div className="prod-dd" ref={ddRef}>
+          <button className={'prod-toggle' + (open ? ' open' : '')} onClick={() => setOpen(!open)}>
+            <span className="chev"></span>
+            <span>{open ? 'הסתר את רשימת המוצרים' : 'הצג את רשימת המוצרים'}</span>
+            <span className="pcount">{products.length}</span>
+          </button>
+          {open && (
+            <div id="prodList">
+              {products.length === 0 ? (
+                <div style={{ fontSize: 12, color: 'var(--ink-soft)', padding: '6px 0' }}>
+                  אין מוצרים שמורים עדיין.
                 </div>
-                <button className="pdel" title="מחק" onClick={() => onDelete(p._id)}>
-                  ✕
-                </button>
-              </div>
-            ))
+              ) : (
+                products.map((p) => (
+                  <div className="prod" key={p._id}>
+                    <div className="pinfo">
+                      <div className="pname">
+                        {p.key} — <span style={{ fontWeight: 300 }}>{p.label}</span>
+                      </div>
+                      <div className="pmeta">
+                        ל{p.unit}: {fmt(p.carbs)} פחמ' · {fmt(p.fat)} שומן · {fmt(p.protein)} חלבון
+                      </div>
+                    </div>
+                    <button className="pdel" title="מחק" onClick={() => onDelete(p._id)}>
+                      ✕
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
           )}
         </div>
-      )}
-
-      <div className="prod-add">
-        <div className="row" style={{ alignItems: 'center', marginBottom: 10 }}>
+        <div className="capture">
           <button
             className="btn ghost"
             disabled={busy}
             data-tour="barcode"
             onClick={() => setScanning(true)}
           >
-            {barBusy ? 'מחפש…' : 'סריקת ברקוד'}
+            {barBusy ? 'מחפש…' : 'ברקוד'}
           </button>
           <button className="btn ghost" disabled={busy} onClick={() => setCapturing(true)}>
-            {imgBusy ? 'מזהה…' : '📷 צלם מוצר'}
+            {imgBusy ? 'מזהה…' : '📷 צילום'}
           </button>
           <button className="btn ghost" disabled={busy} onClick={pickImage}>
-            {imgBusy ? 'מזהה…' : '🖼️ העלה תמונה'}
+            {imgBusy ? 'מזהה…' : '🖼️ תמונה'}
           </button>
           <input
             type="file"
@@ -228,11 +239,10 @@ export default function Products({ products, onAdd, onDelete }) {
             style={{ display: 'none' }}
             onChange={onFile}
           />
-          <span style={{ fontSize: 11.5, color: 'var(--ink-soft)' }}>
-            ברקוד מושך ערכים ממסד נתונים (מדויק לפי מנה). לזיהוי מתמונה — כתוב יחידה + כמה יש באריזה.
-          </span>
         </div>
+      </div>
 
+      <div className="prod-add">
         {note && (
           <div className="calc-note">
             {note.loading &&
@@ -257,25 +267,23 @@ export default function Products({ products, onAdd, onDelete }) {
           </div>
         )}
 
-        <div className="row">
+        <div className="row prod-fields">
           <div className="fld" style={{ flex: 2 }}>
-            <label>שם / כינוי קצר</label>
-            <input placeholder="לדוגמה: שוקולד" value={form.key} onChange={set('key')} />
+            <label>שם / כינוי</label>
+            <input placeholder="שוקולד" value={form.key} onChange={set('key')} />
           </div>
           <div className="fld" style={{ flex: 3 }}>
             <label>תיאור מלא</label>
             <input placeholder="שוקולד 62% עם אלולוז" value={form.label} onChange={set('label')} />
           </div>
-          <div className="fld" style={{ flex: 1 }}>
+          <div className="fld">
             <label>יחידה</label>
             <input placeholder="שורה" value={form.unit} onChange={set('unit')} />
           </div>
-          <div className="fld" style={{ flex: 1 }}>
-            <label>יחידות באריזה</label>
+          <div className="fld">
+            <label>באריזה</label>
             <input type="number" step="1" min="1" placeholder="6" value={form.perPack} onChange={set('perPack')} />
           </div>
-        </div>
-        <div className="row" style={{ marginTop: 8 }}>
           <div className="fld">
             <label>פחמ' נטו</label>
             <input type="number" step="0.1" placeholder="0" value={form.carb} onChange={set('carb')} />
@@ -288,11 +296,9 @@ export default function Products({ products, onAdd, onDelete }) {
             <label>חלבון</label>
             <input type="number" step="0.1" placeholder="0" value={form.prot} onChange={set('prot')} />
           </div>
-          <div className="fld" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-end' }}>
-            <button className="btn" onClick={submit}>
-              הוסף מוצר
-            </button>
-          </div>
+          <button className="btn" onClick={submit}>
+            הוסף מוצר
+          </button>
         </div>
       </div>
     </div>

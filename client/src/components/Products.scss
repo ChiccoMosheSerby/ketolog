@@ -43,6 +43,52 @@
   margin-top: 16px;
   border-top: 1px solid var(--line);
   padding-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  /* spacing between blocks comes from the flex gap */
+  .calc-note {
+    margin-top: 0;
+  }
+}
+
+/* dropdown toggle + capture CTAs share one row (wraps full-width when tight) */
+.prod-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 10px;
+  margin-bottom: 4px;
+  .prod-dd {
+    flex: 1 1 240px;
+    position: relative; /* anchor for the floating list */
+  }
+  .prod-toggle {
+    width: 100%;
+  }
+  .capture {
+    flex: 1 1 auto;
+  }
+}
+.capture {
+  display: flex;
+  gap: 8px;
+  .btn {
+    flex: 1;
+    min-width: 0;
+    padding-inline: 10px;
+  }
+}
+/* all inputs + the submit button on one gracefully-wrapping row, bottom-aligned
+   so the button sits level with the inputs (not their labels) */
+.prod-fields {
+  align-items: flex-end;
+  .fld {
+    min-width: 84px;
+  }
+  .btn {
+    white-space: nowrap;
+  }
 }
 .prod-toggle {
   display: flex;
@@ -78,6 +124,50 @@
     margin-bottom: -3px;
   }
 }
+/* floating dropdown: overlays the panel instead of pushing it down */
 #prodList {
-  margin-top: 4px;
+  position: absolute;
+  top: calc(100% + 6px);
+  inset-inline-start: 0;
+  z-index: 40;
+  width: max(100%, 300px);
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-md);
+  padding: 4px 12px;
+}
+
+/* Compact variant — used in the desktop header slot, where the panel sits
+   beside the live stats and needs to stay tight. */
+.panel.compact {
+  margin: 0;
+  padding: 14px 16px;
+
+  h2 {
+    font-size: 14px;
+    margin-bottom: 8px;
+  }
+  /* the long explainer is redundant in the always-visible header slot */
+  .phelp {
+    display: none;
+  }
+  .prod-add {
+    margin-top: 12px;
+    padding-top: 12px;
+    gap: 10px;
+  }
+
+  /* shorter controls so the whole panel sits low */
+  input,
+  .btn,
+  .prod-toggle {
+    padding-top: 7px;
+    padding-bottom: 7px;
+  }
+  .fld {
+    gap: 3px;
+  }
 }
