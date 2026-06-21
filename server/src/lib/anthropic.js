@@ -15,8 +15,12 @@ export const MODEL = () => process.env.CLAUDE_MODEL || 'claude-opus-4-8';
 // so it reasons at the level of the general Claude chat.
 export const CHAT_MODEL = () => process.env.CHAT_MODEL || 'claude-opus-4-8';
 
-// ---- system prompt (ported from keto-log.html, products injected as context) ----
-function buildSys(products = [], withName = false) {
+// ---- shared keto nutrition rules (the "brain"; no output format) ----------
+// ketoRules is the one nutrition prompt every estimator shares. Each estimator
+// appends its own output-format instruction (below), so there is no need to
+// strip a baked-in format back off — the meal/image/barcode shapes stay distinct
+// and explicit. Ported from keto-log.html; products injected as context.
+function ketoRules(products = []) {
   let base =
     'אתה מומחה/ית התזונה הקטוגנית הטוב/ה בעולם — דיאטן/ית קליני/ת עם דיוק של מעבדה. ' +
     'העריך/י בדיוק הגבוה ביותר האפשרי עבור הכמויות המתוארות: (1) פחמימות נטו בגרמים, (2) שומן בגרמים, (3) חלבון בגרמים. ' +
@@ -39,15 +43,40 @@ function buildSys(products = [], withName = false) {
       '.';
   }
 
-  const fmtJson = withName
-    ? '{"name": "<שם המוצר/המאכל בעברית>", "net_carbs": <מספר>, "fat": <מספר>, "protein": <מספר>, "breakdown": "<פירוט קצר בעברית>"}'
-    : '{"net_carbs": <מספר>, "fat": <מספר>, "protein": <מספר>, "breakdown": "<פירוט קצר בעברית, כל פריט בשורה>"}';
+  return base;
+}
 
+// ---- per-task output-format instructions (appended after ketoRules) --------
+const MEAL_FORMAT =
+  ' השב אך ורק ב-JSON תקין בפורמט: ' +
+  '{"net_carbs": <מספר>, "fat": <מספר>, "protein": <מספר>, "breakdown": "<פירוט קצר בעברית, כל פריט בשורה>"}' +
+  ' ללא שום טקסט נוסף וללא סימוני markdown.';
+
+function imageFormat(unit) {
+  const unitRule = unit ? ` היחידה המבוקשת היא "${unit}".` : '';
   return (
-    base +
-    ' השב אך ורק ב-JSON תקין בפורמט: ' +
-    fmtJson +
-    ' ללא שום טקסט נוסף וללא סימוני markdown.'
+    ' זהה את המוצר בתמונה וקרא את טבלת הערכים התזונתיים אם קיימת.' +
+    ' החזר את הערכים עבור האריזה/המוצר השלם שבתמונה (לא ל-100 גרם), ובנפרד ציין מהי כמות היחידות מהסוג המבוקש שניתן להעריך שיש באריזה' +
+    ' (אם ניתן לראות חלוקה לשורות/ריבועים בתמונה — ספור אותם; אחרת הערך לפי גודל וסוג המוצר).' +
+    unitRule +
+    ' השב אך ורק ב-JSON תקין: {"name": "<כינוי קצר>", "label": "<תיאור מלא>", "unit": "<היחידה>", ' +
+    '"pack_net_carbs": <לכל האריזה>, "pack_fat": <לכל האריזה>, "pack_protein": <לכל האריזה>, ' +
+    '"units_per_pack": <מספר היחידות המשוער באריזה>, "breakdown": "<פירוט קצר כולל גודל האריזה>"} ' +
+    'ללא טקסט נוסף וללא markdown.'
+  );
+}
+
+function barcodeFormat(unit, fiberNote) {
+  const unitRule = unit ? ` היחידה המבוקשת היא "${unit}".` : '';
+  return (
+    ' להלן נתוני מוצר ארוז שנסרק לפי ברקוד, מתוך מסד הנתונים Open Food Facts.' +
+    ' חשב פחמימות נטו לפי הכללים הקטוגניים שלמעלה (החסר סיבים; אריתריטול/אלולוז = 0; מלטיטול = חצי).' +
+    fiberNote +
+    ' החזר ערכים ל-100 גרם אלא אם המשתמש ביקש יחידה אחרת.' +
+    unitRule +
+    ' השב אך ורק ב-JSON תקין: {"name": "<כינוי קצר>", "label": "<תיאור מלא כולל מותג>", ' +
+    '"unit": "<היחידה, ברירת מחדל \\"100 גרם\\">", "net_carbs": <מספר>, "fat": <מספר>, ' +
+    '"protein": <מספר>, "breakdown": "<פירוט קצר בעברית>"} ללא טקסט נוסף וללא markdown.'
   );
 }
 
@@ -71,35 +100,65 @@ function parseJsonReply(message) {
   }
 }
 
+// ---- output validation -----------------------------------------------------
+// Coerce a model-emitted value to a non-negative number, or `undefined` when it
+// is missing/invalid/negative. Returning undefined (rather than 0) is deliberate:
+// the fields drop out of the JSON response, so the clients' existing
+// Number()/isNaN()/!= null guards keep rendering "?" for a missing value instead
+// of silently logging a wrong 0.
+const cleanNum = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 0 ? n : undefined;
+};
+const cleanStr = (v) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
+
+// Each estimator runs its parsed reply through one of these so callers always
+// get a known shape with trustworthy types.
+const normalizeMeal = (r) => ({
+  net_carbs: cleanNum(r.net_carbs),
+  fat: cleanNum(r.fat),
+  protein: cleanNum(r.protein),
+  breakdown: cleanStr(r.breakdown),
+});
+
+const normalizeImage = (r) => ({
+  name: cleanStr(r.name),
+  label: cleanStr(r.label),
+  unit: cleanStr(r.unit),
+  pack_net_carbs: cleanNum(r.pack_net_carbs),
+  pack_fat: cleanNum(r.pack_fat),
+  pack_protein: cleanNum(r.pack_protein),
+  units_per_pack: cleanNum(r.units_per_pack),
+  breakdown: cleanStr(r.breakdown),
+});
+
+const normalizeBarcode = (r) => ({
+  name: cleanStr(r.name),
+  label: cleanStr(r.label),
+  unit: cleanStr(r.unit),
+  net_carbs: cleanNum(r.net_carbs),
+  fat: cleanNum(r.fat),
+  protein: cleanNum(r.protein),
+  breakdown: cleanStr(r.breakdown),
+});
+
 export async function estimateMeal(desc, products = []) {
   const message = await getClient().messages.create({
     model: MODEL(),
     max_tokens: 5000,
     thinking: { type: 'adaptive' },
-    system: buildSys(products, false),
+    system: ketoRules(products) + MEAL_FORMAT,
     messages: [{ role: 'user', content: desc }],
   });
-  return parseJsonReply(message);
+  return normalizeMeal(parseJsonReply(message));
 }
 
 export async function estimateImage(b64, mediaType, unit, products = []) {
-  const unitRule = unit ? ` היחידה המבוקשת היא "${unit}".` : '';
-  const sys =
-    buildSys(products, false).replace(/ השב אך ורק.*$/, '') +
-    ' זהה את המוצר בתמונה וקרא את טבלת הערכים התזונתיים אם קיימת.' +
-    ' החזר את הערכים עבור האריזה/המוצר השלם שבתמונה (לא ל-100 גרם), ובנפרד ציין מהי כמות היחידות מהסוג המבוקש שניתן להעריך שיש באריזה' +
-    ' (אם ניתן לראות חלוקה לשורות/ריבועים בתמונה — ספור אותם; אחרת הערך לפי גודל וסוג המוצר).' +
-    unitRule +
-    ' השב אך ורק ב-JSON תקין: {"name": "<כינוי קצר>", "label": "<תיאור מלא>", "unit": "<היחידה>", ' +
-    '"pack_net_carbs": <לכל האריזה>, "pack_fat": <לכל האריזה>, "pack_protein": <לכל האריזה>, ' +
-    '"units_per_pack": <מספר היחידות המשוער באריזה>, "breakdown": "<פירוט קצר כולל גודל האריזה>"} ' +
-    'ללא טקסט נוסף וללא markdown.';
-
   const message = await getClient().messages.create({
     model: MODEL(),
     max_tokens: 5000,
     thinking: { type: 'adaptive' },
-    system: sys,
+    system: ketoRules(products) + imageFormat(unit),
     messages: [
       {
         role: 'user',
@@ -113,7 +172,7 @@ export async function estimateImage(b64, mediaType, unit, products = []) {
       },
     ],
   });
-  return parseJsonReply(message);
+  return normalizeImage(parseJsonReply(message));
 }
 
 // Turn raw Open Food Facts numbers into keto net carbs. OFF gives total carbs +
@@ -140,27 +199,14 @@ export async function interpretBarcode(off, unit, products = []) {
     off.per100.fiber == null
       ? ' שים לב: ערך הסיבים חסר במסד הנתונים — הערך אותו לפי סוג המוצר הידוע, וציין בפירוט שהסיבים הוערכו.'
       : '';
-  const unitRule = unit ? ` היחידה המבוקשת היא "${unit}".` : '';
-
-  const sys =
-    buildSys(products, false).replace(/ השב אך ורק.*$/, '') +
-    ' להלן נתוני מוצר ארוז שנסרק לפי ברקוד, מתוך מסד הנתונים Open Food Facts.' +
-    ' חשב פחמימות נטו לפי הכללים הקטוגניים שלמעלה (החסר סיבים; אריתריטול/אלולוז = 0; מלטיטול = חצי).' +
-    fiberNote +
-    ' החזר ערכים ל-100 גרם אלא אם המשתמש ביקש יחידה אחרת.' +
-    unitRule +
-    ' השב אך ורק ב-JSON תקין: {"name": "<כינוי קצר>", "label": "<תיאור מלא כולל מותג>", ' +
-    '"unit": "<היחידה, ברירת מחדל \\"100 גרם\\">", "net_carbs": <מספר>, "fat": <מספר>, ' +
-    '"protein": <מספר>, "breakdown": "<פירוט קצר בעברית>"} ללא טקסט נוסף וללא markdown.';
-
   const message = await getClient().messages.create({
     model: MODEL(),
     max_tokens: 5000,
     thinking: { type: 'adaptive' },
-    system: sys,
+    system: ketoRules(products) + barcodeFormat(unit, fiberNote),
     messages: [{ role: 'user', content: facts }],
   });
-  return parseJsonReply(message);
+  return normalizeBarcode(parseJsonReply(message));
 }
 
 export function aiConfigured() {
