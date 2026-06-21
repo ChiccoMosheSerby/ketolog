@@ -27,7 +27,6 @@ export default function AddMeal({
   // Voice dictation: append the recognized speech to whatever was typed before recording.
   const baseDescRef = useRef('');
   const speech = useSpeech({
-    debug: typeof window !== 'undefined' && window.location.search.includes('debug'),
     onTranscript: (text) => {
       const base = baseDescRef.current;
       setDesc(base + (base && text ? ' ' : '') + text);
