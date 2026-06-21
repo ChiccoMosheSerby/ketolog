@@ -1,8 +1,11 @@
 /* ---------- Toast ---------- */
 .toast {
   position: fixed;
-  bottom: 22px;
-  right: 22px;
+  /* Sit above the chat FAB (58px tall, anchored 22px from the bottom on the
+     inline-start edge) and on top of it in stacking order, so messages are
+     never hidden behind the icon. */
+  inset-block-end: 92px;
+  inset-inline-start: 22px;
   background: var(--toast-bg);
   color: #fff;
   padding: 12px 18px;
@@ -14,16 +17,15 @@
   transform: translateY(10px);
   transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   pointer-events: none;
-  z-index: 50;
+  z-index: 70;
   &.show {
     opacity: 1;
     transform: none;
   }
   /* On phones, anchor across the bottom so long messages don't overflow. */
   @media (max-width: 520px) {
-    left: 16px;
-    right: 16px;
-    bottom: 16px;
+    inset-inline: 16px;
+    inset-block-end: 90px;
     text-align: center;
   }
 }
