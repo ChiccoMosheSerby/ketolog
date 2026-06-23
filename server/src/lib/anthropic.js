@@ -5,7 +5,13 @@ export function getClient() {
   if (!process.env.ANTHROPIC_API_KEY) {
     throw new Error('ANTHROPIC_API_KEY is not set');
   }
-  if (!client) client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  if (!client) {
+    // The SDK retries transient failures (429 rate-limit, 408/409, and 5xx
+    // including 529 "overloaded") with exponential backoff + jitter, honoring
+    // any retry-after header. Bumping past the default of 2 makes brief API
+    // overloads self-heal instead of surfacing as a hard error mid-chat.
+    client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, maxRetries: 4 });
+  }
   return client;
 }
 // Estimators (meal/image/barcode → JSON) run on the strongest model with

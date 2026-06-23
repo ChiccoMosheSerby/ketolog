@@ -14,7 +14,12 @@ const conversationSchema = new mongoose.Schema(
     // state across reloads and prevents double-committing the same proposal.
     resolvedActions: { type: mongoose.Schema.Types.Mixed, default: {} },
   },
-  { timestamps: true }
+  // minimize:false is REQUIRED. Read tools that take no arguments produce a
+  // tool_use block with `input: {}`. With Mongoose's default minimize:true that
+  // empty object is stripped on save, so the reloaded thread replays to the
+  // Anthropic API as a tool_use with no `input` -> 400 "tool_use.input: Field
+  // required", which surfaced to users as "העוזר אינו זמין כרגע".
+  { timestamps: true, minimize: false }
 );
 
 export default mongoose.model('Conversation', conversationSchema);

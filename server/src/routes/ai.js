@@ -217,10 +217,28 @@ router.post('/chat', async (req, res) => {
 
     res.json({ conversationId: convo._id, reply, actions });
   } catch (err) {
-    console.error('chat failed:', err.message);
-    res.status(502).json({ error: 'העוזר אינו זמין כרגע' });
+    console.error('chat failed:', err.status || '', err.message);
+    res.status(502).json(chatError(err));
   }
 });
+
+// Map a thrown Anthropic API error to a user-facing Hebrew message plus a short
+// `code` so the real cause is visible client-side instead of a blanket
+// "unavailable". Overload/rate-limit (already retried by the SDK) get a
+// distinct "try again in a moment" so the user knows it's transient.
+function chatError(err) {
+  const status = err.status; // set by the Anthropic SDK on APIError subclasses
+  const m = (err.message || '').toLowerCase();
+  if (status === 429 || m.includes('rate limit'))
+    return { error: 'השירות עמוס כרגע — נסו שוב בעוד רגע', code: 'rate_limit' };
+  if (status === 529 || m.includes('overloaded'))
+    return { error: 'השירות עמוס כרגע — נסו שוב בעוד רגע', code: 'overloaded' };
+  if (status === 401 || m.includes('invalid x-api-key') || m.includes('authentication'))
+    return { error: 'מפתח ה-AI שגוי בשרת', code: 'auth' };
+  if (status === 400)
+    return { error: 'הבקשה נדחתה על ידי שירות ה-AI', code: 'bad_request' };
+  return { error: 'העוזר אינו זמין כרגע', code: 'unknown' };
+}
 
 // POST /api/ai/chat/:id/new -> not needed; omitting conversationId starts fresh.
 

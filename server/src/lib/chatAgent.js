@@ -217,12 +217,26 @@ function buildAction(toolUseId, name, input) {
  *
  * @returns {{ text: string, actions: object[] }}
  */
+// Heal threads persisted before the minimize:false fix: a no-argument tool call
+// was stored as a tool_use whose empty `input: {}` got stripped, and the API
+// rejects a tool_use with no `input`. Backfill `{}` so old conversations replay.
+function normalizeToolInputs(messages) {
+  for (const msg of messages) {
+    if (!Array.isArray(msg.content)) continue;
+    for (const block of msg.content) {
+      if (block && block.type === 'tool_use' && block.input == null) block.input = {};
+    }
+  }
+}
+
 export async function runChatTurn(messages, userId) {
   const client = getClient();
   const target = await getCarbTarget(userId);
   const system = buildSystem(target);
   const actions = [];
   let finalText = '';
+
+  normalizeToolInputs(messages);
 
   for (let turn = 0; turn < MAX_TURNS; turn++) {
     const resp = await client.messages.create({
