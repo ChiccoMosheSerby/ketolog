@@ -79,6 +79,10 @@ export function AuthProvider({ children }) {
     const r = await api.updateProfile({ dailyCarbTarget });
     setUser(r.user);
   }
+  async function updateKetoGoal({ ketoStartDate, ketoGoalMonths }) {
+    const r = await api.updateProfile({ ketoStartDate, ketoGoalMonths });
+    setUser(r.user);
+  }
 
   return (
     <AuthContext.Provider
@@ -89,6 +93,7 @@ export function AuthProvider({ children }) {
         register,
         logout,
         updateCarbTarget,
+        updateKetoGoal,
         needsOnboarding,
         startOnboarding,
         dismissOnboarding,

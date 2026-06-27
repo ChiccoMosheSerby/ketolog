@@ -73,6 +73,19 @@
   }
 }
 
+/* the keto-goal editor adds a date picker, which needs more room */
+.keto-set {
+  flex-wrap: wrap;
+
+  input[type='date'] {
+    width: auto;
+    min-width: 132px;
+  }
+  input[type='number'] {
+    width: 52px;
+  }
+}
+
 /* hamburger */
 .hamburger {
   flex: none;

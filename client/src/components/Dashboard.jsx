@@ -69,20 +69,28 @@ function HoursBars({ peakHours }) {
   );
 }
 
-// Most-logged foods, by how often the same description was recorded.
-function FoodList({ topFoods }) {
-  const max = Math.max(...topFoods.map((f) => f.count)) || 1;
+// Progress through the keto-period goal: a timeline bar (elapsed vs total) plus
+// remaining days and in-target adherence over the period so far.
+function KetoProgress({ keto }) {
   return (
-    <div className="cats">
-      {topFoods.map((f, i) => (
-        <div className="cat-row" key={i}>
-          <span className="cat-name" title={f.label}>{f.label}</span>
-          <span className="cat-track">
-            <i style={{ width: (f.count / max) * 100 + '%' }} />
-          </span>
-          <span className="cat-meta">×{f.count} · {fmt(f.avg)} ג' לארוחה</span>
-        </div>
-      ))}
+    <div className="keto">
+      <div className="keto-hero">
+        <span className="keto-num">{keto.done ? '✓' : keto.pct + '%'}</span>
+        <span className="keto-lab">
+          {keto.done
+            ? `יעד ${keto.months} חודשי הקיטו הושלם!`
+            : `${keto.elapsed} מתוך ${keto.totalDays} ימים · יעד ${keto.months} חודשים`}
+        </span>
+      </div>
+      <div className="keto-bar">
+        <i style={{ width: keto.pct + '%' }} />
+      </div>
+      <div className="keto-foot">
+        {heDate(keto.start)} – {heDate(keto.end)}
+        {!keto.done && ` · נותרו ${keto.remaining} ימים`}
+        {keto.loggedInPeriod > 0 &&
+          ` · ${keto.inTargetInPeriod}/${keto.loggedInPeriod} ימים ביעד בתקופה (${keto.adherence}%)`}
+      </div>
     </div>
   );
 }
@@ -112,8 +120,11 @@ function Coffee({ coffee }) {
   );
 }
 
-export default function Dashboard({ days, target = TARGET }) {
-  const a = useMemo(() => buildAnalytics(days, target), [days, target]);
+export default function Dashboard({ days, target = TARGET, today, ketoStart, ketoMonths }) {
+  const a = useMemo(
+    () => buildAnalytics(days, target, { today, ketoGoal: { start: ketoStart, months: ketoMonths } }),
+    [days, target, today, ketoStart, ketoMonths]
+  );
 
   if (!a.hasData) {
     return (
@@ -127,6 +138,18 @@ export default function Dashboard({ days, target = TARGET }) {
 
   return (
     <div className="dashboard">
+      {/* keto-period goal progress */}
+      <div className="panel d-panel">
+        <h2>תקופת הקיטו</h2>
+        {a.keto ? (
+          <KetoProgress keto={a.keto} />
+        ) : (
+          <div className="d-note">
+            להגדרת יעד לתקופת הקיטו (למשל 3 חודשים), פתח/י את ההגדרות ובחר/י תאריך התחלה ומספר חודשים.
+          </div>
+        )}
+      </div>
+
       {/* 1 · average macro balance */}
       <div className="panel d-panel">
         <h2>איזון מאקרו ממוצע</h2>
@@ -187,17 +210,7 @@ export default function Dashboard({ days, target = TARGET }) {
         )}
       </div>
 
-      {/* 5 · most-eaten food */}
-      <div className="panel d-panel">
-        <h2>המאכלים שנאכלו הכי הרבה</h2>
-        {a.topFoods.length ? (
-          <FoodList topFoods={a.topFoods} />
-        ) : (
-          <div className="d-note">עדיין אין מספיק ארוחות עם תיאור.</div>
-        )}
-      </div>
-
-      {/* 6 · coffee per day */}
+      {/* 5 · coffee per day */}
       <div className="panel d-panel">
         <h2>ממוצע קפה ליום</h2>
         {a.coffee.total ? (

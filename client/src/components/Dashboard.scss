@@ -233,6 +233,50 @@
   }
 }
 
+/* ---- keto-period progress ---- */
+.keto {
+  .keto-hero {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .keto-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    font-size: 34px;
+    line-height: 1;
+    color: var(--accent-ink);
+    letter-spacing: -0.02em;
+  }
+  .keto-lab {
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+  .keto-bar {
+    margin-top: 12px;
+    height: 14px;
+    background: var(--tint);
+    border-radius: 999px;
+    overflow: hidden;
+
+    i {
+      display: block;
+      height: 100%;
+      background: linear-gradient(90deg, var(--olive), var(--olive-soft));
+      border-radius: 999px;
+      transition: width 0.5s ease;
+    }
+  }
+  .keto-foot {
+    margin-top: 10px;
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    line-height: 1.5;
+  }
+}
+
 /* ---- coffee ---- */
 .coffee {
   .coffee-hero {

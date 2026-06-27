@@ -17,6 +17,46 @@ export function parseWeight(w) {
 const asc = (days) => [...days].sort((a, b) => a.date.localeCompare(b.date));
 const round1 = (n) => Math.round(n * 10) / 10;
 const mealsOf = (d) => d.meals || [];
+const pad2 = (n) => String(n).padStart(2, '0');
+
+// ISO date `months` after `iso` (calendar months — clamps day overflow the way
+// the Date constructor does, e.g. Jan 31 + 1mo → Mar 3, which is fine here).
+function addMonthsISO(iso, months) {
+  const [y, m, d] = iso.split('-').map(Number);
+  const dt = new Date(y, m - 1 + months, d);
+  return `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
+}
+// Whole days between two ISO dates (b - a). ISO strings parse as UTC midnight,
+// so the difference is exact regardless of timezone.
+const diffDays = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
+
+// Progress through a keto goal: where today sits between the start date and
+// start+months, plus in-target adherence over the (past) days of that window.
+export function buildKetoProgress(days, goal, today, target = TARGET) {
+  if (!goal || !goal.start || !goal.months || !today) return null;
+  const start = goal.start;
+  const end = addMonthsISO(start, goal.months);
+  const totalDays = Math.max(1, diffDays(start, end));
+  const elapsed = Math.min(Math.max(diffDays(start, today), 0), totalDays);
+  // adherence: logged, completed (past) days inside the window
+  const inWindow = days.filter(
+    (d) => mealsOf(d).length > 0 && d.date >= start && d.date < today && d.date <= end
+  );
+  const inTarget = inWindow.filter((d) => dayTotal(d) <= target).length;
+  return {
+    start,
+    end,
+    months: goal.months,
+    totalDays,
+    elapsed,
+    remaining: Math.max(0, totalDays - elapsed),
+    pct: Math.round((elapsed / totalDays) * 100),
+    done: diffDays(start, today) >= totalDays,
+    loggedInPeriod: inWindow.length,
+    inTargetInPeriod: inTarget,
+    adherence: inWindow.length ? Math.round((inTarget / inWindow.length) * 100) : 0,
+  };
+}
 
 // Longest run of consecutive `true`s in a boolean array, and the trailing run
 // (the streak ending at the last element). Used for "in-target" streaks over
@@ -35,8 +75,12 @@ function streaks(flags) {
 
 // The single object the Dashboard consumes. Every section is null/empty-safe so
 // the UI can simply hide a card when its data isn't there yet.
-export function buildAnalytics(days, target = TARGET) {
-  const all = asc(days);
+export function buildAnalytics(days, target = TARGET, opts = {}) {
+  const { today, ketoGoal } = opts;
+  // Statistics only count days that have already passed — today is still in
+  // progress, so including it would skew records (a half-eaten day looks
+  // "cleanest") and averages. Drop today (and any stray future date).
+  const all = asc(days).filter((d) => !today || d.date < today);
   // A "logged" day is one with at least one meal — metric-only days (just a
   // weight, say) shouldn't drag the carb averages down to 0.
   const logged = all.filter((d) => mealsOf(d).length > 0);
@@ -147,22 +191,6 @@ export function buildAnalytics(days, target = TARGET) {
     .map((e) => ({ ...e, carbs: round1(e.carbs), avg: round1(e.carbs / e.count) }))
     .sort((a, b) => b.carbs - a.carbs);
 
-  // ---- most-logged foods (by normalized free-text description) ----
-  const foodMap = new Map();
-  allMeals.forEach((m) => {
-    const raw = (m.desc || '').trim();
-    if (!raw) return;
-    const key = raw.replace(/\s+/g, ' ').toLowerCase();
-    const e = foodMap.get(key) || { label: raw, count: 0, carbs: 0 };
-    e.count += 1;
-    e.carbs += Number(m.carbs) || 0;
-    foodMap.set(key, e);
-  });
-  const topFoods = [...foodMap.values()]
-    .map((e) => ({ label: e.label, count: e.count, avg: round1(e.carbs / e.count) }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 6);
-
   // ---- coffee/day — detect coffee meals and bucket by type ----
   // A meal only counts as coffee when it actually mentions coffee, so a stray
   // "נס" elsewhere never registers. Order matters: espresso → instant → black.
@@ -214,7 +242,7 @@ export function buildAnalytics(days, target = TARGET) {
     categories,
     topMeals,
     peakHours,
-    topFoods,
     coffee,
+    keto: buildKetoProgress(days, ketoGoal, today, target),
   };
 }

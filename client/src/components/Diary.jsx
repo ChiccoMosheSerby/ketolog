@@ -295,7 +295,19 @@ export default function Diary() {
   const tabs = [
     { id: 'today', label: 'היום', content: todayTab },
     { id: 'history', label: 'יומן', content: historyTab },
-    { id: 'insights', label: 'תובנות', content: <Dashboard days={days} target={target} /> },
+    {
+      id: 'insights',
+      label: 'תובנות',
+      content: (
+        <Dashboard
+          days={days}
+          target={target}
+          today={todayISO()}
+          ketoStart={user?.ketoStartDate || ''}
+          ketoMonths={user?.ketoGoalMonths || 0}
+        />
+      ),
+    },
     ...(isMobile ? [{ id: 'products', label: 'המוצרים שלי', content: productsPanel }] : []),
   ];
 

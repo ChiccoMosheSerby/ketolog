@@ -3,6 +3,7 @@ import { useAuth } from '../lib/auth.jsx';
 import { useToast } from '../lib/toast.jsx';
 import { useMediaQuery, MOBILE_QUERY } from '../lib/useMediaQuery.js';
 import { useTheme } from '../lib/theme.js';
+import { todayISO } from '../lib/helpers.js';
 import CarbRing from './CarbRing.jsx';
 import './Header.scss';
 
@@ -127,6 +128,78 @@ function TargetSetting() {
   );
 }
 
+// Inline editor for the keto-period goal: a start date + a length in months.
+// Drives the progress chart on the dashboard. Empty/0 = no goal.
+function KetoGoalSetting() {
+  const { user, updateKetoGoal } = useAuth();
+  const toast = useToast();
+  const months = user?.ketoGoalMonths || 0;
+  const startDate = user?.ketoStartDate || '';
+  const [editing, setEditing] = useState(false);
+  const [start, setStart] = useState(startDate || todayISO());
+  const [mo, setMo] = useState(String(months || 3));
+  const [saving, setSaving] = useState(false);
+
+  function open() {
+    setStart(startDate || todayISO());
+    setMo(String(months || 3));
+    setEditing(true);
+  }
+
+  async function save(clear = false) {
+    const payload = clear
+      ? { ketoStartDate: '', ketoGoalMonths: 0 }
+      : { ketoStartDate: start, ketoGoalMonths: Number(mo) };
+    if (!clear) {
+      const m = Number(mo);
+      if (!start) return toast('בחר/י תאריך התחלה');
+      if (!Number.isInteger(m) || m < 1 || m > 60) return toast('משך לא תקין (1–60 חודשים)');
+    }
+    setSaving(true);
+    try {
+      await updateKetoGoal(payload);
+      toast(clear ? 'יעד הקיטו נמחק' : 'יעד הקיטו נשמר');
+      setEditing(false);
+    } catch (e) {
+      toast(e.message || 'העדכון נכשל');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (editing) {
+    return (
+      <span className="target-set keto-set">
+        <span>יעד קיטו:</span>
+        <input type="date" value={start} onChange={(e) => setStart(e.target.value)} />
+        <input
+          type="number"
+          min="1"
+          max="60"
+          step="1"
+          value={mo}
+          onChange={(e) => setMo(e.target.value)}
+          title="חודשים"
+        />
+        <span>ח'</span>
+        <button className="btn ghost mini" disabled={saving} onClick={() => save(false)}>
+          {saving ? '…' : 'שמור'}
+        </button>
+        {months > 0 && (
+          <button className="btn ghost mini" disabled={saving} onClick={() => save(true)}>
+            מחק
+          </button>
+        )}
+      </span>
+    );
+  }
+  return (
+    <button className="btn ghost mini" onClick={open}>
+      {months > 0 ? `יעד קיטו: ${months} ח' ✎` : 'הגדר יעד קיטו ✎'}
+    </button>
+  );
+}
+
 function AccountActions({ onCopyData, onAction }) {
   const { user, logout, startOnboarding } = useAuth();
   const { theme, toggle } = useTheme();
@@ -138,6 +211,7 @@ function AccountActions({ onCopyData, onAction }) {
     <div className="userbar">
       <span className="uemail">{user?.email}</span>
       <TargetSetting />
+      <KetoGoalSetting />
       <button
         className="btn ghost mini"
         onClick={toggle}
