@@ -32,6 +32,7 @@ export default function Diary() {
   const [templates, setTemplates] = useState([]);
   const [expanded, setExpanded] = useState(new Set());
   const [viewDate, setViewDate] = useState(''); // '' = show all (history filter)
+  const [historyOpen, setHistoryOpen] = useState(false); // folded journal under "today"
   const [jump, setJump] = useState(todayISO());
   const [activeDate, setActiveDate] = useState(todayISO()); // the day the "Today" tab + AddMeal point at
   const [loaded, setLoaded] = useState(false);
@@ -215,7 +216,12 @@ export default function Diary() {
     meals: [],
     metrics: {},
   };
-  const shown = viewDate ? days.filter((d) => d.date === viewDate) : days;
+  // The folded journal lists past days; the current day already has its own card
+  // above it, so drop it from the "all" view to avoid showing it twice.
+  const shown = viewDate
+    ? days.filter((d) => d.date === viewDate)
+    : days.filter((d) => d.date !== activeDate);
+  const journalCount = days.filter((d) => d.date !== activeDate).length;
 
   const canRepeat = (days.find((d) => d.date === prevISO(activeDate))?.meals || []).length > 0;
 
@@ -224,9 +230,49 @@ export default function Diary() {
     <Products products={products} onAdd={addProduct} onDelete={deleteProduct} compact={!isMobile} />
   );
 
+  const historyContent = (
+    <>
+      <div className="toolbar">
+        <label style={{ fontSize: 12, color: 'var(--ink-soft)' }}>קפיצה ליום:</label>
+        <input type="date" value={jump} onChange={(e) => setJump(e.target.value)} />
+        <button className="btn ghost mini" onClick={() => jump && setViewDate(jump)}>
+          הצג יום
+        </button>
+        <button className="btn ghost mini" onClick={() => setViewDate('')}>
+          כל הימים
+        </button>
+      </div>
+      <div id="days">
+        {!loaded ? null : shown.length === 0 ? (
+          <div className="empty">
+            {viewDate ? 'אין רישום ליום שנבחר.' : 'אין עדיין ימים קודמים ביומן.'}
+          </div>
+        ) : (
+          shown.map((d) => (
+            <DayCard
+              key={d.date}
+              iso={d.date}
+              day={d}
+              title={dayTitle(d.date)}
+              open={expanded.has(d.date)}
+              onToggle={() => toggle(d.date)}
+              onDeleteMeal={deleteMeal}
+              onSetMetric={setMetric}
+              onCopyMeal={copyMealToActive}
+              onSaveTemplate={saveMealAsTemplate}
+              onSaveProduct={saveMealAsProduct}
+              target={target}
+            />
+          ))
+        )}
+      </div>
+    </>
+  );
+
   // Desktop: a 2-col grid — products spans the full top row, then AddMeal (right
   // in RTL) and the current day sit below. Mobile: a plain block that stacks
-  // AddMeal + day, with products living in its own tab instead.
+  // AddMeal + day. The full journal lives below the current day as a folded
+  // section (no separate tab), so it's one scroll away on every breakpoint.
   const todayTab = (
     <div className="today-grid">
       {!isMobile && <div className="grid-top">{productsPanel}</div>}
@@ -253,52 +299,31 @@ export default function Diary() {
         onSaveProduct={saveMealAsProduct}
         target={target}
       />
-    </div>
-  );
 
-  const historyTab = (
-    <>
-      <div className="toolbar">
-        <label style={{ fontSize: 12, color: 'var(--ink-soft)' }}>קפיצה ליום:</label>
-        <input type="date" value={jump} onChange={(e) => setJump(e.target.value)} />
-        <button className="btn ghost mini" onClick={() => jump && setViewDate(jump)}>
-          הצג יום
+      <div className={'journal-fold' + (historyOpen ? ' open' : '')}>
+        <button
+          className="journal-head"
+          onClick={() => setHistoryOpen((o) => !o)}
+          aria-expanded={historyOpen}
+          data-tour="journal"
+        >
+          <span className="journal-htext">
+            <span className="journal-title">יומן</span>
+            <span className="journal-sub">כל הימים הקודמים</span>
+          </span>
+          <span className="journal-hright">
+            <span className="journal-count">{journalCount}</span>
+            <span className="chev"></span>
+          </span>
         </button>
-        <button className="btn ghost mini" onClick={() => setViewDate('')}>
-          כל הימים
-        </button>
+        {historyOpen && <div className="journal-body">{historyContent}</div>}
       </div>
-      <div id="days">
-        {!loaded ? null : shown.length === 0 ? (
-          <div className="empty">
-            {viewDate ? 'אין רישום ליום שנבחר.' : 'עדיין אין ימים מתועדים. הוסף ארוחה בלשונית "היום".'}
-          </div>
-        ) : (
-          shown.map((d) => (
-            <DayCard
-              key={d.date}
-              iso={d.date}
-              day={d}
-              title={dayTitle(d.date)}
-              open={expanded.has(d.date)}
-              onToggle={() => toggle(d.date)}
-              onDeleteMeal={deleteMeal}
-              onSetMetric={setMetric}
-              onCopyMeal={copyMealToActive}
-              onSaveTemplate={saveMealAsTemplate}
-              onSaveProduct={saveMealAsProduct}
-              target={target}
-            />
-          ))
-        )}
-      </div>
-    </>
+    </div>
   );
 
   // Products lives at the top of the today grid on desktop, so it's only a tab on mobile.
   const tabs = [
     { id: 'today', label: 'היום', content: todayTab },
-    { id: 'history', label: 'יומן', content: historyTab },
     {
       id: 'insights',
       label: 'תובנות',
