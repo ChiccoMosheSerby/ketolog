@@ -6,6 +6,7 @@ import { dayTotal, fmt, todayISO, dayHebrewName, prevISO, TARGET } from '../lib/
 import AddMeal from './AddMeal.jsx';
 import Products from './Products.jsx';
 import DayCard from './DayCard.jsx';
+import Dashboard from './Dashboard.jsx';
 import Header, { TargetLegend } from './Header.jsx';
 import TabShell from './TabShell.jsx';
 import { useMediaQuery, MOBILE_QUERY } from '../lib/useMediaQuery.js';
@@ -294,6 +295,19 @@ export default function Diary() {
   const tabs = [
     { id: 'today', label: 'היום', content: todayTab },
     { id: 'history', label: 'יומן', content: historyTab },
+    {
+      id: 'insights',
+      label: 'תובנות',
+      content: (
+        <Dashboard
+          days={days}
+          target={target}
+          today={todayISO()}
+          ketoStart={user?.ketoStartDate || ''}
+          ketoMonths={user?.ketoGoalMonths || 0}
+        />
+      ),
+    },
     ...(isMobile ? [{ id: 'products', label: 'המוצרים שלי', content: productsPanel }] : []),
   ];
 

@@ -1,0 +1,333 @@
+/* ============================================================
+   Dashboard — insights over the whole log. Reuses .panel + the
+   design tokens from base.scss; only dashboard-specific bits live here.
+   ============================================================ */
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  .d-panel {
+    padding: 18px 20px;
+  }
+}
+
+/* ---- stat tiles ---- */
+.d-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+
+  &.compact {
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  }
+}
+
+.d-tile {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+
+  .d-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    font-size: 26px;
+    line-height: 1;
+    color: var(--ink);
+    letter-spacing: -0.02em;
+  }
+  .d-sub {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    margin-inline-start: 2px;
+  }
+  .d-lab {
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    line-height: 1.35;
+  }
+
+  &.tone-good .d-num {
+    color: var(--accent-ink);
+  }
+  &.tone-warn .d-num {
+    color: var(--amber);
+  }
+  &.tone-bad .d-num {
+    color: var(--red);
+  }
+
+  /* the average-carb ring tile spans a bit wider and centers its gauge */
+  &.d-ring {
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 8px;
+
+    .ring-num {
+      font-family: 'IBM Plex Mono', monospace;
+      font-variant-numeric: tabular-nums;
+      font-weight: 700;
+      font-size: 17px;
+      color: var(--ink);
+    }
+    .d-lab {
+      text-align: center;
+    }
+  }
+}
+
+.d-span {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.d-note {
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: var(--accent-ink);
+}
+
+/* ---- macro balance ---- */
+.macro {
+  .macro-bar {
+    display: flex;
+    height: 16px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: var(--tint);
+
+    i {
+      display: block;
+      height: 100%;
+      transition: width 0.4s ease;
+    }
+  }
+  .macro-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--ink-soft);
+
+    .it {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    b {
+      color: var(--ink);
+      font-weight: 700;
+    }
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      display: inline-block;
+    }
+  }
+  .macro-foot {
+    margin-top: 12px;
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    line-height: 1.5;
+  }
+}
+
+/* ---- records / top meals ---- */
+.d-records {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.rec {
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+
+  &.good {
+    background: var(--green-tint);
+    border-color: var(--accent-line);
+  }
+  &.bad {
+    background: var(--danger-tint);
+    border-color: var(--danger-line);
+  }
+  .rec-cap {
+    font-size: 11.5px;
+    color: var(--ink-soft);
+  }
+  .rec-val {
+    font-family: 'IBM Plex Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    font-size: 22px;
+  }
+  &.good .rec-val {
+    color: var(--accent-ink);
+  }
+  &.bad .rec-val {
+    color: var(--red);
+  }
+  .rec-date {
+    font-size: 11.5px;
+    color: var(--ink-soft);
+  }
+}
+
+/* ---- category / hour / food bars ---- */
+.cats {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cat-row {
+  display: grid;
+  grid-template-columns: minmax(80px, 0.9fr) 1.4fr auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+
+  .cat-name {
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    &.mono {
+      font-family: 'IBM Plex Mono', monospace;
+      font-variant-numeric: tabular-nums;
+    }
+  }
+  .cat-track {
+    height: 10px;
+    background: var(--tint);
+    border-radius: 999px;
+    overflow: hidden;
+
+    i {
+      display: block;
+      height: 100%;
+      background: var(--olive);
+      border-radius: 999px;
+      transition: width 0.4s ease;
+    }
+  }
+  .cat-meta {
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    white-space: nowrap;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+}
+
+/* ---- keto-period progress ---- */
+.keto {
+  .keto-hero {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .keto-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    font-size: 34px;
+    line-height: 1;
+    color: var(--accent-ink);
+    letter-spacing: -0.02em;
+  }
+  .keto-lab {
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+  .keto-bar {
+    margin-top: 12px;
+    height: 14px;
+    background: var(--tint);
+    border-radius: 999px;
+    overflow: hidden;
+
+    i {
+      display: block;
+      height: 100%;
+      background: linear-gradient(90deg, var(--olive), var(--olive-soft));
+      border-radius: 999px;
+      transition: width 0.5s ease;
+    }
+  }
+  .keto-foot {
+    margin-top: 10px;
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    line-height: 1.5;
+  }
+}
+
+/* ---- coffee ---- */
+.coffee {
+  .coffee-hero {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .coffee-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    font-size: 34px;
+    line-height: 1;
+    color: var(--accent-ink);
+    letter-spacing: -0.02em;
+  }
+  .coffee-lab {
+    font-size: 12.5px;
+    color: var(--ink-soft);
+  }
+  .coffee-types {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
+
+    .chip {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 12.5px;
+      color: var(--ink-soft);
+
+      b {
+        color: var(--ink);
+        font-family: 'IBM Plex Mono', monospace;
+        font-variant-numeric: tabular-nums;
+        margin-inline-start: 4px;
+      }
+    }
+  }
+}
+
+@media (max-width: 560px) {
+  .d-records {
+    grid-template-columns: 1fr;
+  }
+  .cat-row {
+    grid-template-columns: minmax(64px, 0.8fr) 1fr auto;
+    gap: 8px;
+  }
+}

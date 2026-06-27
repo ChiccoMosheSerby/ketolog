@@ -24,7 +24,16 @@ function signToken(user) {
   return jwt.sign({ sub: user._id.toString() }, process.env.JWT_SECRET, { expiresIn: '30d' });
 }
 
-const userPayload = (u) => ({ id: u._id, email: u.email, dailyCarbTarget: u.dailyCarbTarget });
+const userPayload = (u) => ({
+  id: u._id,
+  email: u.email,
+  dailyCarbTarget: u.dailyCarbTarget,
+  ketoStartDate: u.ketoStartDate || '',
+  ketoGoalMonths: u.ketoGoalMonths || 0,
+});
+
+const PROFILE_FIELDS = 'email dailyCarbTarget ketoStartDate ketoGoalMonths';
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 // Base URL for the approval link in the email.
 //   1. APP_URL env wins if set (explicit override, trailing slash trimmed)
@@ -129,12 +138,12 @@ router.post('/approve', asyncHandler(async (req, res) => {
 }));
 
 router.get('/me', requireAuth, asyncHandler(async (req, res) => {
-  const user = await User.findById(req.userId).select('email dailyCarbTarget');
+  const user = await User.findById(req.userId).select(PROFILE_FIELDS);
   if (!user) return res.status(404).json({ error: 'משתמש לא נמצא' });
   res.json({ user: userPayload(user) });
 }));
 
-// PATCH /me -> update profile settings (currently the daily carb target)
+// PATCH /me -> update profile settings (daily carb target + keto-period goal)
 router.patch('/me', requireAuth, asyncHandler(async (req, res) => {
   const update = {};
   if (req.body.dailyCarbTarget != null) {
@@ -144,9 +153,21 @@ router.patch('/me', requireAuth, asyncHandler(async (req, res) => {
     }
     update.dailyCarbTarget = t;
   }
-  const user = await User.findByIdAndUpdate(req.userId, update, { new: true }).select(
-    'email dailyCarbTarget'
-  );
+  if (req.body.ketoGoalMonths != null) {
+    const m = Number(req.body.ketoGoalMonths);
+    if (!Number.isInteger(m) || m < 0 || m > 60) {
+      return res.status(400).json({ error: 'יעד תקופת קיטו לא תקין (0–60 חודשים)' });
+    }
+    update.ketoGoalMonths = m;
+  }
+  if (req.body.ketoStartDate != null) {
+    const d = String(req.body.ketoStartDate);
+    if (d !== '' && !ISO_DATE.test(d)) {
+      return res.status(400).json({ error: 'תאריך התחלה לא תקין' });
+    }
+    update.ketoStartDate = d;
+  }
+  const user = await User.findByIdAndUpdate(req.userId, update, { new: true }).select(PROFILE_FIELDS);
   if (!user) return res.status(404).json({ error: 'משתמש לא נמצא' });
   res.json({ user: userPayload(user) });
 }));
