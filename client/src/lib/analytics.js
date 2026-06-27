@@ -32,9 +32,14 @@ const diffDays = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000
 
 // Progress through a keto goal: where today sits between the start date and
 // start+months, plus in-target adherence over the (past) days of that window.
+// The start is the first day of keto *according to the journal* — the earliest
+// day that carries a logged meal — not a manually picked date. With no logged
+// days yet there's no period to show.
 export function buildKetoProgress(days, goal, today, target = TARGET) {
-  if (!goal || !goal.start || !goal.months || !today) return null;
-  const start = goal.start;
+  if (!goal || !goal.months || !today) return null;
+  const loggedDates = days.filter((d) => mealsOf(d).length > 0).map((d) => d.date);
+  if (!loggedDates.length) return null;
+  const start = loggedDates.reduce((a, b) => (a < b ? a : b));
   const end = addMonthsISO(start, goal.months);
   const totalDays = Math.max(1, diffDays(start, end));
   const elapsed = Math.min(Math.max(diffDays(start, today), 0), totalDays);

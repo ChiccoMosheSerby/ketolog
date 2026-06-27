@@ -3,7 +3,6 @@ import { useAuth } from '../lib/auth.jsx';
 import { useToast } from '../lib/toast.jsx';
 import { useMediaQuery, MOBILE_QUERY } from '../lib/useMediaQuery.js';
 import { useTheme } from '../lib/theme.js';
-import { todayISO } from '../lib/helpers.js';
 import CarbRing from './CarbRing.jsx';
 import './Header.scss';
 
@@ -128,31 +127,26 @@ function TargetSetting() {
   );
 }
 
-// Inline editor for the keto-period goal: a start date + a length in months.
-// Drives the progress chart on the dashboard. Empty/0 = no goal.
+// Inline editor for the keto-period goal: just a length in months. The period
+// starts on the first day recorded in the journal, so there's no start-date
+// picker. Drives the progress chart on the dashboard. 0 months = no goal.
 function KetoGoalSetting() {
   const { user, updateKetoGoal } = useAuth();
   const toast = useToast();
   const months = user?.ketoGoalMonths || 0;
-  const startDate = user?.ketoStartDate || '';
   const [editing, setEditing] = useState(false);
-  const [start, setStart] = useState(startDate || todayISO());
   const [mo, setMo] = useState(String(months || 3));
   const [saving, setSaving] = useState(false);
 
   function open() {
-    setStart(startDate || todayISO());
     setMo(String(months || 3));
     setEditing(true);
   }
 
   async function save(clear = false) {
-    const payload = clear
-      ? { ketoStartDate: '', ketoGoalMonths: 0 }
-      : { ketoStartDate: start, ketoGoalMonths: Number(mo) };
+    const payload = clear ? { ketoGoalMonths: 0 } : { ketoGoalMonths: Number(mo) };
     if (!clear) {
       const m = Number(mo);
-      if (!start) return toast('בחר/י תאריך התחלה');
       if (!Number.isInteger(m) || m < 1 || m > 60) return toast('משך לא תקין (1–60 חודשים)');
     }
     setSaving(true);
@@ -171,7 +165,6 @@ function KetoGoalSetting() {
     return (
       <span className="target-set keto-set">
         <span>יעד קיטו:</span>
-        <input type="date" value={start} onChange={(e) => setStart(e.target.value)} />
         <input
           type="number"
           min="1"

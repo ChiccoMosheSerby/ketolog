@@ -303,7 +303,6 @@ export default function Diary() {
           days={days}
           target={target}
           today={todayISO()}
-          ketoStart={user?.ketoStartDate || ''}
           ketoMonths={user?.ketoGoalMonths || 0}
         />
       ),

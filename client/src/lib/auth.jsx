@@ -79,8 +79,8 @@ export function AuthProvider({ children }) {
     const r = await api.updateProfile({ dailyCarbTarget });
     setUser(r.user);
   }
-  async function updateKetoGoal({ ketoStartDate, ketoGoalMonths }) {
-    const r = await api.updateProfile({ ketoStartDate, ketoGoalMonths });
+  async function updateKetoGoal({ ketoGoalMonths }) {
+    const r = await api.updateProfile({ ketoGoalMonths });
     setUser(r.user);
   }
 

@@ -120,10 +120,10 @@ function Coffee({ coffee }) {
   );
 }
 
-export default function Dashboard({ days, target = TARGET, today, ketoStart, ketoMonths }) {
+export default function Dashboard({ days, target = TARGET, today, ketoMonths }) {
   const a = useMemo(
-    () => buildAnalytics(days, target, { today, ketoGoal: { start: ketoStart, months: ketoMonths } }),
-    [days, target, today, ketoStart, ketoMonths]
+    () => buildAnalytics(days, target, { today, ketoGoal: { months: ketoMonths } }),
+    [days, target, today, ketoMonths]
   );
 
   if (!a.hasData) {
@@ -145,7 +145,7 @@ export default function Dashboard({ days, target = TARGET, today, ketoStart, ket
           <KetoProgress keto={a.keto} />
         ) : (
           <div className="d-note">
-            להגדרת יעד לתקופת הקיטו (למשל 3 חודשים), פתח/י את ההגדרות ובחר/י תאריך התחלה ומספר חודשים.
+            להגדרת יעד לתקופת הקיטו (למשל 3 חודשים), פתח/י את ההגדרות ובחר/י מספר חודשים. הספירה תתחיל מהיום הראשון ביומן.
           </div>
         )}
       </div>
