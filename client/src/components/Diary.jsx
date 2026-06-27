@@ -194,9 +194,13 @@ export default function Diary() {
   }
 
   // ---- summary (persistent header) ----
-  const totals = days.map(dayTotal);
-  const avg = totals.length ? totals.reduce((a, b) => a + b, 0) / totals.length : 0;
   const t = todayISO();
+  // Average over *past* logged days only — today is still in progress, so
+  // counting it would drag the average down (matches the insights tab).
+  const totals = days
+    .filter((d) => d.date < t && (d.meals || []).length > 0)
+    .map(dayTotal);
+  const avg = totals.length ? totals.reduce((a, b) => a + b, 0) / totals.length : 0;
   const today = days.find((d) => d.date === t);
   const stats = {
     avg: totals.length ? fmt(avg) : '–',
