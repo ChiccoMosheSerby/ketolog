@@ -1,71 +1,26 @@
 import { useMemo } from 'react';
 import { buildAnalytics } from '../lib/analytics.js';
-import { zoneInfo, fmt, heDate, TARGET } from '../lib/helpers.js';
+import { fmt, heDate, TARGET } from '../lib/helpers.js';
 import CarbRing from './CarbRing.jsx';
 import './Dashboard.scss';
 
-// dd.m — compact axis/label date (RTL-safe: reads as a single number cluster)
-function shortDate(iso) {
-  const [, m, d] = iso.split('-');
-  return Number(d) + '.' + Number(m);
-}
+const pad2 = (n) => String(n).padStart(2, '0');
+// "08:00–09:00" — the one-hour bucket a meal time falls into
+const hourRange = (h) => `${pad2(h)}:00–${pad2((h + 1) % 24)}:00`;
 
-// ---- tiny inline charts (no chart lib — keeps the bundle lean) ----
+// ---- small presentational pieces ----
 
-// Daily net-carb bars over the (chronological) log, oldest→newest left→right,
-// each bar colored by the same zone logic as the rest of the app, with the
-// daily target drawn as a dashed line across the plot.
-function CarbTrend({ series, target }) {
-  const W = 720;
-  const H = 200;
-  const padX = 8;
-  const padTop = 14;
-  const padBottom = 26;
-  const plotH = H - padTop - padBottom;
-  const max = Math.max(target, ...series.map((p) => p.total)) * 1.12 || 1;
-  const n = series.length;
-  const slot = (W - padX * 2) / n;
-  const barW = Math.max(2, Math.min(26, slot * 0.7));
-  const y = (v) => padTop + plotH * (1 - v / max);
-  const targetY = y(target);
-  // thin out x labels so they never collide
-  const step = Math.ceil(n / 12);
-
+function Tile({ num, sub, lab, tone }) {
   return (
-    <div className="chart-scroll">
-      <svg className="trend" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img"
-           aria-label="מגמת פחמימות נטו יומית">
-        {/* target line */}
-        <line x1={padX} x2={W - padX} y1={targetY} y2={targetY}
-              stroke="var(--olive-soft)" strokeWidth="1.5" strokeDasharray="5 5" />
-        <text x={W - padX} y={targetY - 5} textAnchor="end" className="trend-tl">
-          יעד {fmt(target)} ג'
-        </text>
-        {series.map((p, i) => {
-          const cx = padX + slot * i + (slot - barW) / 2;
-          const yy = y(p.total);
-          const h = Math.max(1, padTop + plotH - yy);
-          return (
-            <g key={p.date}>
-              <rect x={cx} y={yy} width={barW} height={h} rx="2.5"
-                    fill={zoneInfo(p.total, target).color}>
-                <title>{`${shortDate(p.date)} · ${fmt(p.total)} ג'`}</title>
-              </rect>
-              {i % step === 0 && (
-                <text x={cx + barW / 2} y={H - 8} textAnchor="middle" className="trend-x">
-                  {shortDate(p.date)}
-                </text>
-              )}
-            </g>
-          );
-        })}
-      </svg>
+    <div className={'d-tile' + (tone ? ' tone-' + tone : '')}>
+      <span className="d-num">{num}{sub && <span className="d-sub">{sub}</span>}</span>
+      <span className="d-lab">{lab}</span>
     </div>
   );
 }
 
-// Average keto macro split (calorie %) drawn as a stacked bar, mirroring the
-// header's TargetLegend so the two read the same way.
+// Average keto macro split (calorie %) as a stacked bar, mirroring the header
+// TargetLegend so the two read the same way.
 function MacroBalance({ macroAvg }) {
   const segs = [
     { key: 'fat', label: 'שומן', pct: macroAvg.fat, color: 'var(--olive)' },
@@ -95,63 +50,64 @@ function MacroBalance({ macroAvg }) {
   );
 }
 
-// Weight over time as a sparkline polyline with start/min/max framing.
-function WeightSpark({ weight }) {
-  const W = 720;
-  const H = 150;
-  const padX = 10;
-  const padY = 16;
-  const pts = weight.points;
-  const lo = Math.min(...pts.map((p) => p.w));
-  const hi = Math.max(...pts.map((p) => p.w));
-  const span = hi - lo || 1;
-  const x = (i) => padX + (i / Math.max(1, pts.length - 1)) * (W - padX * 2);
-  const y = (w) => padY + (1 - (w - lo) / span) * (H - padY * 2);
-  const d = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)} ${y(p.w).toFixed(1)}`).join(' ');
-  const area = `${d} L${x(pts.length - 1).toFixed(1)} ${H - padY} L${x(0).toFixed(1)} ${H - padY} Z`;
-
-  return (
-    <div className="chart-scroll">
-      <svg className="spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img"
-           aria-label="מגמת משקל">
-        <path d={area} fill="var(--green-tint)" stroke="none" />
-        <path d={d} fill="none" stroke="var(--accent-ink)" strokeWidth="2"
-              strokeLinejoin="round" strokeLinecap="round" />
-        {pts.map((p, i) => (
-          <circle key={p.date} cx={x(i)} cy={y(p.w)} r={i === pts.length - 1 ? 4 : 2.5}
-                  fill="var(--accent-ink)">
-            <title>{`${shortDate(p.date)} · ${fmt(p.w)}`}</title>
-          </circle>
-        ))}
-      </svg>
-    </div>
-  );
-}
-
-// Horizontal "count" bars for the most-logged meal categories.
-function CategoryBars({ categories }) {
-  const top = categories.slice(0, 6);
-  const max = Math.max(...top.map((c) => c.count)) || 1;
+// Horizontal bars of net carbs per hour-of-day, busiest hours first.
+function HoursBars({ peakHours }) {
+  const top = peakHours.slice(0, 6);
+  const max = Math.max(...top.map((h) => h.carbs)) || 1;
   return (
     <div className="cats">
-      {top.map((c) => (
-        <div className="cat-row" key={c.cat}>
-          <span className="cat-name" title={c.cat}>{c.cat}</span>
+      {top.map((h) => (
+        <div className="cat-row" key={h.hour}>
+          <span className="cat-name mono">{hourRange(h.hour)}</span>
           <span className="cat-track">
-            <i style={{ width: (c.count / max) * 100 + '%' }} />
+            <i style={{ width: (h.carbs / max) * 100 + '%', background: 'var(--amber)' }} />
           </span>
-          <span className="cat-meta">{c.count} · {fmt(c.avg)} ג' לארוחה</span>
+          <span className="cat-meta">{fmt(h.carbs)} ג' · {h.count} ארוחות</span>
         </div>
       ))}
     </div>
   );
 }
 
-function Tile({ num, sub, lab, tone }) {
+// Most-logged foods, by how often the same description was recorded.
+function FoodList({ topFoods }) {
+  const max = Math.max(...topFoods.map((f) => f.count)) || 1;
   return (
-    <div className={'d-tile' + (tone ? ' tone-' + tone : '')}>
-      <span className="d-num">{num}{sub && <span className="d-sub">{sub}</span>}</span>
-      <span className="d-lab">{lab}</span>
+    <div className="cats">
+      {topFoods.map((f, i) => (
+        <div className="cat-row" key={i}>
+          <span className="cat-name" title={f.label}>{f.label}</span>
+          <span className="cat-track">
+            <i style={{ width: (f.count / max) * 100 + '%' }} />
+          </span>
+          <span className="cat-meta">×{f.count} · {fmt(f.avg)} ג' לארוחה</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Average coffees/day + a breakdown by type (black / espresso / instant).
+function Coffee({ coffee }) {
+  const types = [
+    { key: 'black', label: 'שחור', n: coffee.types.black },
+    { key: 'espresso', label: 'אספרסו', n: coffee.types.espresso },
+    { key: 'instant', label: 'נס', n: coffee.types.instant },
+    ...(coffee.types.other ? [{ key: 'other', label: 'אחר', n: coffee.types.other }] : []),
+  ];
+  return (
+    <div className="coffee">
+      <div className="coffee-hero">
+        <span className="coffee-num">{fmt(coffee.perDay)}</span>
+        <span className="coffee-lab">כוסות קפה ליום בממוצע · {coffee.total} סה"כ ☕</span>
+      </div>
+      <div className="coffee-types">
+        {types.map((t) => (
+          <span className="chip" key={t.key}>
+            {t.label} <b>{t.n}</b>
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
@@ -169,18 +125,21 @@ export default function Dashboard({ days, target = TARGET }) {
     );
   }
 
-  const trendNote =
-    a.avg7 && a.loggedDays > 7
-      ? a.avg7 < a.avg
-        ? `ממוצע 7 הימים האחרונים (${fmt(a.avg7)} ג') נמוך מהממוצע הכולל — מגמה טובה ⬇`
-        : `ממוצע 7 הימים האחרונים: ${fmt(a.avg7)} ג'`
-      : null;
-
   return (
     <div className="dashboard">
-      {/* headline tiles */}
+      {/* 1 · average macro balance */}
       <div className="panel d-panel">
-        <h2>תמונת מצב</h2>
+        <h2>איזון מאקרו ממוצע</h2>
+        {a.macroAvg ? (
+          <MacroBalance macroAvg={a.macroAvg} />
+        ) : (
+          <div className="d-note">אין עדיין ארוחות עם פירוט שומן/חלבון לחישוב האיזון.</div>
+        )}
+      </div>
+
+      {/* 2 · daily average + streaks */}
+      <div className="panel d-panel">
+        <h2>ממוצע יומי ורצפים</h2>
         <div className="d-tiles">
           <div className="d-tile d-ring">
             <CarbRing consumed={a.avg} target={target} size={66} stroke={7}>
@@ -188,26 +147,16 @@ export default function Dashboard({ days, target = TARGET }) {
             </CarbRing>
             <span className="d-lab">ממוצע נטו ליום (יעד {fmt(target)})</span>
           </div>
-          <Tile num={a.inTargetRate} sub="%" lab={`ימים ביעד (${a.inTargetCount}/${a.loggedDays})`}
-                tone={a.inTargetRate >= 70 ? 'good' : a.inTargetRate >= 40 ? 'warn' : 'bad'} />
-          <Tile num={a.currentStreak} lab="רצף נוכחי ביעד" tone={a.currentStreak > 0 ? 'good' : null} />
-          <Tile num={a.longestStreak} lab="הרצף הארוך ביותר" />
-          <Tile num={a.loggedDays} lab="ימים מתועדים" />
-          <Tile num={a.totalMeals} sub={` · ${fmt(a.avgMeals)}/יום`} lab="ארוחות נרשמו" />
+          <Tile num={a.longestStreak} sub=" ימים" lab="הרצף הארוך ביותר ביעד" />
+          <Tile num={a.currentStreak} sub=" ימים" lab="הרצף הנוכחי ביעד"
+                tone={a.currentStreak > 0 ? 'good' : null} />
         </div>
         {a.span && (
-          <div className="d-span">מתועד מ-{heDate(a.span.from)} עד {heDate(a.span.to)}</div>
+          <div className="d-span">{a.loggedDays} ימים מתועדים · {heDate(a.span.from)} – {heDate(a.span.to)}</div>
         )}
       </div>
 
-      {/* carb trend */}
-      <div className="panel d-panel">
-        <h2>מגמת פחמימות נטו</h2>
-        <CarbTrend series={a.series} target={target} />
-        {trendNote && <div className="d-note">{trendNote}</div>}
-      </div>
-
-      {/* best / worst */}
+      {/* 3 · records (best / worst day) */}
       <div className="panel d-panel">
         <h2>שיאים</h2>
         <div className="d-records">
@@ -226,60 +175,37 @@ export default function Dashboard({ days, target = TARGET }) {
             </div>
           )}
         </div>
-        {a.topMeals.length > 0 && (
-          <>
-            <div className="d-subhead">הארוחות עתירות הפחמימות</div>
-            <ul className="d-list">
-              {a.topMeals.map((m, i) => (
-                <li key={i}>
-                  <span className="li-carb">{fmt(m.carbs)} ג'</span>
-                  <span className="li-label">{m.label}</span>
-                  <span className="li-date">{shortDate(m.date)}</span>
-                </li>
-              ))}
-            </ul>
-          </>
+      </div>
+
+      {/* 4 · peak carb hours */}
+      <div className="panel d-panel">
+        <h2>השעות העתירות בפחמימות</h2>
+        {a.peakHours.length ? (
+          <HoursBars peakHours={a.peakHours} />
+        ) : (
+          <div className="d-note">אין מספיק ארוחות עם שעת רישום כדי לחשב את התפלגות השעות.</div>
         )}
       </div>
 
-      {/* macro balance */}
-      {a.macroAvg && (
-        <div className="panel d-panel">
-          <h2>איזון מאקרו ממוצע</h2>
-          <MacroBalance macroAvg={a.macroAvg} />
-        </div>
-      )}
-
-      {/* weight */}
-      {a.weight && (
-        <div className="panel d-panel">
-          <h2>מגמת משקל</h2>
-          <div className="d-tiles compact">
-            <Tile num={fmt(a.weight.start)} lab="התחלה" />
-            <Tile num={fmt(a.weight.current)} lab="נוכחי" />
-            <Tile num={(a.weight.delta > 0 ? '+' : '') + fmt(a.weight.delta)} lab="שינוי"
-                  tone={a.weight.delta < 0 ? 'good' : a.weight.delta > 0 ? 'warn' : null} />
-          </div>
-          <WeightSpark weight={a.weight} />
-        </div>
-      )}
-
-      {/* activity */}
+      {/* 5 · most-eaten food */}
       <div className="panel d-panel">
-        <h2>פעילות</h2>
-        <div className="d-tiles compact">
-          <Tile num={a.activity.runDays} sub={` · ${a.activity.runRate}%`} lab="ימי ריצה" />
-          <Tile num={a.activity.absDays} lab="ימי בטן" />
-        </div>
+        <h2>המאכלים שנאכלו הכי הרבה</h2>
+        {a.topFoods.length ? (
+          <FoodList topFoods={a.topFoods} />
+        ) : (
+          <div className="d-note">עדיין אין מספיק ארוחות עם תיאור.</div>
+        )}
       </div>
 
-      {/* categories */}
-      {a.categories.length > 0 && (
-        <div className="panel d-panel">
-          <h2>קטגוריות מובילות</h2>
-          <CategoryBars categories={a.categories} />
-        </div>
-      )}
+      {/* 6 · coffee per day */}
+      <div className="panel d-panel">
+        <h2>ממוצע קפה ליום</h2>
+        {a.coffee.total ? (
+          <Coffee coffee={a.coffee} />
+        ) : (
+          <div className="d-note">לא זוהו ארוחות קפה (שחור · אספרסו · נס) ביומן.</div>
+        )}
+      </div>
     </div>
   );
 }

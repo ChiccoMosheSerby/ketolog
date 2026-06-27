@@ -96,39 +96,6 @@
   color: var(--accent-ink);
 }
 
-.d-subhead {
-  margin: 16px 0 8px;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--ink-soft);
-}
-
-/* ---- charts ---- */
-.chart-scroll {
-  width: 100%;
-  overflow-x: auto;
-
-  svg {
-    display: block;
-    width: 100%;
-    min-width: 320px;
-    height: auto;
-  }
-}
-
-.trend {
-  .trend-x {
-    font-size: 11px;
-    fill: var(--ink-soft);
-    font-family: 'IBM Plex Mono', monospace;
-  }
-  .trend-tl {
-    font-size: 11px;
-    fill: var(--olive-soft);
-    font-family: 'IBM Plex Mono', monospace;
-  }
-}
-
 /* ---- macro balance ---- */
 .macro {
   .macro-bar {
@@ -220,48 +187,7 @@
   }
 }
 
-.d-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-
-  li {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 0;
-    border-top: 1px solid var(--line);
-    font-size: 13.5px;
-
-    &:first-child {
-      border-top: none;
-    }
-    .li-carb {
-      font-family: 'IBM Plex Mono', monospace;
-      font-variant-numeric: tabular-nums;
-      font-weight: 700;
-      color: var(--amber);
-      min-width: 52px;
-    }
-    .li-label {
-      flex: 1;
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      color: var(--ink);
-    }
-    .li-date {
-      font-size: 12px;
-      color: var(--ink-soft);
-      font-family: 'IBM Plex Mono', monospace;
-    }
-  }
-}
-
-/* ---- category bars ---- */
+/* ---- category / hour / food bars ---- */
 .cats {
   display: flex;
   flex-direction: column;
@@ -279,6 +205,11 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+
+    &.mono {
+      font-family: 'IBM Plex Mono', monospace;
+      font-variant-numeric: tabular-nums;
+    }
   }
   .cat-track {
     height: 10px;
@@ -299,6 +230,51 @@
     color: var(--ink-soft);
     white-space: nowrap;
     font-family: 'IBM Plex Mono', monospace;
+  }
+}
+
+/* ---- coffee ---- */
+.coffee {
+  .coffee-hero {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .coffee-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    font-size: 34px;
+    line-height: 1;
+    color: var(--accent-ink);
+    letter-spacing: -0.02em;
+  }
+  .coffee-lab {
+    font-size: 12.5px;
+    color: var(--ink-soft);
+  }
+  .coffee-types {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
+
+    .chip {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 12.5px;
+      color: var(--ink-soft);
+
+      b {
+        color: var(--ink);
+        font-family: 'IBM Plex Mono', monospace;
+        font-variant-numeric: tabular-nums;
+        margin-inline-start: 4px;
+      }
+    }
   }
 }
 

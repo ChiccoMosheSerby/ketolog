@@ -131,6 +131,62 @@ export function buildAnalytics(days, target = TARGET) {
       label: (m.desc || m.cat || 'ארוחה').trim(),
     }));
 
+  // ---- carb load by hour-of-day (only meals that carry a HH:MM time) ----
+  const hourMap = new Map();
+  allMeals.forEach((m) => {
+    const t = String(m.time || '');
+    if (!/^\d{1,2}:\d{2}$/.test(t)) return;
+    const h = parseInt(t.slice(0, 2), 10);
+    if (h < 0 || h > 23) return;
+    const e = hourMap.get(h) || { hour: h, carbs: 0, count: 0 };
+    e.carbs += Number(m.carbs) || 0;
+    e.count += 1;
+    hourMap.set(h, e);
+  });
+  const peakHours = [...hourMap.values()]
+    .map((e) => ({ ...e, carbs: round1(e.carbs), avg: round1(e.carbs / e.count) }))
+    .sort((a, b) => b.carbs - a.carbs);
+
+  // ---- most-logged foods (by normalized free-text description) ----
+  const foodMap = new Map();
+  allMeals.forEach((m) => {
+    const raw = (m.desc || '').trim();
+    if (!raw) return;
+    const key = raw.replace(/\s+/g, ' ').toLowerCase();
+    const e = foodMap.get(key) || { label: raw, count: 0, carbs: 0 };
+    e.count += 1;
+    e.carbs += Number(m.carbs) || 0;
+    foodMap.set(key, e);
+  });
+  const topFoods = [...foodMap.values()]
+    .map((e) => ({ label: e.label, count: e.count, avg: round1(e.carbs / e.count) }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 6);
+
+  // ---- coffee/day — detect coffee meals and bucket by type ----
+  // A meal only counts as coffee when it actually mentions coffee, so a stray
+  // "נס" elsewhere never registers. Order matters: espresso → instant → black.
+  const COFFEE = /קפה|אספרסו|espresso|קפוצ['׳]?ינו|cappuccino|לאטה|latte|מקיאטו|אמריקנו/i;
+  const ESPRESSO = /אספרסו|espresso/i;
+  const INSTANT = /נס[\s-]?קפה|נסקפה|נסטל[ה]?|\bנס\b/u;
+  const BLACK = /שחור|שחורה/;
+  const coffeeTypes = { black: 0, espresso: 0, instant: 0, other: 0 };
+  let coffeeTotal = 0;
+  allMeals.forEach((m) => {
+    const text = `${m.desc || ''} ${m.cat || ''}`;
+    if (!COFFEE.test(text)) return;
+    coffeeTotal += 1;
+    if (ESPRESSO.test(text)) coffeeTypes.espresso += 1;
+    else if (INSTANT.test(text)) coffeeTypes.instant += 1;
+    else if (BLACK.test(text)) coffeeTypes.black += 1;
+    else coffeeTypes.other += 1;
+  });
+  const coffee = {
+    total: coffeeTotal,
+    perDay: logged.length ? round1(coffeeTotal / logged.length) : 0,
+    types: coffeeTypes,
+  };
+
   return {
     hasData: logged.length > 0,
     loggedDays: logged.length,
@@ -157,5 +213,8 @@ export function buildAnalytics(days, target = TARGET) {
     avgMeals: logged.length ? round1(totalMeals / logged.length) : 0,
     categories,
     topMeals,
+    peakHours,
+    topFoods,
+    coffee,
   };
 }
