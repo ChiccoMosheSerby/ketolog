@@ -15,6 +15,7 @@ export default function DayCard({
   onCopyMeal,
   onSaveTemplate,
   onSaveProduct,
+  onSaveItemProduct,
   target = TARGET,
 }) {
   const mt = day.metrics || {};
@@ -89,11 +90,36 @@ export default function DayCard({
                 עדיין אין ארוחות ליום הזה.
               </div>
             ) : (
-              meals.map((m) => (
+              meals.map((m) => {
+                const items = Array.isArray(m.items) ? m.items : [];
+                return (
                 <div className="meal" key={m._id}>
                   <div className="time">{m.time || '--:--'}</div>
                   <div className="body">
                     <div className="desc">{m.desc || m.cat}</div>
+                    {items.length > 0 && (
+                      <ul className="meal-items">
+                        {items.map((it, i) => (
+                          <li key={i}>
+                            <span className="mi-name">
+                              {it.qty > 1 && <b className="mi-qty">{fmt(it.qty)}×</b>} {it.name}
+                            </span>
+                            <span className="mi-carb">
+                              {fmt((Number(it.carbs) || 0) * (it.qty || 1))} ג'
+                            </span>
+                            {onSaveItemProduct && (
+                              <button
+                                className="mi-save"
+                                title="הוסף למוצרים שלי"
+                                onClick={() => onSaveItemProduct(it)}
+                              >
+                                📦
+                              </button>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                   <div className="carb">{fmt(Number(m.carbs) || 0)} ג'</div>
                   <div className="meal-acts">
@@ -121,7 +147,8 @@ export default function DayCard({
                     </button>
                   </div>
                 </div>
-              ))
+                );
+              })
             )}
           </div>
 

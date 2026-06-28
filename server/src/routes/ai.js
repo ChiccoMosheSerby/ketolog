@@ -34,7 +34,7 @@ router.post('/transcribe', async (req, res) => {
   }
 });
 
-// POST /api/ai/estimate-meal { desc } -> { net_carbs, fat, protein, breakdown }
+// POST /api/ai/estimate-meal { desc } -> { net_carbs, fat, protein, items[] }
 router.post('/estimate-meal', async (req, res) => {
   if (!aiConfigured()) return res.status(503).json({ error: 'מפתח ה-AI לא הוגדר בשרת' });
   const desc = (req.body.desc || '').trim();

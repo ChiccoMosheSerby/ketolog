@@ -54,8 +54,16 @@ function ketoRules(products = []) {
 
 // ---- per-task output-format instructions (appended after ketoRules) --------
 const MEAL_FORMAT =
-  ' השב אך ורק ב-JSON תקין בפורמט: ' +
-  '{"net_carbs": <מספר>, "fat": <מספר>, "protein": <מספר>, "breakdown": "<פירוט קצר בעברית, כל פריט בשורה>"}' +
+  ' פרק/י את הארוחה לפריטים נפרדים בדיוק כפי שנרשמו — אל תאחד/י פריטים זהים. ' +
+  'אם הפריט נכתב כמה פעמים (למשל "נקניקיה, נקניקיה, נקניקיה"), החזר/י שורה נפרדת לכל מופע, ולא פריט אחד עם כמות. ' +
+  'לכל פריט ציין/י את הערכים ל‏יחידה אחת, ואת מספר היחידות (qty) רק כאשר המשתמש ציין במפורש כמות לאותה שורה ' +
+  '(למשל "3 ביצים" = qty=3); אחרת qty=1. היחידה (unit) תהיה בלשון יחיד וקצרה ' +
+  '(למשל "נקניקיה", "פרוסה", "כף", "ביצה", "מנה"). net_carbs/fat/protein הם סך הכל לכל הארוחה, ' +
+  'וחייבים להיות שווים לסכום של qty×ערך-ליחידה על פני כל הפריטים. ' +
+  ' השב/י אך ורק ב-JSON תקין בפורמט: ' +
+  '{"items": [{"name": "<שם הפריט>", "qty": <מספר היחידות>, "unit": "<יחידה ביחיד>", ' +
+  '"carbs": <פחמ\' נטו ליחידה>, "fat": <שומן ליחידה>, "protein": <חלבון ליחידה>}], ' +
+  '"net_carbs": <סך פחמ\' נטו>, "fat": <סך שומן>, "protein": <סך חלבון>}' +
   ' ללא שום טקסט נוסף וללא סימוני markdown.';
 
 function imageFormat(unit) {
@@ -118,13 +126,35 @@ const cleanNum = (v) => {
 };
 const cleanStr = (v) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
 
+// Normalize the model's per-item array into clean meal items (macros per single
+// unit). Items are kept exactly as listed — repeated parts stay as separate
+// lines, not folded into one entry with a quantity.
+const cleanItems = (arr) => {
+  if (!Array.isArray(arr)) return [];
+  return arr
+    .map((raw) => {
+      const name = cleanStr(raw?.name);
+      if (!name) return null;
+      const q = cleanNum(raw?.qty);
+      return {
+        name,
+        qty: q && q > 0 ? q : 1,
+        unit: cleanStr(raw?.unit) || '',
+        carbs: cleanNum(raw?.carbs) ?? 0,
+        fat: cleanNum(raw?.fat) ?? null,
+        protein: cleanNum(raw?.protein) ?? null,
+      };
+    })
+    .filter(Boolean);
+};
+
 // Each estimator runs its parsed reply through one of these so callers always
 // get a known shape with trustworthy types.
 const normalizeMeal = (r) => ({
   net_carbs: cleanNum(r.net_carbs),
   fat: cleanNum(r.fat),
   protein: cleanNum(r.protein),
-  breakdown: cleanStr(r.breakdown),
+  items: cleanItems(r.items),
 });
 
 const normalizeImage = (r) => ({

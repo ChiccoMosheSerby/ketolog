@@ -40,11 +40,28 @@ router.patch('/:date/metrics', asyncHandler(async (req, res) => {
   res.json(day);
 }));
 
+// Sanitize the optional per-item breakdown. Each item carries macros PER ONE
+// unit plus a qty; names are required, the rest fall back to safe defaults.
+const cleanMealItems = (arr) =>
+  Array.isArray(arr)
+    ? arr
+        .map((it) => ({
+          name: String(it?.name || '').trim(),
+          qty: Number(it?.qty) > 0 ? Number(it.qty) : 1,
+          unit: String(it?.unit || '').trim(),
+          carbs: Number(it?.carbs) || 0,
+          fat: it?.fat == null ? null : Number(it.fat),
+          protein: it?.protein == null ? null : Number(it.protein),
+        }))
+        .filter((it) => it.name)
+    : [];
+
 // POST /api/days/:date/meals  -> add a meal, creating the day if needed
 router.post('/:date/meals', asyncHandler(async (req, res) => {
   const { date } = req.params;
-  const { time = '', cat = '', desc = '', carbs = 0, fat = null, protein = null, label } = req.body;
-  const meal = { time, cat, desc, carbs: Number(carbs) || 0, fat, protein };
+  const { time = '', cat = '', desc = '', carbs = 0, fat = null, protein = null, items, label } =
+    req.body;
+  const meal = { time, cat, desc, carbs: Number(carbs) || 0, fat, protein, items: cleanMealItems(items) };
   const setOnInsert = { user: req.userId, date };
   if (label) setOnInsert.label = label;
   const day = await Day.findOneAndUpdate(

@@ -207,6 +207,55 @@
     font-weight: 400;
     line-height: 1.45;
   }
+  /* per-item breakdown — one line per part of the meal */
+  .meal-items {
+    list-style: none;
+    margin: 6px 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 2px 0;
+      font-size: 12px;
+      color: var(--ink-soft);
+    }
+    .mi-name {
+      flex: 1;
+      min-width: 0;
+    }
+    .mi-qty {
+      font-family: 'IBM Plex Mono', monospace;
+      font-weight: 600;
+      color: var(--accent-ink);
+      font-variant-numeric: tabular-nums;
+    }
+    .mi-carb {
+      font-family: 'IBM Plex Mono', monospace;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      color: var(--ink);
+    }
+    .mi-save {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 13px;
+      line-height: 1;
+      padding: 2px 5px;
+      border-radius: 999px;
+      opacity: 0.5;
+      flex: none;
+      transition: opacity 0.15s ease, background 0.15s ease;
+      &:hover {
+        opacity: 1;
+        background: var(--green-tint);
+      }
+    }
+  }
   .carb {
     font-family: 'IBM Plex Mono', monospace;
     font-size: 13px;
@@ -266,6 +315,11 @@
       opacity: 0.7; // no hover on touch — keep them legible
       font-size: 15px;
       padding: 4px 8px;
+    }
+    .meal-items .mi-save {
+      opacity: 0.75; // no hover on touch — keep it tappable
+      font-size: 15px;
+      padding: 4px 7px;
     }
   }
 }

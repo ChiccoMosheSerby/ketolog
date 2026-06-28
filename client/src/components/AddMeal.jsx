@@ -21,6 +21,7 @@ export default function AddMeal({
   const [carb, setCarb] = useState('');
   const [desc, setDesc] = useState('');
   const [pendingMacro, setPendingMacro] = useState({ fat: null, protein: null });
+  const [items, setItems] = useState([]); // per-item breakdown from the last calc
   const [note, setNote] = useState(null); // { html } via structured fields
   const [busy, setBusy] = useState(false);
 
@@ -47,6 +48,7 @@ export default function AddMeal({
   function clearNote() {
     setNote(null);
     setPendingMacro({ fat: null, protein: null });
+    setItems([]);
   }
 
   // A product chip (ingredient) is appended to the description; the carbs reset
@@ -78,7 +80,7 @@ export default function AddMeal({
     toast('התבנית נוספה לפירוט');
   }
 
-  async function doAdd(carbsValue, macro) {
+  async function doAdd(carbsValue, macro, mealItems) {
     if (!date) {
       toast('בחר/י תאריך');
       return;
@@ -89,6 +91,7 @@ export default function AddMeal({
       carbs: Number(carbsValue) || 0,
       fat: macro?.fat ?? null,
       protein: macro?.protein ?? null,
+      items: mealItems ?? items,
     };
     await onLogged(date, meal);
     setDesc('');
@@ -110,10 +113,12 @@ export default function AddMeal({
       const n = Number(r.net_carbs);
       const fat = Number(r.fat);
       const prot = Number(r.protein);
+      const mealItems = Array.isArray(r.items) ? r.items : [];
       const carbsValue = isNaN(n) ? '' : fmt(n);
       const macro = { fat: isNaN(fat) ? null : fat, protein: isNaN(prot) ? null : prot };
       setCarb(carbsValue);
       setPendingMacro(macro);
+      setItems(mealItems);
       const mp =
         !isNaN(fat) && !isNaN(prot) ? macroPct({ carb: isNaN(n) ? 0 : n, fat, protein: prot }) : null;
       setNote({
@@ -121,9 +126,9 @@ export default function AddMeal({
         fat: isNaN(fat) ? '?' : fmt(fat),
         protein: isNaN(prot) ? '?' : fmt(prot),
         mp,
-        breakdown: r.breakdown,
+        items: mealItems,
       });
-      if (thenLog && !isNaN(n)) await doAdd(carbsValue, macro);
+      if (thenLog && !isNaN(n)) await doAdd(carbsValue, macro, mealItems);
     } catch {
       setNote({ error: 'לא הצלחתי לחשב אוטומטית כרגע — אפשר להזין מספר פחמימות ידנית ולרשום.' });
     } finally {
@@ -133,7 +138,7 @@ export default function AddMeal({
 
   function onAddClick() {
     if (desc.trim() && carb === '') runCalc(true);
-    else doAdd(carb, pendingMacro);
+    else doAdd(carb, pendingMacro, items);
   }
 
   return (
@@ -218,11 +223,17 @@ export default function AddMeal({
                   {note.mp.kcal} קק"ל)
                 </span>
               )}
-              {note.breakdown && (
-                <span className="bd">
-                  <br />
-                  {note.breakdown}
-                </span>
+              {note.items && note.items.length > 0 && (
+                <ul className="calc-items">
+                  {note.items.map((it, i) => (
+                    <li key={i}>
+                      <span className="ci-name">
+                        {it.qty > 1 && <b className="ci-qty">{fmt(it.qty)}×</b>} {it.name}
+                      </span>
+                      <span className="ci-carb">{fmt((Number(it.carbs) || 0) * (it.qty || 1))} ג' פחמ'</span>
+                    </li>
+                  ))}
+                </ul>
               )}
             </>
           )}

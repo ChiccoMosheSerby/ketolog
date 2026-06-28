@@ -20,6 +20,16 @@ const cleanMeal = (m) => ({
   carbs: Number(m.carbs) || 0,
   fat: m.fat ?? null,
   protein: m.protein ?? null,
+  items: Array.isArray(m.items)
+    ? m.items.map((it) => ({
+        name: it.name || '',
+        qty: Number(it.qty) > 0 ? Number(it.qty) : 1,
+        unit: it.unit || '',
+        carbs: Number(it.carbs) || 0,
+        fat: it.fat ?? null,
+        protein: it.protein ?? null,
+      }))
+    : [],
 });
 
 export default function Diary() {
@@ -170,6 +180,24 @@ export default function Diary() {
     toast('המוצר נוסף לרשימה שלך');
   }
 
+  // Turn a single part of a meal into a reusable product. Its macros are already
+  // per-unit, so the product maps onto it 1:1 (the unit becomes the product unit,
+  // e.g. one "נקניקיה"), ready to one-click add to future meals.
+  async function saveItemAsProduct(item) {
+    const def = (item.name || 'מוצר').slice(0, 30);
+    const name = window.prompt('שם קצר למוצר חדש:', def);
+    if (name == null || !name.trim()) return;
+    await addProduct({
+      key: name.trim(),
+      label: (item.name || name).trim(),
+      unit: (item.unit || '').trim() || 'מנה',
+      carbs: Number(item.carbs) || 0,
+      fat: Number(item.fat) || 0,
+      protein: Number(item.protein) || 0,
+    });
+    toast('המוצר נוסף לרשימה שלך');
+  }
+
   async function deleteTemplate(id) {
     await api.deleteTemplate(id);
     setTemplates((prev) => prev.filter((t) => t._id !== id));
@@ -261,6 +289,7 @@ export default function Diary() {
               onCopyMeal={copyMealToActive}
               onSaveTemplate={saveMealAsTemplate}
               onSaveProduct={saveMealAsProduct}
+              onSaveItemProduct={saveItemAsProduct}
               target={target}
             />
           ))
@@ -297,6 +326,7 @@ export default function Diary() {
         onCopyMeal={copyMealToActive}
         onSaveTemplate={saveMealAsTemplate}
         onSaveProduct={saveMealAsProduct}
+        onSaveItemProduct={saveItemAsProduct}
         target={target}
       />
 

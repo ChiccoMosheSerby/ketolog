@@ -264,6 +264,39 @@ textarea:focus {
     font-size: 12.5px;
     font-weight: 400;
   }
+  /* per-item carb breakdown shown after a calc */
+  .calc-items {
+    list-style: none;
+    margin: 8px 0 0;
+    padding: 8px 0 0;
+    border-top: 1px solid var(--accent-line);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12.5px;
+      color: var(--ink-soft);
+      font-weight: 400;
+    }
+    .ci-name {
+      flex: 1;
+      min-width: 0;
+    }
+    .ci-qty {
+      font-family: 'IBM Plex Mono', monospace;
+      font-weight: 600;
+      color: var(--accent-ink);
+      font-variant-numeric: tabular-nums;
+    }
+    .ci-carb {
+      font-family: 'IBM Plex Mono', monospace;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+  }
 }
 
 /* ---------- Misc shared ---------- */
