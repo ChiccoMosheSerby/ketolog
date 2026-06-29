@@ -14,8 +14,11 @@ export function getClient() {
   }
   return client;
 }
-// Estimators (meal/image/barcode → JSON) run on the strongest model with
-// adaptive thinking, so the logged numbers are at expert level.
+// Estimators (meal/image/barcode → JSON) run on the strongest model at
+// temperature 0 (no extended thinking). Determinism is the priority here: the
+// same description must always yield the same macros, otherwise an identical
+// food logged twice gets two different carb values. The keto rules + reference
+// values in the prompt carry the accuracy that thinking used to provide.
 export const MODEL = () => process.env.CLAUDE_MODEL || 'claude-opus-4-8';
 // The conversational keto assistant runs on the strongest model with thinking,
 // so it reasons at the level of the general Claude chat.
@@ -35,7 +38,14 @@ function ketoRules(products = []) {
     'פחמימות נטו = סך הפחמימות, פחות סיבים תזונתיים (אינם הופכים לגלוקוז), פחות אריתריטול ואלולוז (אינם מעלים סוכר בדם). ' +
     'ממתיקים סטיביה/טרוביה = 0 פחמימות. מלטיטול או כוהל סוכר אחר שמעלה סוכר חלקית — ספור כמחצית מערכו. ' +
     'בשר/דג/ביצים = 0 פחמימות; שמן וחמאה = 0 פחמימות וגם 0 חלבון; גבינות קשות מיושנות ≈ 0 פחמימות; ' +
-    'אם כמות לא צוינה, הנח מנה בינונית סבירה.';
+    'אם כמות לא צוינה, הנח מנה בינונית סבירה. ' +
+    // Consistency + portion scaling: the same base food must always map to the same
+    // per-unit reference, and size/fraction words scale it linearly — so "half" can
+    // never come out larger than the "whole" of the same food.
+    'עקביות מחייבת: לאותו מאכל בסיסי השתמש/י תמיד באותו ערך ייחוס קבוע ליחידה שלמה (למשל מלפפון בינוני, ביצה L), ' +
+    'ללא תלות בארוחה או בניסוח. מילות כמות וגודל משנות את הערך באופן ליניארי מתוך אותו ערך בסיס: ' +
+    '"חצי" = מחצית הערך, "רבע" = רבע, "שלם"/"שלמה" = יחידה מלאה, "גדול" / "קטן" ביחס למנה בינונית. ' +
+    'לכן מנה חלקית של מאכל לעולם אינה יכולה להיות גדולה ממנה שלמה של אותו מאכל — בדוק/י זאת לפני התשובה.';
 
   if (products.length) {
     base +=
@@ -182,7 +192,7 @@ export async function estimateMeal(desc, products = []) {
   const message = await getClient().messages.create({
     model: MODEL(),
     max_tokens: 5000,
-    thinking: { type: 'adaptive' },
+    temperature: 0,
     system: ketoRules(products) + MEAL_FORMAT,
     messages: [{ role: 'user', content: desc }],
   });
@@ -193,7 +203,7 @@ export async function estimateImage(b64, mediaType, unit, products = []) {
   const message = await getClient().messages.create({
     model: MODEL(),
     max_tokens: 5000,
-    thinking: { type: 'adaptive' },
+    temperature: 0,
     system: ketoRules(products) + imageFormat(unit),
     messages: [
       {
@@ -238,7 +248,7 @@ export async function interpretBarcode(off, unit, products = []) {
   const message = await getClient().messages.create({
     model: MODEL(),
     max_tokens: 5000,
-    thinking: { type: 'adaptive' },
+    temperature: 0,
     system: ketoRules(products) + barcodeFormat(unit, fiberNote),
     messages: [{ role: 'user', content: facts }],
   });
