@@ -14,11 +14,11 @@ export function getClient() {
   }
   return client;
 }
-// Estimators (meal/image/barcode → JSON) run on the strongest model at
-// temperature 0 (no extended thinking). Determinism is the priority here: the
-// same description must always yield the same macros, otherwise an identical
-// food logged twice gets two different carb values. The keto rules + reference
-// values in the prompt carry the accuracy that thinking used to provide.
+// Estimators (meal/image/barcode → JSON) run on the strongest model. Note this
+// model rejects the `temperature` param entirely (it's deprecated there), so we
+// can't force greedy decoding — consistency comes from the keto reference values
+// and portion-scaling rules in the prompt, plus deriving the meal total from the
+// per-item breakdown (see normalizeMeal) so the numbers always reconcile.
 export const MODEL = () => process.env.CLAUDE_MODEL || 'claude-opus-4-8';
 // The conversational keto assistant runs on the strongest model with thinking,
 // so it reasons at the level of the general Claude chat.
@@ -160,12 +160,30 @@ const cleanItems = (arr) => {
 
 // Each estimator runs its parsed reply through one of these so callers always
 // get a known shape with trustworthy types.
-const normalizeMeal = (r) => ({
-  net_carbs: cleanNum(r.net_carbs),
-  fat: cleanNum(r.fat),
-  protein: cleanNum(r.protein),
-  items: cleanItems(r.items),
-});
+const normalizeMeal = (r) => {
+  const items = cleanItems(r.items);
+  let net_carbs = cleanNum(r.net_carbs);
+  let fat = cleanNum(r.fat);
+  let protein = cleanNum(r.protein);
+
+  // The meal card renders each item as qty×(per-unit value) next to the meal
+  // total. The model is supposed to keep net_carbs == Σ qty×per-unit, but it
+  // sometimes breaks the contract — e.g. for "חצי מלפפון" it emits
+  // {qty: 0.5, carbs: 1.9} (the whole-unit value) yet reports net_carbs: 1.9,
+  // so the visible item (0.5×1.9 = 0.95) disagrees with the total (1.9). The
+  // breakdown is what the user reads and sums by eye, so treat it as the source
+  // of truth and derive the totals from it — the card then always reconciles.
+  // (fat/protein per item are nullable; only derive when every item carries one.)
+  if (items.length) {
+    const round2 = (n) => Math.round(n * 100) / 100;
+    const sum = (key) => items.reduce((a, it) => a + (Number(it[key]) || 0) * (it.qty || 1), 0);
+    net_carbs = round2(sum('carbs'));
+    if (items.every((it) => it.fat != null)) fat = round2(sum('fat'));
+    if (items.every((it) => it.protein != null)) protein = round2(sum('protein'));
+  }
+
+  return { net_carbs, fat, protein, items };
+};
 
 const normalizeImage = (r) => ({
   name: cleanStr(r.name),
@@ -192,7 +210,6 @@ export async function estimateMeal(desc, products = []) {
   const message = await getClient().messages.create({
     model: MODEL(),
     max_tokens: 5000,
-    temperature: 0,
     system: ketoRules(products) + MEAL_FORMAT,
     messages: [{ role: 'user', content: desc }],
   });
@@ -203,7 +220,6 @@ export async function estimateImage(b64, mediaType, unit, products = []) {
   const message = await getClient().messages.create({
     model: MODEL(),
     max_tokens: 5000,
-    temperature: 0,
     system: ketoRules(products) + imageFormat(unit),
     messages: [
       {
@@ -248,7 +264,6 @@ export async function interpretBarcode(off, unit, products = []) {
   const message = await getClient().messages.create({
     model: MODEL(),
     max_tokens: 5000,
-    temperature: 0,
     system: ketoRules(products) + barcodeFormat(unit, fiberNote),
     messages: [{ role: 'user', content: facts }],
   });
