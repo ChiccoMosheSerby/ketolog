@@ -3,7 +3,8 @@ import Product from '../models/Product.js';
 import Day from '../models/Day.js';
 import Conversation from '../models/Conversation.js';
 import { requireAuth } from '../middleware/auth.js';
-import { estimateMeal, estimateImage, interpretBarcode, aiConfigured } from '../lib/anthropic.js';
+import { estimateImage, interpretBarcode, aiConfigured } from '../lib/anthropic.js';
+import { estimateMealCached } from '../lib/estimateCache.js';
 import { fetchProductByBarcode, rawKeto } from '../lib/openfoodfacts.js';
 import { runChatTurn } from '../lib/chatAgent.js';
 import { transcribeAudio, transcribeConfigured } from '../lib/transcribe.js';
@@ -41,7 +42,9 @@ router.post('/estimate-meal', async (req, res) => {
   if (!desc) return res.status(400).json({ error: 'חסר תיאור הארוחה' });
   try {
     const products = await Product.find({ user: req.userId }).lean();
-    const result = await estimateMeal(desc, products);
+    // Reuse a previously computed estimate for the same description + product
+    // context instead of re-calling the AI; only misses hit Claude.
+    const { result } = await estimateMealCached(req.userId, desc, products);
     res.json(result);
   } catch (err) {
     console.error('estimate-meal failed:', err.message);
