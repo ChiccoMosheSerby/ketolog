@@ -37,6 +37,58 @@ export function hasMacros(d) {
   return (d.meals || []).some((m) => m.fat != null || m.protein != null);
 }
 
+// Calories *eaten* that day, derived from the logged macros (same fat 9 /
+// protein 4 / carb 4 split as macroPct). null when no macros were logged.
+export function dayKcal(d) {
+  const mp = macroPct(dayMacroGrams(d));
+  return mp ? mp.kcal : null;
+}
+
+// ---- activity calorie burn (rough estimates) ------------------------------
+// Calories burned are estimated from logged activity with the standard MET
+// formula: kcal = MET × 3.5 × bodyWeightKg / 200 × minutes. Body weight is read
+// from the day's morning-weight metric when present, otherwise a default. These
+// figures are deliberately rough (±15%) — a motivational tag, not a medical
+// number.
+export const BURN_DEFAULT_KG = 80;
+
+// Logged exercises — match the metric checkboxes shown on the day card.
+const BURN_RUN = { min: 10, met: 9.8 }; // ריצה 10 דק'
+const BURN_ABS = { min: 5, met: 4.0 }; // תרגילי בטן 5 דק'
+
+// Incidental daily movement that happens almost every day and is never logged
+// as a meal or an exercise: two ~10-min dog walks, the walk to work, and a few
+// trips up/down the stairs at home. Counted as one flat daily baseline.
+const BURN_BASELINE = [
+  { min: 35, met: 3.5 }, // walking: 2×10-min dog walks + ~15 min to work
+  { min: 3, met: 8.0 }, // stairs: a few flights, 2–3× a day
+];
+
+const metKcal = (min, met, kg) => ((met * 3.5 * kg) / 200) * min;
+
+// Body weight used for the burn estimate: the day's morning weight if it parses
+// to a sane number, otherwise the default.
+export function burnWeight(d) {
+  const w = parseFloat(String(d?.metrics?.weight || '').replace(',', '.'));
+  return Number.isFinite(w) && w > 30 && w < 400 ? w : BURN_DEFAULT_KG;
+}
+
+// Breakdown of estimated calories burned for a day: the daily-movement baseline
+// plus any logged run / abs session. Values are rounded kcal.
+export function activityBurn(d) {
+  const kg = burnWeight(d);
+  const mt = d?.metrics || {};
+  const base = BURN_BASELINE.reduce((s, b) => s + metKcal(b.min, b.met, kg), 0);
+  const run = mt.run ? metKcal(BURN_RUN.min, BURN_RUN.met, kg) : 0;
+  const abs = mt.abs ? metKcal(BURN_ABS.min, BURN_ABS.met, kg) : 0;
+  return {
+    base: Math.round(base),
+    run: Math.round(run),
+    abs: Math.round(abs),
+    total: Math.round(base + run + abs),
+  };
+}
+
 export function fmt(n) {
   return (Math.round(n * 100) / 100).toString();
 }

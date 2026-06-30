@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
-  dayTotal, dayMacroGrams, macroPct, hasMacros, fmt, heDate, zoneInfo, maxRange, TARGET,
+  dayTotal, dayMacroGrams, macroPct, hasMacros, fmt, heDate, zoneInfo, maxRange,
+  activityBurn, dayKcal, TARGET,
 } from '../lib/helpers.js';
 import './DayCard.scss';
 
@@ -28,6 +29,8 @@ export default function DayCard({
   const meals = [...(day.meals || [])].sort((a, b) => (a.time || '').localeCompare(b.time || ''));
   const g = dayMacroGrams(day);
   const mp = macroPct(g);
+  const burn = activityBurn(day);
+  const eaten = dayKcal(day);
 
   return (
     <div className={'day' + (open ? ' open' : '')}>
@@ -37,6 +40,9 @@ export default function DayCard({
           <span className="day-date">{heDate(iso)}</span>
         </span>
         <span className="day-hright">
+          <span className="day-burn" title="הערכת קלוריות שנשרפו היום (תנועה יומית + פעילות מתועדת)">
+            🔥 {fmt(burn.total)} <small>קק"ל</small>
+          </span>
           <span className="day-total" style={{ color: zi.color }}>
             {fmt(total)} <small>ג' נטו</small>
           </span>
@@ -183,6 +189,30 @@ export default function DayCard({
                 תרגילי בטן 5 דק'
               </label>
             </div>
+
+            <div className="burn">
+              <div className="burn-top">
+                <span className="burn-fire">🔥</span>
+                <span className="burn-total">
+                  ~{fmt(burn.total)} <small>קק"ל נשרפו (הערכה)</small>
+                </span>
+                {eaten != null && (
+                  <span className="burn-eaten">מול ~{fmt(eaten)} קק"ל שנאכלו</span>
+                )}
+              </div>
+              <div className="burn-rows">
+                <span className="burn-it">
+                  תנועה יומית <small>(הליכת כלב · הליכה לעבודה · מדרגות)</small> <b>{fmt(burn.base)}</b>
+                </span>
+                {burn.run > 0 && (
+                  <span className="burn-it">ריצה <b>{fmt(burn.run)}</b></span>
+                )}
+                {burn.abs > 0 && (
+                  <span className="burn-it">תרגילי בטן <b>{fmt(burn.abs)}</b></span>
+                )}
+              </div>
+            </div>
+
             <div className="status">
               <textarea
                 placeholder="הרגשה, אנרגיה, סטטוס קטוזיס..."
