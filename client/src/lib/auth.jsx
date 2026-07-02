@@ -83,6 +83,10 @@ export function AuthProvider({ children }) {
     const r = await api.updateProfile({ ketoGoalMonths });
     setUser(r.user);
   }
+  async function updateWhatsapp(whatsappPhone) {
+    const r = await api.updateProfile({ whatsappPhone });
+    setUser(r.user);
+  }
 
   return (
     <AuthContext.Provider
@@ -94,6 +98,7 @@ export function AuthProvider({ children }) {
         logout,
         updateCarbTarget,
         updateKetoGoal,
+        updateWhatsapp,
         needsOnboarding,
         startOnboarding,
         dismissOnboarding,

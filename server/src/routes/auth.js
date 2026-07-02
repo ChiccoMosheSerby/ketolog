@@ -30,9 +30,10 @@ const userPayload = (u) => ({
   dailyCarbTarget: u.dailyCarbTarget,
   ketoStartDate: u.ketoStartDate || '',
   ketoGoalMonths: u.ketoGoalMonths || 0,
+  whatsappPhone: u.whatsappPhone || '',
 });
 
-const PROFILE_FIELDS = 'email dailyCarbTarget ketoStartDate ketoGoalMonths';
+const PROFILE_FIELDS = 'email dailyCarbTarget ketoStartDate ketoGoalMonths whatsappPhone';
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 // Base URL for the approval link in the email.
@@ -166,6 +167,21 @@ router.patch('/me', requireAuth, asyncHandler(async (req, res) => {
       return res.status(400).json({ error: 'תאריך התחלה לא תקין' });
     }
     update.ketoStartDate = d;
+  }
+  if (req.body.whatsappPhone != null) {
+    // Normalize to bare E.164 digits so it compares equal to what Twilio sends.
+    // Empty string unlinks. Otherwise require a plausible international number.
+    const phone = String(req.body.whatsappPhone).replace(/\D/g, '');
+    if (phone && (phone.length < 8 || phone.length > 15)) {
+      return res.status(400).json({ error: 'מספר WhatsApp לא תקין (כולל קידומת מדינה, ללא +)' });
+    }
+    if (phone) {
+      const other = await User.findOne({ whatsappPhone: phone, _id: { $ne: req.userId } })
+        .select('_id')
+        .lean();
+      if (other) return res.status(409).json({ error: 'מספר WhatsApp זה כבר מקושר לחשבון אחר' });
+    }
+    update.whatsappPhone = phone;
   }
   const user = await User.findByIdAndUpdate(req.userId, update, { new: true }).select(PROFILE_FIELDS);
   if (!user) return res.status(404).json({ error: 'משתמש לא נמצא' });

@@ -39,3 +39,13 @@ services:
         value: chiccomoshe@gmail.com
       - key: SMTP_PASS
         sync: false # set in dashboard (Gmail 16-char App Password)
+      # WhatsApp meal logging (Twilio). Text a meal to the sandbox number and it
+      # is calculated + logged, with a receipt reply. Secrets set in dashboard.
+      - key: TWILIO_ACCOUNT_SID
+        sync: false # set in dashboard (AC...)
+      - key: TWILIO_AUTH_TOKEN
+        sync: false # set in dashboard (Twilio Auth Token)
+      - key: TWILIO_WHATSAPP_FROM
+        value: whatsapp:+14155238886 # Twilio WhatsApp sandbox sender
+      - key: WHATSAPP_WEBHOOK_URL
+        value: https://ketolog.onrender.com/api/whatsapp/inbound

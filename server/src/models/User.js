@@ -13,8 +13,20 @@ const userSchema = new mongoose.Schema(
     // Access gate: a user can sign in only once approved (admins are auto-approved
     // at registration; everyone else waits for the admin to click the email link).
     approved: { type: Boolean, default: false },
+    // Linked WhatsApp number (normalized to E.164 digits, no '+', e.g.
+    // '972501234567') so meals texted to the bot map back to this account. Empty
+    // = not linked. Uniqueness is enforced by the partial index below (an empty
+    // string never participates, so many un-linked users can coexist).
+    whatsappPhone: { type: String, default: '' },
   },
   { timestamps: true }
+);
+
+// One phone links to at most one user. Partial filter so only non-empty numbers
+// are indexed/uniqueness-checked — blank whatsappPhone values don't collide.
+userSchema.index(
+  { whatsappPhone: 1 },
+  { unique: true, partialFilterExpression: { whatsappPhone: { $gt: '' } } }
 );
 
 export default mongoose.model('User', userSchema);

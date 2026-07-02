@@ -193,6 +193,71 @@ function KetoGoalSetting() {
   );
 }
 
+// Link a WhatsApp number so meals texted to the bot log to this account. Stored
+// as bare digits (country code, no +); an empty value unlinks.
+function WhatsAppSetting() {
+  const { user, updateWhatsapp } = useAuth();
+  const toast = useToast();
+  const phone = user?.whatsappPhone || '';
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(phone);
+  const [saving, setSaving] = useState(false);
+
+  function open() {
+    setVal(phone);
+    setEditing(true);
+  }
+
+  async function save() {
+    const digits = val.replace(/\D/g, '');
+    if (digits && (digits.length < 8 || digits.length > 15)) {
+      toast('מספר לא תקין — כולל קידומת מדינה, ללא + (למשל 972501234567)');
+      return;
+    }
+    if (digits !== phone) {
+      setSaving(true);
+      try {
+        await updateWhatsapp(digits);
+        toast(digits ? 'מספר ה-WhatsApp נשמר' : 'הקישור ל-WhatsApp בוטל');
+      } catch (e) {
+        toast(e.message || 'העדכון נכשל');
+        setSaving(false);
+        return;
+      }
+      setSaving(false);
+    }
+    setEditing(false);
+  }
+
+  if (editing) {
+    return (
+      <span className="target-set">
+        <span>WhatsApp:</span>
+        <input
+          type="tel"
+          dir="ltr"
+          placeholder="972501234567"
+          value={val}
+          autoFocus
+          onChange={(e) => setVal(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') save();
+            if (e.key === 'Escape') setEditing(false);
+          }}
+        />
+        <button className="btn ghost mini" disabled={saving} onClick={save}>
+          {saving ? '…' : 'שמור'}
+        </button>
+      </span>
+    );
+  }
+  return (
+    <button className="btn ghost mini" onClick={open} title="רישום ארוחות בהודעת WhatsApp">
+      {phone ? `WhatsApp: ${phone} ✎` : 'קשר WhatsApp ✎'}
+    </button>
+  );
+}
+
 function AccountActions({ onCopyData, onAction }) {
   const { user, logout, startOnboarding } = useAuth();
   const { theme, toggle } = useTheme();
@@ -205,6 +270,7 @@ function AccountActions({ onCopyData, onAction }) {
       <span className="uemail">{user?.email}</span>
       <TargetSetting />
       <KetoGoalSetting />
+      <WhatsAppSetting />
       <button
         className="btn ghost mini"
         onClick={toggle}
