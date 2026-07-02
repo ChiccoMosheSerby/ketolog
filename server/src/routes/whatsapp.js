@@ -87,7 +87,6 @@ router.post('/inbound', async (req, res) => {
       return;
     }
 
-    await sendWhatsApp(from, '📝 מחשב את הארוחה ורושם ליומן…');
     const logged = await logMealFromDesc({ userId: user._id.toString(), desc: text });
     await sendWhatsApp(from, formatMealReceipt(logged));
   } catch (err) {

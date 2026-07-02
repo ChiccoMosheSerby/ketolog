@@ -44,7 +44,12 @@ services:
       - key: TWILIO_ACCOUNT_SID
         sync: false # set in dashboard (AC...)
       - key: TWILIO_AUTH_TOKEN
-        sync: false # set in dashboard (Twilio Auth Token)
+        sync: false # set in dashboard (validates inbound webhook signatures)
+      # Recommended API key for outbound sends (account Auth Token auto-resets).
+      - key: TWILIO_API_KEY_SID
+        sync: false # set in dashboard (SK...)
+      - key: TWILIO_API_KEY_SECRET
+        sync: false # set in dashboard (shown once at key creation)
       - key: TWILIO_WHATSAPP_FROM
         value: whatsapp:+14155238886 # Twilio WhatsApp sandbox sender
       - key: WHATSAPP_WEBHOOK_URL
