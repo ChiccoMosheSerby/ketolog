@@ -91,7 +91,15 @@ router.post('/inbound', async (req, res) => {
     const logged = await logMealFromDesc({ userId: user._id.toString(), desc: text });
     await sendWhatsApp(from, formatMealReceipt(logged));
   } catch (err) {
-    console.error('[whatsapp] processing failed:', err.message);
+    // Surface Twilio's real error code/status/moreInfo — 'Authenticate' alone
+    // hides whether it's a bad SID, bad token, or a wrong From number.
+    console.error(
+      '[whatsapp] processing failed:',
+      'status=', err.status ?? '-',
+      'code=', err.code ?? '-',
+      'msg=', err.message,
+      err.moreInfo ? 'moreInfo=' + err.moreInfo : ''
+    );
     try {
       await sendWhatsApp(from, 'החישוב נכשל כרגע — נסה/י שוב בעוד רגע, או רשום/רשמי דרך האפליקציה.');
     } catch {

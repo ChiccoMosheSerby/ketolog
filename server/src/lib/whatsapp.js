@@ -31,7 +31,16 @@ export function whatsappConfigured() {
 
 let _client = null;
 function client() {
-  if (!_client) _client = twilio(ACCOUNT_SID(), AUTH_TOKEN());
+  if (!_client) {
+    const sid = ACCOUNT_SID();
+    // One-time masked diagnostic: a correct Account SID is 34 chars starting
+    // 'AC'; the Auth Token is 32. Wrong lengths (or a SID not starting with AC)
+    // point at a bad paste / stray whitespace without ever logging the secret.
+    console.log(
+      `[whatsapp] Twilio client init: SID "${sid.slice(0, 4)}…${sid.slice(-2)}" len=${sid.length} startsAC=${sid.startsWith('AC')}, token len=${AUTH_TOKEN().length}, from="${FROM()}"`
+    );
+    _client = twilio(sid, AUTH_TOKEN());
+  }
   return _client;
 }
 
