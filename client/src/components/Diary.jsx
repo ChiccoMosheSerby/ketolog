@@ -3,6 +3,7 @@ import { api } from '../lib/api.js';
 import { useToast } from '../lib/toast.jsx';
 import { useAuth } from '../lib/auth.jsx';
 import { dayTotal, fmt, todayISO, dayHebrewName, prevISO, TARGET } from '../lib/helpers.js';
+import { downloadReport } from '../lib/exportLog.js';
 import AddMeal from './AddMeal.jsx';
 import Products from './Products.jsx';
 import DayCard from './DayCard.jsx';
@@ -222,6 +223,24 @@ export default function Diary() {
     }
   }
 
+  // Download a full, human-readable HTML report: all insights + every logged
+  // day + the saved products (with their thumbnails). Opens/prints anywhere.
+  function exportReport() {
+    try {
+      downloadReport({
+        days,
+        products,
+        target,
+        email: user?.email || '',
+        ketoMonths: user?.ketoGoalMonths || 0,
+        generatedAt: todayISO(),
+      });
+      toast('הדוח יוצא');
+    } catch {
+      toast('ייצוא הדוח נכשל');
+    }
+  }
+
   // ---- summary (persistent header) ----
   const t = todayISO();
   // Average over *past* logged days only — today is still in progress, so
@@ -371,7 +390,7 @@ export default function Diary() {
 
   return (
     <div className="wrap">
-      <Header stats={stats} onCopyData={copyData} />
+      <Header stats={stats} onCopyData={copyData} onExport={exportReport} />
 
       <TabShell tabs={tabs} />
 

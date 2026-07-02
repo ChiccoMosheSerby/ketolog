@@ -14,8 +14,14 @@ router.get('/', asyncHandler(async (req, res) => {
 
 // POST /api/products -> create a product
 router.post('/', asyncHandler(async (req, res) => {
-  const { key, label, unit, cat, carbs, fat, protein } = req.body;
+  const { key, label, unit, cat, carbs, fat, protein, image } = req.body;
   if (!key || !String(key).trim()) return res.status(400).json({ error: 'תן/י שם למוצר' });
+  // Only accept a small inline data-URL thumbnail; ignore anything oversized or
+  // not an image data URL so a stray payload can't bloat the document.
+  const img =
+    typeof image === 'string' && /^data:image\/(jpeg|png|webp);base64,/.test(image) && image.length < 200000
+      ? image
+      : '';
   const product = await Product.create({
     user: req.userId,
     key: String(key).trim(),
@@ -25,6 +31,7 @@ router.post('/', asyncHandler(async (req, res) => {
     carbs: Number(carbs) || 0,
     fat: Number(fat) || 0,
     protein: Number(protein) || 0,
+    image: img,
   });
   res.status(201).json(product);
 }));

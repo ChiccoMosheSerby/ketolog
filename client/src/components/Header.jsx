@@ -258,7 +258,7 @@ function WhatsAppSetting() {
   );
 }
 
-function AccountActions({ onCopyData, onAction }) {
+function AccountActions({ onCopyData, onExport, onAction }) {
   const { user, logout, startOnboarding } = useAuth();
   const { theme, toggle } = useTheme();
   const replay = () => {
@@ -284,6 +284,9 @@ function AccountActions({ onCopyData, onAction }) {
       <button className="btn ghost mini" onClick={onCopyData}>
         העתק נתונים
       </button>
+      <button className="btn ghost mini" onClick={onExport} title="ייצוא דוח מלא (יומן, מוצרים ותובנות)">
+        ייצוא דוח
+      </button>
       <button className="btn ghost mini" onClick={logout}>
         התנתק
       </button>
@@ -291,7 +294,7 @@ function AccountActions({ onCopyData, onAction }) {
   );
 }
 
-export default function Header({ stats, onCopyData }) {
+export default function Header({ stats, onCopyData, onExport }) {
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -315,7 +318,7 @@ export default function Header({ stats, onCopyData }) {
       <header className="top">
         <div className="headrow">
           <Stats stats={stats} />
-          <AccountActions onCopyData={onCopyData} />
+          <AccountActions onCopyData={onCopyData} onExport={onExport} />
         </div>
       </header>
     );
@@ -343,7 +346,7 @@ export default function Header({ stats, onCopyData }) {
         <button className="drawer-close" aria-label="סגור" onClick={() => setDrawerOpen(false)}>
           ✕
         </button>
-        <AccountActions onCopyData={onCopyData} onAction={() => setDrawerOpen(false)} />
+        <AccountActions onCopyData={onCopyData} onExport={onExport} onAction={() => setDrawerOpen(false)} />
         <TargetLegend />
       </aside>
     </header>

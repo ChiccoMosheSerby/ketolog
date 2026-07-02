@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { useToast } from '../lib/toast.jsx';
 import { fmt } from '../lib/helpers.js';
+import { toThumbnail, dataUrl } from '../lib/image.js';
 import './Products.scss';
 
 // Scanner pulls in ZXing (large) — load it only when the user opens the camera.
@@ -12,7 +13,7 @@ export default function Products({ products, onAdd, onDelete, compact }) {
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
-    key: '', label: '', unit: '', perPack: '', carb: '', fat: '', prot: '',
+    key: '', label: '', unit: '', perPack: '', carb: '', fat: '', prot: '', image: '',
   });
   const [note, setNote] = useState(null);
   const [imgBusy, setImgBusy] = useState(false);
@@ -46,8 +47,9 @@ export default function Products({ products, onAdd, onDelete, compact }) {
       carbs: Number(form.carb) || 0,
       fat: Number(form.fat) || 0,
       protein: Number(form.prot) || 0,
+      image: form.image || '',
     });
-    setForm({ key: '', label: '', unit: '', perPack: '', carb: '', fat: '', prot: '' });
+    setForm({ key: '', label: '', unit: '', perPack: '', carb: '', fat: '', prot: '', image: '' });
     setNote(null);
     toast('המוצר נוסף');
   }
@@ -81,6 +83,11 @@ export default function Products({ products, onAdd, onDelete, compact }) {
     const typedUnit = form.unit.trim();
     setImgBusy(true);
     setNote({ loading: true, unit: typedUnit });
+    // Keep the photo as the product's thumbnail regardless of whether the AI
+    // estimate below succeeds — it'll show in the saved-products dropdown.
+    toThumbnail(dataUrl(b64, mt)).then((thumb) => {
+      if (thumb) setForm((f) => ({ ...f, image: thumb }));
+    });
     try {
       const r = await api.estimateImage(b64, mt, typedUnit);
       const userPP = Number(form.perPack);
@@ -99,7 +106,8 @@ export default function Products({ products, onAdd, onDelete, compact }) {
         fat: isNaN(f) ? '' : fmt(f),
         prot: isNaN(p) ? '' : fmt(p),
       };
-      setForm(next);
+      // keep the thumbnail captured above (its setState may race this one)
+      setForm((prev) => ({ ...next, image: prev.image }));
       const src = userPP > 0 ? 'לפי הכמות שציינת' : modelPP > 0 ? 'הערכה אוטומטית' : 'אריזה שלמה';
       setNote({
         name: r.name || 'מוצר',
@@ -200,6 +208,11 @@ export default function Products({ products, onAdd, onDelete, compact }) {
               ) : (
                 products.map((p) => (
                   <div className="prod" key={p._id}>
+                    {p.image ? (
+                      <img className="pthumb" src={p.image} alt="" loading="lazy" />
+                    ) : (
+                      <span className="pthumb pthumb-ph" aria-hidden="true">🍽️</span>
+                    )}
                     <div className="pinfo">
                       <div className="pname">
                         {p.key} — <span style={{ fontWeight: 300 }}>{p.label}</span>
@@ -264,6 +277,24 @@ export default function Products({ products, onAdd, onDelete, compact }) {
                 )}
               </>
             )}
+          </div>
+        )}
+
+        {form.image && (
+          <div className="prod-img-preview">
+            <img src={form.image} alt="תצוגה מקדימה של המוצר" />
+            <div className="pip-text">
+              <strong>תמונת המוצר</strong>
+              <span>תישמר ותוצג ברשימת המוצרים</span>
+            </div>
+            <button
+              type="button"
+              className="pip-x"
+              title="הסר תמונה"
+              onClick={() => setForm((f) => ({ ...f, image: '' }))}
+            >
+              ✕
+            </button>
           </div>
         )}
 
