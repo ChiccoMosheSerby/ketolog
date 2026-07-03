@@ -50,3 +50,28 @@ export async function sendApprovalRequest({ email, approveUrl }) {
   console.log('[approval] approval request emailed to', ADMIN_EMAIL, 'for', email);
   return { delivered: true };
 }
+
+// Send a password-reset link to the account owner. Like sendApprovalRequest,
+// falls back to logging the link when SMTP isn't configured so the flow still
+// works in development.
+export async function sendPasswordReset({ email, resetUrl }) {
+  const subject = 'KetoLog — איפוס סיסמה';
+  const text =
+    `התקבלה בקשה לאיפוס הסיסמה של החשבון ${email} ב-KetoLog.\n\n` +
+    `כדי לבחור סיסמה חדשה, לחץ על הקישור הבא (בתוקף לשעה אחת):\n${resetUrl}\n\n` +
+    `אם לא ביקשת לאפס את הסיסמה, אפשר להתעלם מהמייל — הסיסמה לא תשתנה.`;
+  const html =
+    `<p>התקבלה בקשה לאיפוס הסיסמה של החשבון <strong>${escapeHtml(email)}</strong> ב-KetoLog.</p>` +
+    `<p><a href="${escapeHtml(resetUrl)}">לחץ כאן כדי לבחור סיסמה חדשה</a> (הקישור בתוקף לשעה אחת).</p>` +
+    `<p style="color:#888;font-size:13px">אם לא ביקשת לאפס את הסיסמה, אפשר להתעלם מהמייל — הסיסמה לא תשתנה.</p>`;
+
+  const t = transport();
+  if (!t) {
+    console.log('\n[reset] SMTP not configured — password-reset link for', email + ':');
+    console.log('[reset]', resetUrl, '\n');
+    return { delivered: false };
+  }
+  await t.sendMail({ from: from(), to: email, subject, text, html });
+  console.log('[reset] password-reset link emailed to', email);
+  return { delivered: true };
+}

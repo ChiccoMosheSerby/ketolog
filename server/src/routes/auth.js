@@ -8,8 +8,11 @@ import {
   isApproved,
   makeApprovalToken,
   readApprovalToken,
+  makeResetToken,
+  readResetToken,
+  passwordFingerprint,
 } from '../lib/approval.js';
-import { sendApprovalRequest } from '../lib/mailer.js';
+import { sendApprovalRequest, sendPasswordReset } from '../lib/mailer.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { asyncHandler, escapeHtml, isValidEmail } from '../lib/http.js';
 
@@ -19,6 +22,10 @@ const router = Router();
 // /login and stops /register being used to spam the admin with approval emails.
 const loginLimiter = rateLimit({ name: 'login', windowMs: 15 * 60_000, max: 10 });
 const registerLimiter = rateLimit({ name: 'register', windowMs: 60 * 60_000, max: 5 });
+// Throttle the reset endpoints: /forgot-password by how often we'll email a
+// given client, /reset-password by how fast tokens can be submitted.
+const forgotLimiter = rateLimit({ name: 'forgot', windowMs: 60 * 60_000, max: 5 });
+const resetLimiter = rateLimit({ name: 'reset', windowMs: 15 * 60_000, max: 10 });
 
 function signToken(user) {
   return jwt.sign({ sub: user._id.toString() }, process.env.JWT_SECRET, { expiresIn: '30d' });
@@ -48,13 +55,16 @@ const baseUrl = () => {
 };
 
 const PENDING_MSG = 'החשבון שלך נוצר וממתין לאישור מנהל. תקבל גישה לאחר האישור.';
+const MIN_PASSWORD = 6;
 
 router.post('/register', registerLimiter, asyncHandler(async (req, res) => {
   const email = (typeof req.body.email === 'string' ? req.body.email : '').trim().toLowerCase();
   const password = typeof req.body.password === 'string' ? req.body.password : '';
   if (!email || !password) return res.status(400).json({ error: 'אימייל וסיסמה נדרשים' });
   if (!isValidEmail(email)) return res.status(400).json({ error: 'כתובת אימייל לא תקינה' });
-  if (password.length < 6) return res.status(400).json({ error: 'הסיסמה חייבת להכיל לפחות 6 תווים' });
+  if (password.length < MIN_PASSWORD) {
+    return res.status(400).json({ error: `הסיסמה חייבת להכיל לפחות ${MIN_PASSWORD} תווים` });
+  }
 
   const exists = await User.findOne({ email });
   if (exists) return res.status(409).json({ error: 'משתמש עם אימייל זה כבר קיים' });
@@ -136,6 +146,87 @@ router.post('/approve', asyncHandler(async (req, res) => {
     await user.save();
   }
   res.send(approvePage(`<p>הגישה של ${escapeHtml(user.email)} אושרה. המשתמש יכול להתחבר עכשיו.</p>`));
+}));
+
+// POST /forgot-password — the user asks for a reset link. We always return the
+// same response whether or not an account exists, so the endpoint can't be used
+// to probe which email addresses are registered.
+router.post('/forgot-password', forgotLimiter, asyncHandler(async (req, res) => {
+  const email = (typeof req.body.email === 'string' ? req.body.email : '').trim().toLowerCase();
+  const generic = { message: 'אם קיים חשבון עם האימייל הזה, ישלח אליו קישור לאיפוס הסיסמה.' };
+  if (!isValidEmail(email)) return res.json(generic);
+
+  const user = await User.findOne({ email });
+  if (user) {
+    const resetUrl = `${baseUrl()}/api/auth/reset-password?token=${makeResetToken(user)}`;
+    try {
+      await sendPasswordReset({ email, resetUrl });
+    } catch (e) {
+      console.error('[reset] failed to send reset email:', e.message);
+    }
+  }
+  res.json(generic);
+}));
+
+// Server-rendered "choose a new password" form, reached from the emailed link.
+// Mirrors the approval page's shell. `error` re-renders the form with a message.
+const resetForm = (token, error = '') =>
+  approvePage(
+    (error ? `<p style="color:#dc2626">${escapeHtml(error)}</p>` : '<p>בחר/י סיסמה חדשה ל-KetoLog.</p>') +
+      `<form method="POST" action="/api/auth/reset-password" style="display:inline-block;direction:rtl;text-align:right">` +
+      `<input type="hidden" name="token" value="${escapeHtml(token)}">` +
+      `<div style="margin:12px 0"><label>סיסמה חדשה<br>` +
+      `<input type="password" name="password" minlength="${MIN_PASSWORD}" required autocomplete="new-password" style="font-size:16px;padding:8px;width:260px;box-sizing:border-box"></label></div>` +
+      `<div style="margin:12px 0"><label>אימות סיסמה<br>` +
+      `<input type="password" name="confirm" minlength="${MIN_PASSWORD}" required autocomplete="new-password" style="font-size:16px;padding:8px;width:260px;box-sizing:border-box"></label></div>` +
+      `<button type="submit" style="font-size:16px;padding:10px 28px;border:0;border-radius:8px;background:#2563eb;color:#fff;cursor:pointer">אפס/י סיסמה</button>` +
+      `</form>`
+  );
+
+const RESET_BAD_LINK = '<p>קישור האיפוס אינו תקין, שפג תוקפו, או שכבר נעשה בו שימוש.</p>';
+
+// Load the user a reset token points at, but only if the token's fingerprint
+// still matches the current password — i.e. the link hasn't already been used.
+async function userForResetToken(token) {
+  const parsed = readResetToken(token);
+  if (!parsed) return null;
+  const user = await User.findById(parsed.userId);
+  if (!user || parsed.pv !== passwordFingerprint(user)) return null;
+  return user;
+}
+
+// GET /reset-password — show the form (validating the link first).
+router.get('/reset-password', resetLimiter, asyncHandler(async (req, res) => {
+  const token = typeof req.query.token === 'string' ? req.query.token : '';
+  const user = await userForResetToken(token);
+  if (!user) return res.status(400).send(approvePage(RESET_BAD_LINK));
+  res.send(resetForm(token));
+}));
+
+// POST /reset-password — set the new password. Changing the hash invalidates the
+// token (its fingerprint no longer matches), so each link works at most once.
+router.post('/reset-password', resetLimiter, asyncHandler(async (req, res) => {
+  const token = typeof req.body.token === 'string' ? req.body.token : '';
+  const password = typeof req.body.password === 'string' ? req.body.password : '';
+  const confirm = typeof req.body.confirm === 'string' ? req.body.confirm : '';
+
+  const user = await userForResetToken(token);
+  if (!user) return res.status(400).send(approvePage(RESET_BAD_LINK));
+  if (password.length < MIN_PASSWORD) {
+    return res.status(400).send(resetForm(token, `הסיסמה חייבת להכיל לפחות ${MIN_PASSWORD} תווים.`));
+  }
+  if (password !== confirm) {
+    return res.status(400).send(resetForm(token, 'הסיסמאות אינן תואמות.'));
+  }
+
+  user.passwordHash = await bcrypt.hash(password, 10);
+  await user.save();
+  res.send(
+    approvePage(
+      '<p>הסיסמה עודכנה בהצלחה. אפשר להתחבר עכשיו עם הסיסמה החדשה.</p>' +
+        '<p><a href="/">חזרה ל-KetoLog</a></p>'
+    )
+  );
 }));
 
 router.get('/me', requireAuth, asyncHandler(async (req, res) => {
