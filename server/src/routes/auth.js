@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -5,6 +6,7 @@ import User from '../models/User.js';
 import { requireAuth } from '../middleware/auth.js';
 import {
   AUTO_APPROVED_EMAILS,
+  ADMIN_EMAIL,
   isApproved,
   makeApprovalToken,
   readApprovalToken,
@@ -224,6 +226,65 @@ router.post('/reset-password', resetLimiter, asyncHandler(async (req, res) => {
   res.send(
     approvePage(
       '<p>הסיסמה עודכנה בהצלחה. אפשר להתחבר עכשיו עם הסיסמה החדשה.</p>' +
+        '<p><a href="/">חזרה ל-KetoLog</a></p>'
+    )
+  );
+}));
+
+// ---------------------------------------------------------------------------
+// TEMPORARY emergency admin recovery. Added to let the admin regain access when
+// email delivery is unavailable and only the website is reachable (no logs / DB
+// / env access). Gated by a one-time key whose SHA-256 is embedded below — the
+// raw key is held out-of-band and never committed, so reading this file grants
+// no access. Only ever resets the admin account. REMOVE once access is restored.
+const RECOVERY_KEY_SHA256 = '5632e020c9f58b1218131b5ead8ec2d4b1f85b823e2bd6b06f214779cfc81885';
+const recoverLimiter = rateLimit({ name: 'recover', windowMs: 15 * 60_000, max: 10 });
+const recoveryKeyOk = (k) =>
+  typeof k === 'string' &&
+  k.length > 0 &&
+  crypto.createHash('sha256').update(k).digest('hex') === RECOVERY_KEY_SHA256;
+
+const recoverForm = (key, error = '') =>
+  approvePage(
+    (error
+      ? `<p style="color:#dc2626">${escapeHtml(error)}</p>`
+      : `<p>איפוס סיסמת המנהל (${escapeHtml(ADMIN_EMAIL)}).</p>`) +
+      `<form method="POST" action="/api/auth/recover" style="display:inline-block;direction:rtl;text-align:right">` +
+      `<input type="hidden" name="key" value="${escapeHtml(key)}">` +
+      `<div style="margin:12px 0"><label>סיסמה חדשה<br>` +
+      `<input type="password" name="password" minlength="${MIN_PASSWORD}" required autocomplete="new-password" style="font-size:16px;padding:8px;width:260px;box-sizing:border-box"></label></div>` +
+      `<div style="margin:12px 0"><label>אימות סיסמה<br>` +
+      `<input type="password" name="confirm" minlength="${MIN_PASSWORD}" required autocomplete="new-password" style="font-size:16px;padding:8px;width:260px;box-sizing:border-box"></label></div>` +
+      `<button type="submit" style="font-size:16px;padding:10px 28px;border:0;border-radius:8px;background:#2563eb;color:#fff;cursor:pointer">אפס/י סיסמה</button>` +
+      `</form>`
+  );
+
+// A wrong/missing key looks like a plain 404 so the endpoint isn't discoverable.
+router.get('/recover', recoverLimiter, asyncHandler(async (req, res) => {
+  const key = typeof req.query.k === 'string' ? req.query.k : '';
+  if (!recoveryKeyOk(key)) return res.status(404).send(approvePage('<p>הדף לא נמצא.</p>'));
+  res.send(recoverForm(key));
+}));
+
+router.post('/recover', recoverLimiter, asyncHandler(async (req, res) => {
+  const key = typeof req.body.key === 'string' ? req.body.key : '';
+  if (!recoveryKeyOk(key)) return res.status(404).send(approvePage('<p>הדף לא נמצא.</p>'));
+  const password = typeof req.body.password === 'string' ? req.body.password : '';
+  const confirm = typeof req.body.confirm === 'string' ? req.body.confirm : '';
+  if (password.length < MIN_PASSWORD) {
+    return res.status(400).send(recoverForm(key, `הסיסמה חייבת להכיל לפחות ${MIN_PASSWORD} תווים.`));
+  }
+  if (password !== confirm) {
+    return res.status(400).send(recoverForm(key, 'הסיסמאות אינן תואמות.'));
+  }
+  const user = await User.findOne({ email: ADMIN_EMAIL.toLowerCase() });
+  if (!user) return res.status(404).send(approvePage('<p>חשבון המנהל לא נמצא.</p>'));
+  user.passwordHash = await bcrypt.hash(password, 10);
+  user.approved = true; // make sure the approval gate can't keep the admin out
+  await user.save();
+  res.send(
+    approvePage(
+      '<p>סיסמת המנהל עודכנה בהצלחה. אפשר להתחבר עכשיו עם הסיסמה החדשה.</p>' +
         '<p><a href="/">חזרה ל-KetoLog</a></p>'
     )
   );
