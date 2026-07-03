@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import dns from 'node:dns';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -21,6 +22,11 @@ if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
   console.error('✗ JWT_SECRET must be set to a long random string (>= 32 chars).');
   process.exit(1);
 }
+
+// Prefer IPv4 for all outbound DNS. Render instances have no working IPv6
+// egress, so resolving a host's IPv6 (AAAA) record first makes outbound TLS
+// (notably Gmail SMTP) fail with ENETUNREACH / connection timeouts.
+dns.setDefaultResultOrder('ipv4first');
 
 const app = express();
 

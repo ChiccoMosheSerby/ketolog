@@ -17,6 +17,11 @@ function transport() {
     host,
     port,
     secure: port === 465, // 465 = implicit TLS, 587 = STARTTLS
+    // Force IPv4. Render instances have no working IPv6 egress, but DNS returns
+    // Gmail's AAAA (IPv6) record first, so the default connect fails with
+    // ENETUNREACH / a connection timeout before auth is ever attempted.
+    family: 4,
+    connectionTimeout: 15_000, // fail in 15s instead of hanging the request
     auth: process.env.SMTP_USER
       ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
       : undefined,
