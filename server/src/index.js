@@ -51,7 +51,13 @@ app.use(
     origin(origin, cb) {
       // allow same-origin / non-browser clients (no Origin header)
       if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
-      return cb(new Error('Not allowed by CORS'));
+      // Disallowed origin: withhold CORS headers but STILL let the request run,
+      // rather than throwing (which 500s). Cross-origin XHR/fetch is still
+      // blocked from reading the response (no ACAO header), which is the real
+      // protection; but our server-rendered auth form POSTs (approve / reset /
+      // recover) — reached via a cross-origin email-link redirect that sends an
+      // unrecognized (often "null") Origin — proceed normally as they must.
+      return cb(null, false);
     },
   })
 );
