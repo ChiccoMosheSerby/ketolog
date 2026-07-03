@@ -277,17 +277,28 @@ router.post('/recover', recoverLimiter, asyncHandler(async (req, res) => {
   if (password !== confirm) {
     return res.status(400).send(recoverForm(key, 'הסיסמאות אינן תואמות.'));
   }
-  const user = await User.findOne({ email: ADMIN_EMAIL.toLowerCase() });
-  if (!user) return res.status(404).send(approvePage('<p>חשבון המנהל לא נמצא.</p>'));
-  user.passwordHash = await bcrypt.hash(password, 10);
-  user.approved = true; // make sure the approval gate can't keep the admin out
-  await user.save();
-  res.send(
-    approvePage(
-      '<p>סיסמת המנהל עודכנה בהצלחה. אפשר להתחבר עכשיו עם הסיסמה החדשה.</p>' +
-        '<p><a href="/">חזרה ל-KetoLog</a></p>'
-    )
-  );
+  try {
+    const email = ADMIN_EMAIL.toLowerCase();
+    const passwordHash = await bcrypt.hash(password, 10);
+    // Targeted update so an existing legacy field can't fail whole-document
+    // validation. upsert = if the admin account doesn't exist yet, create it.
+    const user = await User.findOneAndUpdate(
+      { email },
+      { $set: { passwordHash, approved: true }, $setOnInsert: { email } },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+    if (!user) return res.status(404).send(approvePage('<p>חשבון המנהל לא נמצא.</p>'));
+    res.send(
+      approvePage(
+        '<p>סיסמת המנהל עודכנה בהצלחה. אפשר להתחבר עכשיו עם הסיסמה החדשה.</p>' +
+          '<p><a href="/">חזרה ל-KetoLog</a></p>'
+      )
+    );
+  } catch (e) {
+    // Temporary: the page is key-gated, so surfacing the real cause here is safe
+    // and lets us diagnose without server-log access.
+    res.status(500).send(recoverForm(key, 'שגיאה: ' + (e?.message || 'לא ידועה')));
+  }
 }));
 
 router.get('/me', requireAuth, asyncHandler(async (req, res) => {
