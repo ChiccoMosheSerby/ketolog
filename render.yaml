@@ -31,6 +31,16 @@ services:
       # intentionally omitted so the code defaults to the deployed Render URL.
       - key: ADMIN_EMAIL
         value: chiccomoshe@gmail.com
+      # Email delivery. Render's free tier blocks outbound SMTP (ports 25/465/587),
+      # so production sends via Brevo's HTTPS API instead. Set BREVO_API_KEY in the
+      # dashboard; when present it takes precedence over the SMTP_* vars below
+      # (which remain for local dev, where SMTP isn't blocked).
+      - key: BREVO_API_KEY
+        sync: false # set in dashboard (Brevo API key, starts with xkeysib-)
+      - key: BREVO_SENDER_EMAIL
+        value: chiccomoshe@gmail.com # must be a verified sender in Brevo
+      - key: BREVO_SENDER_NAME
+        value: KetoLog
       - key: SMTP_HOST
         value: smtp.gmail.com
       - key: SMTP_PORT

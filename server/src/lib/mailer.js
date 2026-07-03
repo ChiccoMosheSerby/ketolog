@@ -2,8 +2,46 @@ import nodemailer from 'nodemailer';
 import { ADMIN_EMAIL } from './approval.js';
 import { escapeHtml } from './http.js';
 
-// Build an SMTP transport from env, or null if SMTP isn't configured.
-// Supported env: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM.
+// Email delivery. Two backends, chosen at send time:
+//   1. Brevo HTTP API (BREVO_API_KEY set) — sends over HTTPS, so it works on
+//      hosts that block outbound SMTP ports (e.g. Render's free tier blocks
+//      25/465/587). This is the production path.
+//   2. SMTP (SMTP_HOST set) — plain nodemailer, used for local development
+//      where SMTP isn't blocked.
+// If neither is configured, callers log the link to the console instead so the
+// flows still work with no email backend at all.
+
+// Sender identity. Brevo requires the "from" address to be a verified sender
+// (single-sender verification is enough — no custom domain needed).
+const senderEmail = () =>
+  process.env.BREVO_SENDER_EMAIL || process.env.SMTP_FROM || process.env.SMTP_USER || ADMIN_EMAIL;
+const senderName = () => process.env.BREVO_SENDER_NAME || 'KetoLog';
+
+// --- Brevo HTTP API -------------------------------------------------------
+async function sendViaBrevo({ to, subject, text, html }) {
+  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'api-key': process.env.BREVO_API_KEY,
+      'content-type': 'application/json',
+      accept: 'application/json',
+    },
+    body: JSON.stringify({
+      sender: { email: senderEmail(), name: senderName() },
+      to: [{ email: to }],
+      subject,
+      textContent: text,
+      htmlContent: html,
+    }),
+  });
+  if (!res.ok) {
+    // Surface Brevo's error body so a bad key / unverified sender is diagnosable.
+    const body = await res.text().catch(() => '');
+    throw new Error(`Brevo API ${res.status}: ${body.slice(0, 300)}`);
+  }
+}
+
+// --- SMTP (local/dev fallback) --------------------------------------------
 let _transport;
 function transport() {
   if (_transport !== undefined) return _transport;
@@ -17,9 +55,8 @@ function transport() {
     host,
     port,
     secure: port === 465, // 465 = implicit TLS, 587 = STARTTLS
-    // Force IPv4. Render instances have no working IPv6 egress, but DNS returns
-    // Gmail's AAAA (IPv6) record first, so the default connect fails with
-    // ENETUNREACH / a connection timeout before auth is ever attempted.
+    // Force IPv4 — some hosts resolve the SMTP host's IPv6 (AAAA) record first
+    // but have no IPv6 egress, which fails with ENETUNREACH before auth.
     family: 4,
     connectionTimeout: 15_000, // fail in 15s instead of hanging the request
     auth: process.env.SMTP_USER
@@ -29,11 +66,26 @@ function transport() {
   return _transport;
 }
 
-const from = () => process.env.SMTP_FROM || process.env.SMTP_USER || ADMIN_EMAIL;
+// Deliver one message via whichever backend is configured. Returns
+// { delivered: true, via } on success, or { delivered: false } when no backend
+// is configured (so the caller can log the link instead). Throws if a
+// configured backend fails, so the route can log the real cause.
+async function deliver({ to, subject, text, html }) {
+  if (process.env.BREVO_API_KEY) {
+    await sendViaBrevo({ to, subject, text, html });
+    return { delivered: true, via: 'brevo' };
+  }
+  const t = transport();
+  if (t) {
+    await t.sendMail({ from: senderEmail(), to, subject, text, html });
+    return { delivered: true, via: 'smtp' };
+  }
+  return { delivered: false };
+}
 
 // Notify the admin that a new user is awaiting approval, with a one-click link.
-// Falls back to logging the link to the console when SMTP isn't configured, so
-// the approval flow still works in development.
+// Falls back to logging the link to the console when no email backend is
+// configured, so the approval flow still works in development.
 export async function sendApprovalRequest({ email, approveUrl }) {
   const subject = `KetoLog — בקשת הרשמה חדשה: ${email}`;
   const text =
@@ -45,20 +97,19 @@ export async function sendApprovalRequest({ email, approveUrl }) {
     `<p><a href="${escapeHtml(approveUrl)}">לחץ כאן כדי לאשר את הגישה</a></p>` +
     `<p style="color:#888;font-size:13px">אם לא ביקשת זאת, אפשר להתעלם מהמייל.</p>`;
 
-  const t = transport();
-  if (!t) {
-    console.log('\n[approval] SMTP not configured — approval link for', email + ':');
+  const r = await deliver({ to: ADMIN_EMAIL, subject, text, html });
+  if (!r.delivered) {
+    console.log('\n[approval] no email backend configured — approval link for', email + ':');
     console.log('[approval]', approveUrl, '\n');
-    return { delivered: false };
+    return r;
   }
-  await t.sendMail({ from: from(), to: ADMIN_EMAIL, subject, text, html });
-  console.log('[approval] approval request emailed to', ADMIN_EMAIL, 'for', email);
-  return { delivered: true };
+  console.log(`[approval] approval request emailed to ${ADMIN_EMAIL} for ${email} (via ${r.via})`);
+  return r;
 }
 
 // Send a password-reset link to the account owner. Like sendApprovalRequest,
-// falls back to logging the link when SMTP isn't configured so the flow still
-// works in development.
+// falls back to logging the link when no email backend is configured so the
+// flow still works in development.
 export async function sendPasswordReset({ email, resetUrl }) {
   const subject = 'KetoLog — איפוס סיסמה';
   const text =
@@ -70,13 +121,12 @@ export async function sendPasswordReset({ email, resetUrl }) {
     `<p><a href="${escapeHtml(resetUrl)}">לחץ כאן כדי לבחור סיסמה חדשה</a> (הקישור בתוקף לשעה אחת).</p>` +
     `<p style="color:#888;font-size:13px">אם לא ביקשת לאפס את הסיסמה, אפשר להתעלם מהמייל — הסיסמה לא תשתנה.</p>`;
 
-  const t = transport();
-  if (!t) {
-    console.log('\n[reset] SMTP not configured — password-reset link for', email + ':');
+  const r = await deliver({ to: email, subject, text, html });
+  if (!r.delivered) {
+    console.log('\n[reset] no email backend configured — password-reset link for', email + ':');
     console.log('[reset]', resetUrl, '\n');
-    return { delivered: false };
+    return r;
   }
-  await t.sendMail({ from: from(), to: email, subject, text, html });
-  console.log('[reset] password-reset link emailed to', email);
-  return { delivered: true };
+  console.log(`[reset] password-reset link emailed to ${email} (via ${r.via})`);
+  return r;
 }
