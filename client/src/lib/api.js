@@ -30,6 +30,7 @@ export const api = {
   // auth
   register: (email, password) => request('POST', '/auth/register', { email, password }),
   login: (email, password) => request('POST', '/auth/login', { email, password }),
+  forgotPassword: (email) => request('POST', '/auth/forgot-password', { email }),
   me: () => request('GET', '/auth/me'),
   updateProfile: (fields) => request('PATCH', '/auth/me', fields),
 

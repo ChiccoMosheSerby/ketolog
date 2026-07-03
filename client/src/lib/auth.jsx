@@ -61,6 +61,12 @@ export function AuthProvider({ children }) {
     setNeedsOnboarding(true);
     return { pending: false };
   }
+  // Request a password-reset email. Returns the server's generic message; never
+  // reveals whether the address has an account. Doesn't touch auth state.
+  async function forgotPassword(email) {
+    const r = await api.forgotPassword(email);
+    return r?.message || '';
+  }
   // Replay the tour on demand (e.g. from the menu). Doesn't touch the
   // saved 'done'/'pending' flag — dismissing it will settle that again.
   function startOnboarding() {
@@ -95,6 +101,7 @@ export function AuthProvider({ children }) {
         loading,
         login,
         register,
+        forgotPassword,
         logout,
         updateCarbTarget,
         updateKetoGoal,
