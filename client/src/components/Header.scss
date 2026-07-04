@@ -73,6 +73,13 @@
   }
 }
 
+/* gender toggle: highlight the selected option */
+.gender-set .btn.active {
+  background: var(--olive);
+  color: #fff;
+  border-color: var(--olive);
+}
+
 /* the keto-goal editor adds a date picker, which needs more room */
 .keto-set {
   flex-wrap: wrap;

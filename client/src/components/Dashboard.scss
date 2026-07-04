@@ -13,14 +13,11 @@
 }
 
 /* ---- stat tiles ---- */
+/* Always a single row (ring + the two streak tiles) on every screen size. */
 .d-tiles {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
-
-  &.compact {
-    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-  }
 }
 
 .d-tile {
@@ -329,5 +326,24 @@
   .cat-row {
     grid-template-columns: minmax(64px, 0.8fr) 1fr auto;
     gap: 8px;
+  }
+}
+
+/* keep the 3 stat tiles on one line even on narrow phones */
+@media (max-width: 560px) {
+  .d-tiles {
+    gap: 6px;
+  }
+  .d-tile {
+    padding: 12px 8px;
+    align-items: center;
+    text-align: center;
+
+    .d-num {
+      font-size: 20px;
+    }
+    .d-lab {
+      font-size: 10.5px;
+    }
   }
 }

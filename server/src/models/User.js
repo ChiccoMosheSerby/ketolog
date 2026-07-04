@@ -4,6 +4,10 @@ const userSchema = new mongoose.Schema(
   {
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash: { type: String, required: true },
+    // Grammatical gender for Hebrew address ('male' | 'female'). Empty = unset,
+    // so AI text falls back to neutral dual forms (/ית). Drives correctly-
+    // gendered wording in the insight reports.
+    gender: { type: String, enum: ['male', 'female', ''], default: '' },
     // Daily net-carb budget (grams). Drives the live budget meter + carb zones.
     dailyCarbTarget: { type: Number, default: 20, min: 5, max: 200 },
     // Keto-period goal: when the run started (YYYY-MM-DD) + its length in months.

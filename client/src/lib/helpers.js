@@ -65,6 +65,19 @@ export function prevISO(iso) {
   );
 }
 
+// ISO date of the day after `iso` (YYYY-MM-DD).
+export function nextISO(iso) {
+  const [y, m, d] = iso.split('-').map(Number);
+  const dt = new Date(y, m - 1, d + 1);
+  return (
+    dt.getFullYear() +
+    '-' +
+    String(dt.getMonth() + 1).padStart(2, '0') +
+    '-' +
+    String(dt.getDate()).padStart(2, '0')
+  );
+}
+
 export function nowHM() {
   const now = new Date();
   return String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');

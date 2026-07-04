@@ -64,4 +64,8 @@ export const api = {
     request('POST', '/ai/chat', { conversationId, text, image }),
   resolveAction: (conversationId, actionId, decision) =>
     request('POST', `/ai/chat/${conversationId}/actions/${actionId}`, { decision }),
+
+  // AI insights — auto-generated weekly/monthly report history
+  getInsights: (today) => request('GET', `/ai/insights${today ? `?today=${today}` : ''}`),
+  markInsightSeen: (id) => request('POST', `/ai/insights/${id}/seen`),
 };

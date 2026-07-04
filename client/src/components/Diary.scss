@@ -81,16 +81,23 @@ header.top {
   color: var(--ink-soft);
 }
 
-/* target banner */
+/* Desktop header: one line — stats on one side, the compact user bar (email,
+   settings gear, logout) on the other. */
 .headrow {
   display: flex;
   justify-content: space-between;
-  align-items: stretch;
+  align-items: center;
   gap: 14px;
   flex-wrap: wrap;
 }
 .headrow .stats {
-  flex: 1;
+  flex: 0 1 auto;
+}
+.headrow .stats .stat {
+  flex: 0 0 auto;
+}
+.headrow .userbar {
+  margin-top: 0;
 }
 .target {
   background: var(--card);
@@ -299,9 +306,7 @@ header.top {
     align-items: center;
     gap: 18px;
   }
-  .headrow .stats {
-    flex: 0 1 320px;
-  }
+
   .headrow .userbar {
     flex: 1 1 auto;
     flex-wrap: wrap;

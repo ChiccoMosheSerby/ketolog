@@ -29,7 +29,7 @@ export const CHAT_MODEL = () => process.env.CHAT_MODEL || 'claude-opus-4-8';
 // appends its own output-format instruction (below), so there is no need to
 // strip a baked-in format back off — the meal/image/barcode shapes stay distinct
 // and explicit. Ported from keto-log.html; products injected as context.
-function ketoRules(products = []) {
+export function ketoRules(products = []) {
   let base =
     'אתה מומחה/ית התזונה הקטוגנית הטוב/ה בעולם — דיאטן/ית קליני/ת עם דיוק של מעבדה. ' +
     'העריך/י בדיוק הגבוה ביותר האפשרי עבור הכמויות המתוארות: (1) פחמימות נטו בגרמים, (2) שומן בגרמים, (3) חלבון בגרמים. ' +
@@ -104,7 +104,7 @@ function barcodeFormat(unit, fiberNote) {
   );
 }
 
-function parseJsonReply(message) {
+export function parseJsonReply(message) {
   // Only the visible text blocks carry the JSON; thinking blocks are ignored.
   const text = (message.content || [])
     .filter((b) => b.type === 'text')

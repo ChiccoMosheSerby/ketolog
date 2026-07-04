@@ -3,6 +3,7 @@ import { api } from '../lib/api.js';
 import { useToast } from '../lib/toast.jsx';
 import { useSpeech, speechErrorMessage } from '../lib/useSpeech.js';
 import { fmt } from '../lib/helpers.js';
+import { renderText } from '../lib/markdown.jsx';
 import Logo from './Logo.jsx';
 import './ChatWidget.scss';
 
@@ -24,42 +25,6 @@ function actionView(a) {
     };
   }
   return { key: s.key, label: s.label, unit: s.unit, carbs: s.carbs, fat: s.fat, protein: s.protein };
-}
-
-// Tiny markdown-ish renderer: **bold**, and `- ` / `* ` bullet lines.
-function renderText(text) {
-  if (!text) return null;
-  const lines = text.split('\n');
-  const out = [];
-  let bullets = null;
-  const flush = () => {
-    if (bullets) {
-      out.push(
-        <ul key={'ul' + out.length}>
-          {bullets.map((b, i) => (
-            <li key={i}>{inline(b)}</li>
-          ))}
-        </ul>
-      );
-      bullets = null;
-    }
-  };
-  lines.forEach((ln, i) => {
-    const m = ln.match(/^\s*[-*]\s+(.*)$/);
-    if (m) {
-      (bullets ||= []).push(m[1]);
-    } else {
-      flush();
-      if (ln.trim()) out.push(<p key={'p' + i}>{inline(ln)}</p>);
-    }
-  });
-  flush();
-  return out;
-}
-function inline(s) {
-  return s.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
-    part.startsWith('**') && part.endsWith('**') ? <strong key={i}>{part.slice(2, -2)}</strong> : part
-  );
 }
 
 export default function ChatWidget() {

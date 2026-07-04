@@ -120,7 +120,7 @@ function Coffee({ coffee }) {
   );
 }
 
-export default function Dashboard({ days, target = TARGET, today, ketoMonths }) {
+export default function Dashboard({ days, target = TARGET, today, ketoMonths, children }) {
   const a = useMemo(
     () => buildAnalytics(days, target, { today, ketoGoal: { months: ketoMonths } }),
     [days, target, today, ketoMonths]
@@ -132,12 +132,35 @@ export default function Dashboard({ days, target = TARGET, today, ketoMonths }) 
         <div className="empty">
           עדיין אין נתונים לניתוח. הוסף ארוחות בלשונית "היום" והתובנות יופיעו כאן.
         </div>
+        {children}
       </div>
     );
   }
 
   return (
     <div className="dashboard">
+      {/* daily average + streaks — kept at the top of the tab */}
+      <div className="panel d-panel">
+        <h2>ממוצע יומי ורצפים</h2>
+        <div className="d-tiles">
+          <div className="d-tile d-ring">
+            <CarbRing consumed={a.avg} target={target} size={66} stroke={7}>
+              <span className="ring-num">{fmt(a.avg)}</span>
+            </CarbRing>
+            <span className="d-lab">ממוצע נטו ליום (יעד {fmt(target)})</span>
+          </div>
+          <Tile num={a.longestStreak} sub=" ימים" lab="הרצף הארוך ביותר ביעד" />
+          <Tile num={a.currentStreak} sub=" ימים" lab="הרצף הנוכחי ביעד"
+                tone={a.currentStreak > 0 ? 'good' : null} />
+        </div>
+        {a.span && (
+          <div className="d-span">{a.loggedDays} ימים מתועדים · {heDate(a.span.from)} – {heDate(a.span.to)}</div>
+        )}
+      </div>
+
+      {/* AI insights slot — rendered right under the daily-average summary */}
+      {children}
+
       {/* keto-period goal progress */}
       <div className="panel d-panel">
         <h2>תקופת הקיטו</h2>
@@ -160,26 +183,7 @@ export default function Dashboard({ days, target = TARGET, today, ketoMonths }) 
         )}
       </div>
 
-      {/* 2 · daily average + streaks */}
-      <div className="panel d-panel">
-        <h2>ממוצע יומי ורצפים</h2>
-        <div className="d-tiles">
-          <div className="d-tile d-ring">
-            <CarbRing consumed={a.avg} target={target} size={66} stroke={7}>
-              <span className="ring-num">{fmt(a.avg)}</span>
-            </CarbRing>
-            <span className="d-lab">ממוצע נטו ליום (יעד {fmt(target)})</span>
-          </div>
-          <Tile num={a.longestStreak} sub=" ימים" lab="הרצף הארוך ביותר ביעד" />
-          <Tile num={a.currentStreak} sub=" ימים" lab="הרצף הנוכחי ביעד"
-                tone={a.currentStreak > 0 ? 'good' : null} />
-        </div>
-        {a.span && (
-          <div className="d-span">{a.loggedDays} ימים מתועדים · {heDate(a.span.from)} – {heDate(a.span.to)}</div>
-        )}
-      </div>
-
-      {/* 3 · records (best / worst day) */}
+      {/* records (best / worst day) */}
       <div className="panel d-panel">
         <h2>שיאים</h2>
         <div className="d-records">

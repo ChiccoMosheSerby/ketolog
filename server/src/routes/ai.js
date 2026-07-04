@@ -2,11 +2,13 @@ import { Router } from 'express';
 import Product from '../models/Product.js';
 import Day from '../models/Day.js';
 import Conversation from '../models/Conversation.js';
+import User from '../models/User.js';
 import { requireAuth } from '../middleware/auth.js';
 import { estimateImage, interpretBarcode, aiConfigured } from '../lib/anthropic.js';
 import { estimateMealCached } from '../lib/estimateCache.js';
 import { fetchProductByBarcode, rawKeto } from '../lib/openfoodfacts.js';
 import { runChatTurn } from '../lib/chatAgent.js';
+import { ensureDueReports, listReports, markSeen } from '../lib/insightsAgent.js';
 import { transcribeAudio, transcribeConfigured } from '../lib/transcribe.js';
 import { asyncHandler } from '../lib/http.js';
 
@@ -331,6 +333,54 @@ router.post('/chat/:id/actions/:actionId', asyncHandler(async (req, res) => {
     console.error('commit action failed:', err.message);
     return res.status(502).json({ error: 'השמירה נכשלה' });
   }
+}));
+
+// ----------------------------------------------------------------------------
+// AI insights — narrative summaries / trends / recommendations over the log
+// ----------------------------------------------------------------------------
+
+const ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
+const serverToday = () => new Date().toISOString().slice(0, 10);
+
+// GET /api/ai/insights -> the user's report history (newest first), and, in the
+// background, kick off any completed-period report that's due. The request never
+// blocks on generation; a freshly generated report appears on a later load. When
+// the AI key is off we still return existing reports (just no new generation).
+router.get('/insights', asyncHandler(async (req, res) => {
+  const today = ISO_RE.test(req.query.today || '') ? req.query.today : serverToday();
+  const [user, days] = await Promise.all([
+    User.findById(req.userId).select('dailyCarbTarget ketoGoalMonths gender').lean(),
+    Day.find({ user: req.userId }).lean(),
+  ]);
+  const opts = {
+    target: user?.dailyCarbTarget ?? 20,
+    ketoGoalMonths: user?.ketoGoalMonths ?? 0,
+    gender: user?.gender ?? '',
+    today,
+  };
+
+  let due = { enoughData: days.some((d) => (d.meals || []).length > 0), generating: [] };
+  if (aiConfigured()) {
+    try {
+      due = await ensureDueReports(req.userId, days, opts);
+    } catch (err) {
+      console.error('ensureDueReports failed:', err.message);
+    }
+  }
+
+  const reports = await listReports(req.userId);
+  res.json({
+    enoughData: due.enoughData,
+    reports,
+    generating: due.generating || [],
+    aiConfigured: aiConfigured(),
+  });
+}));
+
+// POST /api/ai/insights/:id/seen -> clear a report's "new" highlight once viewed.
+router.post('/insights/:id/seen', asyncHandler(async (req, res) => {
+  await markSeen(req.userId, req.params.id);
+  res.json({ ok: true });
 }));
 
 export default router;

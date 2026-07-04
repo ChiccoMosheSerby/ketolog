@@ -93,6 +93,15 @@ export function AuthProvider({ children }) {
     const r = await api.updateProfile({ whatsappPhone });
     setUser(r.user);
   }
+  async function updateGender(gender) {
+    const r = await api.updateProfile({ gender });
+    setUser(r.user);
+  }
+  // Save several profile fields at once (used by the settings modal).
+  async function updateProfile(fields) {
+    const r = await api.updateProfile(fields);
+    setUser(r.user);
+  }
 
   return (
     <AuthContext.Provider
@@ -106,6 +115,8 @@ export function AuthProvider({ children }) {
         updateCarbTarget,
         updateKetoGoal,
         updateWhatsapp,
+        updateGender,
+        updateProfile,
         needsOnboarding,
         startOnboarding,
         dismissOnboarding,

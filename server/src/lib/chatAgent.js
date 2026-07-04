@@ -229,6 +229,31 @@ function normalizeToolInputs(messages) {
   }
 }
 
+// Prompt caching. The chat loop re-sends the whole growing transcript on every
+// tool-use round (up to MAX_TURNS) and on every follow-up turn, at full input
+// price. Placing one `cache_control` breakpoint on the LAST content block caches
+// the entire prefix before it (render order tools → system → messages), so
+// subsequent calls read it at ~0.1× instead of paying full price again. The
+// tools+system prefix alone is ~2.9K tokens — below Opus 4.8's 4096-token cache
+// minimum — so caching only kicks in once the conversation grows past that,
+// which is exactly the long/expensive conversations. We mark a shallow copy so
+// no `cache_control` marker is ever persisted into the stored conversation
+// (which would risk exceeding the 4-breakpoint limit as the thread grows).
+function withCacheBreakpoint(messages) {
+  if (!messages.length) return messages;
+  const out = messages.slice();
+  const last = out[out.length - 1];
+  const content = Array.isArray(last.content)
+    ? last.content.map((b) => ({ ...b }))
+    : [{ type: 'text', text: String(last.content) }];
+  content[content.length - 1] = {
+    ...content[content.length - 1],
+    cache_control: { type: 'ephemeral' },
+  };
+  out[out.length - 1] = { ...last, content };
+  return out;
+}
+
 export async function runChatTurn(messages, userId) {
   const client = getClient();
   const target = await getCarbTarget(userId);
@@ -245,7 +270,7 @@ export async function runChatTurn(messages, userId) {
       thinking: { type: 'adaptive' },
       system,
       tools: TOOLS,
-      messages,
+      messages: withCacheBreakpoint(messages),
     });
 
     messages.push({ role: 'assistant', content: resp.content });

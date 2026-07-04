@@ -8,6 +8,7 @@ import AddMeal from './AddMeal.jsx';
 import Products from './Products.jsx';
 import DayCard from './DayCard.jsx';
 import Dashboard from './Dashboard.jsx';
+import SmartInsights from './SmartInsights.jsx';
 import Header, { TargetLegend } from './Header.jsx';
 import TabShell from './TabShell.jsx';
 import { useMediaQuery, MOBILE_QUERY } from '../lib/useMediaQuery.js';
@@ -214,15 +215,6 @@ export default function Diary() {
     });
   }
 
-  async function copyData() {
-    try {
-      await navigator.clipboard.writeText(JSON.stringify({ days, products }, null, 2));
-      toast('הנתונים הועתקו');
-    } catch {
-      toast('לא ניתן להעתיק');
-    }
-  }
-
   // Download a full, human-readable HTML report: all insights + every logged
   // day + the saved products (with their thumbnails). Opens/prints anywhere.
   function exportReport() {
@@ -382,7 +374,9 @@ export default function Diary() {
           target={target}
           today={todayISO()}
           ketoMonths={user?.ketoGoalMonths || 0}
-        />
+        >
+          <SmartInsights />
+        </Dashboard>
       ),
     },
     ...(isMobile ? [{ id: 'products', label: 'המוצרים שלי', content: productsPanel }] : []),
@@ -390,7 +384,7 @@ export default function Diary() {
 
   return (
     <div className="wrap">
-      <Header stats={stats} onCopyData={copyData} onExport={exportReport} />
+      <Header stats={stats} onExport={exportReport} />
 
       <TabShell tabs={tabs} />
 

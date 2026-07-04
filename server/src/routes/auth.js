@@ -34,13 +34,14 @@ function signToken(user) {
 const userPayload = (u) => ({
   id: u._id,
   email: u.email,
+  gender: u.gender || '',
   dailyCarbTarget: u.dailyCarbTarget,
   ketoStartDate: u.ketoStartDate || '',
   ketoGoalMonths: u.ketoGoalMonths || 0,
   whatsappPhone: u.whatsappPhone || '',
 });
 
-const PROFILE_FIELDS = 'email dailyCarbTarget ketoStartDate ketoGoalMonths whatsappPhone';
+const PROFILE_FIELDS = 'email gender dailyCarbTarget ketoStartDate ketoGoalMonths whatsappPhone';
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 // Base URL for the approval link in the email.
@@ -238,6 +239,13 @@ router.get('/me', requireAuth, asyncHandler(async (req, res) => {
 // PATCH /me -> update profile settings (daily carb target + keto-period goal)
 router.patch('/me', requireAuth, asyncHandler(async (req, res) => {
   const update = {};
+  if (req.body.gender != null) {
+    const g = String(req.body.gender);
+    if (!['male', 'female', ''].includes(g)) {
+      return res.status(400).json({ error: 'מגדר לא תקין' });
+    }
+    update.gender = g;
+  }
   if (req.body.dailyCarbTarget != null) {
     const t = Number(req.body.dailyCarbTarget);
     if (!Number.isFinite(t) || t < 5 || t > 200) {
