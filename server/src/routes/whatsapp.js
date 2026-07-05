@@ -8,6 +8,7 @@ import {
   formatMealReceipt,
 } from '../lib/whatsapp.js';
 import { logMealFromDesc } from '../lib/logMeal.js';
+import { recordTwilioUsage } from '../lib/usage.js';
 
 const router = Router();
 
@@ -67,6 +68,7 @@ router.post('/inbound', async (req, res) => {
   const text = String(req.body.Body || '').trim();
   if (!phone) return;
 
+  let userId = null; // set once the sender is mapped to a linked account
   try {
     const user = await User.findOne({ whatsappPhone: phone }).lean();
     if (!user) {
@@ -76,19 +78,22 @@ router.post('/inbound', async (req, res) => {
       );
       return;
     }
+    userId = user._id.toString();
+    // Count the inbound WhatsApp message against this user (Twilio cost).
+    recordTwilioUsage({ userId, kind: 'whatsapp_in' });
 
     if (!text) {
-      await sendWhatsApp(from, 'שלח/י תיאור חופשי של הארוחה ואחשב ואשמור אותה ביומן. לדוגמה: "חביתה מ-3 ביצים, פרוסת גאודה, מלפפון".');
+      await sendWhatsApp(from, 'שלח/י תיאור חופשי של הארוחה ואחשב ואשמור אותה ביומן. לדוגמה: "חביתה מ-3 ביצים, פרוסת גאודה, מלפפון".', { userId });
       return;
     }
 
     if (tooMany(phone)) {
-      await sendWhatsApp(from, 'יותר מדי הודעות ברצף — נסה/י שוב בעוד רגע.');
+      await sendWhatsApp(from, 'יותר מדי הודעות ברצף — נסה/י שוב בעוד רגע.', { userId });
       return;
     }
 
-    const logged = await logMealFromDesc({ userId: user._id.toString(), desc: text });
-    await sendWhatsApp(from, formatMealReceipt(logged));
+    const logged = await logMealFromDesc({ userId, desc: text });
+    await sendWhatsApp(from, formatMealReceipt(logged), { userId });
   } catch (err) {
     // Surface Twilio's real error code/status/moreInfo — 'Authenticate' alone
     // hides whether it's a bad SID, bad token, or a wrong From number.
@@ -100,7 +105,7 @@ router.post('/inbound', async (req, res) => {
       err.moreInfo ? 'moreInfo=' + err.moreInfo : ''
     );
     try {
-      await sendWhatsApp(from, 'החישוב נכשל כרגע — נסה/י שוב בעוד רגע, או רשום/רשמי דרך האפליקציה.');
+      await sendWhatsApp(from, 'החישוב נכשל כרגע — נסה/י שוב בעוד רגע, או רשום/רשמי דרך האפליקציה.', { userId });
     } catch {
       /* nothing more we can do */
     }

@@ -34,6 +34,12 @@ export default function AddMeal({
   const [items, setItems] = useState([]); // per-item breakdown from the last calc
   const [note, setNote] = useState(null); // { html } via structured fields
   const [busy, setBusy] = useState(false);
+  // Structured list of saved products the user tapped in, kept alongside the free
+  // text. `descIsPure` stays true only while the description was built *solely*
+  // from those taps (no manual typing / dictation / template). When it holds, the
+  // meal is just a sum of known values, so we log it locally with no AI call.
+  const [picked, setPicked] = useState([]);
+  const [descIsPure, setDescIsPure] = useState(true);
 
   // Voice dictation: append the recognized speech to whatever was typed before recording.
   const baseDescRef = useRef("");
@@ -41,6 +47,7 @@ export default function AddMeal({
     onTranscript: (text) => {
       const base = baseDescRef.current;
       setDesc(base + (base && text ? " " : "") + text);
+      markManual();
       clearNote();
     },
     onError: (err) => toast(speechErrorMessage(err)),
@@ -61,19 +68,78 @@ export default function AddMeal({
     setItems([]);
   }
 
-  // A product chip (ingredient) is appended to the description; the carbs reset
-  // so the whole meal gets recalculated.
+  // Any hand-typed / dictated / template text means the description is no longer
+  // a clean sum of saved products, so drop the structured list and fall back to
+  // the AI path for this meal.
+  function markManual() {
+    setDescIsPure(false);
+    setPicked([]);
+  }
+
+  const round2 = (n) => Math.round(n * 100) / 100;
+  const unitKey = (p) => `${p.unit ? p.unit + " " : ""}${p.key}`.trim();
+  // Human-readable description composed purely from the tapped products.
+  const pickedToText = (list) =>
+    list.map((p) => (p.qty > 1 ? `${fmt(p.qty)} ${unitKey(p)}` : unitKey(p))).join(", ");
+
+  // Local (no-AI) total for a pure-products meal: sum each product's known macros
+  // × quantity. Mirrors the server's item-derived totals, so the numbers match
+  // exactly what the AI would have returned for the same saved products.
+  function sumPicked(list) {
+    const items = list.map((p) => ({
+      name: p.key,
+      qty: p.qty,
+      unit: p.unit || "",
+      carbs: p.carbs,
+      fat: p.fat,
+      protein: p.protein,
+    }));
+    const sum = (key) => round2(list.reduce((s, p) => s + (Number(p[key]) || 0) * p.qty, 0));
+    return {
+      carbs: sum("carbs"),
+      fat: list.every((p) => p.fat != null) ? sum("fat") : null,
+      protein: list.every((p) => p.protein != null) ? sum("protein") : null,
+      items,
+    };
+  }
+
+  const canSumLocally = () => descIsPure && picked.length > 0 && carb === "";
+
+  // A product chip (ingredient). While the description is still a pure list of
+  // taps, keep it structured (so we can total it locally with no AI). Once the
+  // user has typed free text, just append it and let the AI parse the whole meal.
   function applyProduct(p) {
-    const chunk = p.unit + " " + p.key;
-    setDesc((d) => (d.trim() ? d.trim() + ", " + chunk : chunk));
-    setCarb("");
     clearNote();
+    setCarb("");
+    if (descIsPure) {
+      const i = picked.findIndex((x) => x.key === p.key);
+      const next =
+        i >= 0
+          ? picked.map((x, j) => (j === i ? { ...x, qty: x.qty + 1 } : x))
+          : [
+              ...picked,
+              {
+                key: p.key,
+                label: p.label,
+                unit: p.unit || "",
+                carbs: Number(p.carbs) || 0,
+                fat: p.fat ?? null,
+                protein: p.protein ?? null,
+                qty: 1,
+              },
+            ];
+      setPicked(next);
+      setDesc(pickedToText(next));
+    } else {
+      const chunk = unitKey(p);
+      setDesc((d) => (d.trim() ? d.trim() + ", " + chunk : chunk));
+    }
     toast(p.key + " נוסף לפירוט");
   }
 
   // A template (full meal) fills the form with its saved macros when the
   // description is empty (ready to log); if combined with text, it appends and
-  // forces a recalc.
+  // forces a recalc. Either way the meal is no longer a pure product sum.
   function applyTemplate(t) {
     const text = (t.desc || t.name || "").trim();
     const had = desc.trim();
@@ -86,6 +152,7 @@ export default function AddMeal({
       setCarb(t.carbs != null && t.carbs !== "" ? String(t.carbs) : "");
       setPendingMacro({ fat: t.fat ?? null, protein: t.protein ?? null });
     }
+    markManual();
     setNote(null);
     toast("התבנית נוספה לפירוט");
   }
@@ -106,6 +173,8 @@ export default function AddMeal({
     await onLogged(date, meal);
     setDesc("");
     setCarb("");
+    setPicked([]);
+    setDescIsPure(true);
     clearNote();
     toast("הארוחה נרשמה");
   }
@@ -114,6 +183,26 @@ export default function AddMeal({
     const d = desc.trim();
     if (!d) {
       toast("כתוב/י קודם מה אכלת");
+      return;
+    }
+    // Pure saved-products meal → total it locally, no AI call, no cost.
+    if (canSumLocally()) {
+      const t = sumPicked(picked);
+      setCarb(fmt(t.carbs));
+      setPendingMacro({ fat: t.fat, protein: t.protein });
+      setItems(t.items);
+      setNote({
+        carbs: fmt(t.carbs),
+        fat: t.fat == null ? "?" : fmt(t.fat),
+        protein: t.protein == null ? "?" : fmt(t.protein),
+        mp:
+          t.fat != null && t.protein != null
+            ? macroPct({ carb: t.carbs, fat: t.fat, protein: t.protein })
+            : null,
+        items: t.items,
+        local: true,
+      });
+      if (thenLog) await doAdd(t.carbs, { fat: t.fat, protein: t.protein }, t.items);
       return;
     }
     setBusy(true);
@@ -166,6 +255,8 @@ export default function AddMeal({
     onDateChange(todayISO());
     setCarb("");
     setDesc("");
+    setPicked([]);
+    setDescIsPure(true);
     clearNote();
     toast("הטופס אופס");
   }
@@ -247,6 +338,7 @@ export default function AddMeal({
             value={desc}
             onChange={(e) => {
               setDesc(e.target.value);
+              markManual();
               clearNote();
             }}
           />
@@ -279,6 +371,12 @@ export default function AddMeal({
                   חלוקה קלורית: שומן {note.mp.fat}% · חלבון {note.mp.protein}% ·
                   פחמ' {note.mp.carb}% (~
                   {note.mp.kcal} קק"ל)
+                </span>
+              )}
+              {note.local && (
+                <span className="bd">
+                  <br />
+                  חושב מהמוצרים השמורים שלך — ללא AI.
                 </span>
               )}
               {note.items && note.items.length > 0 && (

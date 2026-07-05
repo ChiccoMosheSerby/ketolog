@@ -9,6 +9,7 @@
 // the browser commits them via the existing /api/days and /api/products routes
 // only after the user taps "add". The model is told it can only *propose*.
 import { getClient, CHAT_MODEL } from './anthropic.js';
+import { recordAnthropicUsage } from './usage.js';
 import Day from '../models/Day.js';
 import Product from '../models/Product.js';
 import User from '../models/User.js';
@@ -272,6 +273,8 @@ export async function runChatTurn(messages, userId) {
       tools: TOOLS,
       messages: withCacheBreakpoint(messages),
     });
+
+    recordAnthropicUsage({ userId, kind: 'chat', model: CHAT_MODEL(), usage: resp.usage });
 
     messages.push({ role: 'assistant', content: resp.content });
 

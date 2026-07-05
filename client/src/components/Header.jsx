@@ -3,6 +3,7 @@ import { useAuth } from '../lib/auth.jsx';
 import { useMediaQuery, MOBILE_QUERY } from '../lib/useMediaQuery.js';
 import CarbRing from './CarbRing.jsx';
 import SettingsModal from './SettingsModal.jsx';
+import AdminUsage from './AdminUsage.jsx';
 import './Header.scss';
 
 // The 3 live day summaries. `mini` shrinks them for the mobile top bar.
@@ -63,11 +64,16 @@ export function TargetLegend() {
 // Compact identity bar: email, a gear that opens the settings modal, and logout.
 // Everything else (target, keto goal, WhatsApp, gender, theme, tour, export)
 // lives inside the settings modal now.
-function UserBar({ onOpenSettings }) {
+function UserBar({ onOpenSettings, onOpenAdmin }) {
   const { user, logout } = useAuth();
   return (
     <div className="userbar">
       <span className="uemail">{user?.email}</span>
+      {user?.isAdmin && (
+        <button className="btn ghost mini" onClick={onOpenAdmin} title="שימוש ועלויות">
+          💰 שימוש
+        </button>
+      )}
       <button className="btn ghost mini" onClick={onOpenSettings} title="הגדרות" data-tour="settings">
         ⚙ הגדרות
       </button>
@@ -82,6 +88,7 @@ export default function Header({ stats, onExport }) {
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
 
   // Close the drawer if we grow back to desktop.
   useEffect(() => {
@@ -98,8 +105,11 @@ export default function Header({ stats, onExport }) {
     };
   }, [drawerOpen]);
 
-  const settingsModal = (
-    <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} onExport={onExport} />
+  const modals = (
+    <>
+      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} onExport={onExport} />
+      <AdminUsage open={adminOpen} onClose={() => setAdminOpen(false)} />
+    </>
   );
 
   if (!isMobile) {
@@ -107,9 +117,12 @@ export default function Header({ stats, onExport }) {
       <header className="top">
         <div className="headrow">
           <Stats stats={stats} />
-          <UserBar onOpenSettings={() => setSettingsOpen(true)} />
+          <UserBar
+            onOpenSettings={() => setSettingsOpen(true)}
+            onOpenAdmin={() => setAdminOpen(true)}
+          />
         </div>
-        {settingsModal}
+        {modals}
       </header>
     );
   }
@@ -136,10 +149,13 @@ export default function Header({ stats, onExport }) {
         <button className="drawer-close" aria-label="סגור" onClick={() => setDrawerOpen(false)}>
           ✕
         </button>
-        <UserBar onOpenSettings={() => { setDrawerOpen(false); setSettingsOpen(true); }} />
+        <UserBar
+          onOpenSettings={() => { setDrawerOpen(false); setSettingsOpen(true); }}
+          onOpenAdmin={() => { setDrawerOpen(false); setAdminOpen(true); }}
+        />
         <TargetLegend />
       </aside>
-      {settingsModal}
+      {modals}
     </header>
   );
 }

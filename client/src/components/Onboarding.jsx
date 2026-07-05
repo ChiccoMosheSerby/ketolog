@@ -1,15 +1,20 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useMediaQuery, MOBILE_QUERY } from '../lib/useMediaQuery.js';
 import { useAuth } from '../lib/auth.jsx';
 import './Onboarding.scss';
 
 // First-run product tour. Shown once after sign-up (see auth.jsx), replayable
-// from the menu. It spotlights the *real* elements in the app — switching to
+// from settings. It spotlights the *real* elements in the app — switching to
 // the right tab first — so the user learns where each feature actually lives.
 // Anchors are tagged with data-tour="…"; tabs with data-tour-tab="…".
+//
+// The spotlight moves to whatever element a step points at, but the tooltip
+// CARD stays docked in ONE fixed place (bottom-center) across steps, so the
+// Next button never chases the user around the screen. The card only flips to
+// the top edge when the spotlighted element sits where the bottom card would be
+// — so it never covers the very thing it's describing.
 
 const PAD = 8; // breathing room around the spotlighted element
-const GAP = 14; // distance between the element and the tooltip
 
 // Switch the app to a given tab by clicking its real tab button. Works on both
 // the desktop tab bar and the mobile carousel dots (same data attribute).
@@ -23,10 +28,8 @@ export default function Onboarding() {
   const steps = buildSteps(isMobile);
 
   const [i, setI] = useState(0);
-  const [rect, setRect] = useState(null); // target rect in viewport coords; null = centered
-  const [tip, setTip] = useState({ top: 0, left: 0, place: 'center', arrow: 0 });
+  const [rect, setRect] = useState(null); // target rect in viewport coords; null = no spotlight
   const [leaving, setLeaving] = useState(false);
-  const tipRef = useRef(null);
 
   const step = steps[i];
   const last = i === steps.length - 1;
@@ -76,37 +79,6 @@ export default function Onboarding() {
     };
   }, [i, step.anchor, step.tab, isMobile]);
 
-  // Position the tooltip relative to the spotlight (or center it if no anchor).
-  useLayoutEffect(() => {
-    const el = tipRef.current;
-    if (!el) return;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const { width: tw, height: th } = el.getBoundingClientRect();
-
-    if (!rect) {
-      setTip({ top: (vh - th) / 2, left: (vw - tw) / 2, place: 'center', arrow: 0 });
-      return;
-    }
-
-    let place = 'bottom';
-    let top = rect.top + rect.height + PAD + GAP;
-    if (top + th > vh - 12) {
-      const above = rect.top - PAD - GAP - th;
-      if (above > 12) {
-        place = 'top';
-        top = above;
-      } else {
-        place = 'center';
-        top = Math.max(12, (vh - th) / 2);
-      }
-    }
-    let left = rect.left + rect.width / 2 - tw / 2;
-    left = Math.max(12, Math.min(left, vw - tw - 12));
-    const arrow = rect.left + rect.width / 2 - left; // arrow x within the tooltip
-    setTip({ top, left, place, arrow: Math.max(18, Math.min(arrow, tw - 18)) });
-  }, [rect, i]);
-
   // Keyboard: arrows move (RTL-aware), Enter advances, Esc skips.
   useEffect(() => {
     const onKey = (e) => {
@@ -129,15 +101,7 @@ export default function Onboarding() {
     <div className={'tour-root' + (leaving ? ' leaving' : '')} role="dialog" aria-modal="true">
       {rect ? <div className="tour-spot" style={spotStyle} /> : <div className="tour-veil" />}
 
-      <div
-        ref={tipRef}
-        className={'tour-tip place-' + tip.place}
-        style={{ top: tip.top, left: tip.left }}
-      >
-        {tip.place !== 'center' && (
-          <span className="tour-arrow" style={{ left: tip.arrow }} />
-        )}
-
+      <div className="tour-tip dock-bottom">
         <button className="tour-skip" onClick={finish} aria-label="דלג">
           דלג/י
         </button>
@@ -187,67 +151,84 @@ function buildSteps(isMobile) {
   const navHint = isMobile
     ? 'החלקה שמאלה/ימינה מחליפה ביניהן.'
     : 'לחיצה על לשונית מחליפה את התצוגה.';
+  // Products & the barcode scanner live in a dedicated tab on mobile, but sit at
+  // the top of the "היום" grid on desktop — so point at the right place per device.
+  const productsTab = isMobile ? 'products' : 'today';
   return [
     {
       emoji: '🥑',
       title: 'ברוכים הבאים ליומן קטו',
-      text: 'בואו נכיר את הפיצ׳רים העיקריים — איפה כל דבר נמצא ואיך משתמשים בו. ייקח רק רגע.',
+      text: 'בואו נכיר את כל הפיצ׳רים — איפה כל דבר נמצא ואיך משתמשים בו. ייקח פחות מדקה, וכל שלב מדגיש לך את האזור באפליקציה.',
     },
     {
       anchor: 'carb-ring',
       tab: 'today',
       emoji: '🎯',
       title: 'תקציב הפחמימות היומי',
-      text: 'הטבעת הזו מראה כמה פחמימות נטו צברת היום מול היעד שלך. כל עוד את/ה מתחת לקו — את/ה בירוק.',
-    },
-    {
-      anchor: isMobile ? 'menu' : 'target',
-      emoji: '⚖️',
-      title: 'שינוי היעד היומי',
-      text: isMobile
-        ? 'היעד היומי הוא אישי. פותחים את התפריט (☰) כאן למעלה, ושם אפשר לשנות בכל רגע את יעד הפחמימות שלך — הטבעת תתעדכן בהתאם.'
-        : 'היעד היומי הוא אישי. לחיצה על "יעד יומי" כאן פותחת עריכה מהירה — קובעים מספר חדש והטבעת מתעדכנת בהתאם.',
-    },
-    {
-      anchor: 'tabs',
-      emoji: '🧭',
-      title: 'הניווט הראשי',
-      text: `כאן עוברים בין "היום", "יומן" ו"המוצרים שלי". ${navHint}`,
+      text: 'הטבעת מראה כמה פחמימות נטו צברת היום מול היעד שלך. כל עוד את/ה מתחת לקו — את/ה בירוק. את היעד האישי אפשר לשנות בהגדרות.',
     },
     {
       anchor: 'add-meal',
       tab: 'today',
       emoji: '🍳',
       title: 'הוספת ארוחה',
-      text: 'כותבים תיאור חופשי של מה שאכלת, וה-AI מעריך פחמימות, שומן וחלבון. יש גם הקלטה קולית וכפתור לחישוב בלבד.',
+      text: 'כותבים תיאור חופשי של מה שאכלת, וה-AI מעריך פחמימות, שומן וחלבון ומפרק לפריטים. יש גם הקלטה קולית (מיקרופון) וכפתור לחישוב-בלבד בלי לשמור.',
     },
     {
       anchor: 'shortcuts',
       tab: 'today',
       emoji: '⚡',
       title: 'הוספה מהירה',
-      text: 'מקום אחד מתקפל לכל הקיצורים: המוצרים השמורים שלך, תבניות ארוחה, ושכפול ארוחות אתמול. קליק מוסיף לפירוט הארוחה.',
-    },
-    {
-      anchor: 'products',
-      tab: 'products',
-      emoji: '📦',
-      title: 'המוצרים שלי',
-      text: 'בלשונית הזו שומרים מוצרים קבועים שאת/ה אוכל/ת הרבה — הם יופיעו כתגיות מהירות בהוספת ארוחה.',
-    },
-    {
-      anchor: 'barcode',
-      tab: 'products',
-      emoji: '📷',
-      title: 'סריקת ברקוד',
-      text: 'הכפתור הזה פותח את סורק הברקוד במצלמה — מכוונים אל הברקוד של המוצר וכל הערכים התזונתיים נמשכים אוטומטית. אפשר גם לזהות מוצר מתמונה או להקליד ברקוד ידנית.',
+      text: 'מקום אחד מתקפל לכל הקיצורים: המוצרים השמורים שלך, תבניות ארוחה, ושכפול הארוחות של אתמול. קליק מוסיף ישר לפירוט הארוחה.',
     },
     {
       anchor: 'chat',
       tab: 'today',
       emoji: '💬',
       title: 'קֶטוֹ — העוזר/ת החכם/ה',
-      text: 'מהבועה הזו אפשר לשאול אם מוצר מתאים לקיטו, לבקש חלופה, לשלוח תמונה — ואפילו לבקש להוסיף ארוחה ליומן.',
+      text: 'מהבועה הזו שואלים אם מוצר מתאים לקיטו, מבקשים חלופה, שולחים תמונה — ואפילו מבקשים להוסיף ארוחה ליומן. קֶטוֹ רואה את היומן שלך ועונה לפי הנתונים האמיתיים.',
+    },
+    {
+      anchor: 'journal',
+      tab: 'today',
+      emoji: '📖',
+      title: 'היומן — כל הימים הקודמים',
+      text: 'תחת היום הנוכחי מתקפל היומן המלא. פותחים אותו כדי לדפדף אחורה, לקפוץ לתאריך, ולראות מדדים לכל יום — משקל, צום, ריצה ועוד.',
+    },
+    {
+      anchor: 'tabs',
+      emoji: '🧭',
+      title: 'הניווט הראשי',
+      text: `כאן עוברים בין "היום", "תובנות"${isMobile ? ' ו"המוצרים שלי"' : ''}. ${navHint}`,
+    },
+    {
+      anchor: 'insights',
+      tab: 'insights',
+      emoji: '📈',
+      title: 'תובנות חכמות',
+      text: 'כאן חיים לוח המחוונים והדוחות: ממוצעים ורצפים, התקדמות תקופת הקיטו, ודוחות AI שבועיים/חודשיים שנכתבים אוטומטית ומזהים מגמות והמלצות — בלי שתצטרך/י לבקש.',
+    },
+    {
+      anchor: 'products',
+      tab: productsTab,
+      emoji: '📦',
+      title: 'המוצרים שלי',
+      text: 'שומרים כאן מוצרים קבועים שאת/ה אוכל/ת הרבה, עם הערכים התזונתיים שלהם. הם קופצים כתגיות מהירות בהוספת ארוחה — וה-AI משתמש בערכים המדויקים שלך.',
+    },
+    {
+      anchor: 'barcode',
+      tab: productsTab,
+      emoji: '📷',
+      title: 'סריקת ברקוד',
+      text: 'הכפתור פותח את סורק הברקוד במצלמה — מכוונים לברקוד המוצר וכל הערכים התזונתיים נמשכים אוטומטית. אפשר גם לזהות מוצר מתמונה או להקליד ברקוד ידנית.',
+    },
+    {
+      anchor: isMobile ? 'menu' : 'settings',
+      emoji: '⚙️',
+      title: 'הגדרות',
+      text: isMobile
+        ? 'פותחים את התפריט (☰) כאן למעלה — ובהגדרות קובעים את היעד היומי, יעד תקופת הקיטו, לשון הפנייה, קישור WhatsApp, מצב כהה, ייצוא דוח, וגם הרצה מחדש של הסיור הזה.'
+        : 'כאן קובעים את היעד היומי, יעד תקופת הקיטו, לשון הפנייה, קישור WhatsApp, מצב כהה, ייצוא דוח — וגם אפשר להריץ מחדש את הסיור הזה בכל רגע.',
     },
   ];
 }

@@ -6,6 +6,7 @@ import { requireAuth } from '../middleware/auth.js';
 import {
   AUTO_APPROVED_EMAILS,
   isApproved,
+  isAdmin,
   makeApprovalToken,
   readApprovalToken,
   makeResetToken,
@@ -39,6 +40,7 @@ const userPayload = (u) => ({
   ketoStartDate: u.ketoStartDate || '',
   ketoGoalMonths: u.ketoGoalMonths || 0,
   whatsappPhone: u.whatsappPhone || '',
+  isAdmin: isAdmin(u),
 });
 
 const PROFILE_FIELDS = 'email gender dailyCarbTarget ketoStartDate ketoGoalMonths whatsappPhone';

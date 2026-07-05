@@ -121,6 +121,26 @@
   gap: 12px;
 }
 
+/* Thin, unobtrusive scrollbars for the scrollable areas inside the panel. */
+.chat-body,
+.chat-input textarea {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: var(--line);
+    border-radius: 999px;
+  }
+  &:hover::-webkit-scrollbar-thumb {
+    background: var(--ink-soft);
+  }
+}
+
 .chat-msg {
   display: flex;
   flex-direction: column;
@@ -334,11 +354,14 @@
   textarea {
     flex: 1;
     resize: none;
-    max-height: 120px;
+    height: 40px; /* JS auto-grows this up to max-height as the user types */
     min-height: 40px;
-    border-radius: 18px;
-    padding: 9px 14px;
-    line-height: 1.4;
+    max-height: 120px;
+    border-radius: 20px;
+    padding: 10px 14px;
+    font-size: 16px; /* >=16px keeps mobile browsers from zooming on focus */
+    line-height: 1.35;
+    overflow-y: auto;
   }
   .send-btn {
     width: 40px;

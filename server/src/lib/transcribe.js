@@ -5,7 +5,7 @@
 // keeps short Hebrew clips (one or two food words) from hallucinating in a
 // random language. gpt-4o-transcribe treats `prompt` as loose instructions and
 // drifts on tiny utterances.
-const TRANSCRIBE_MODEL = () => process.env.TRANSCRIBE_MODEL || 'whisper-1';
+export const TRANSCRIBE_MODEL = () => process.env.TRANSCRIBE_MODEL || 'whisper-1';
 
 // Primes the decoder for Hebrew + the everyday food words this app hears, so a
 // one-word utterance like "שוקולד" stays Hebrew instead of becoming gibberish.
@@ -29,6 +29,9 @@ function extFor(mime = '') {
 }
 
 // Transcribe a raw audio buffer. lang is an ISO-639-1 hint ('he' for Hebrew).
+// Returns { text, duration } — `duration` (seconds of audio) drives the Whisper
+// cost accounting, which is billed per minute. `verbose_json` is what surfaces
+// the duration field; plain json returns only the text.
 export async function transcribeAudio(buffer, mimeType = 'audio/webm', lang = 'he') {
   const form = new FormData();
   form.append('file', new Blob([buffer], { type: mimeType }), `audio.${extFor(mimeType)}`);
@@ -36,6 +39,7 @@ export async function transcribeAudio(buffer, mimeType = 'audio/webm', lang = 'h
   if (lang) form.append('language', lang);
   form.append('prompt', FOOD_PROMPT);
   form.append('temperature', '0'); // deterministic — least likely to hallucinate
+  form.append('response_format', 'verbose_json'); // includes `duration` for cost tracking
 
   const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
     method: 'POST',
@@ -48,5 +52,5 @@ export async function transcribeAudio(buffer, mimeType = 'audio/webm', lang = 'h
     throw new Error(`transcription ${res.status}: ${detail.slice(0, 200)}`);
   }
   const data = await res.json();
-  return (data.text || '').trim();
+  return { text: (data.text || '').trim(), duration: Number(data.duration) || 0 };
 }

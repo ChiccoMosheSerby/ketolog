@@ -38,18 +38,23 @@
   animation: tour-pulse 2s ease-in-out infinite;
 }
 
-/* ---- tooltip card ---- */
+/* ---- tooltip card ----
+   Docked to a fixed screen position so the Next button stays put across steps;
+   the spotlight (below) is what points at the element being described. */
 .tour-tip {
   position: fixed;
-  width: min(340px, calc(100vw - 24px));
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(360px, calc(100vw - 24px));
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-md);
   padding: 18px 18px 14px;
   pointer-events: auto;
-  transition: top 0.3s cubic-bezier(0.2, 0.9, 0.3, 1), left 0.3s cubic-bezier(0.2, 0.9, 0.3, 1);
-  animation: tour-tip-in 0.26s ease both;
+  transition: top 0.28s cubic-bezier(0.2, 0.9, 0.3, 1),
+    bottom 0.28s cubic-bezier(0.2, 0.9, 0.3, 1);
+  animation: tour-tip-in 0.24s ease both;
 
   h2 {
     font-family: 'Heebo', sans-serif;
@@ -67,6 +72,18 @@
   }
 }
 
+/* the three fixed docking positions */
+.tour-tip.dock-bottom {
+  bottom: 20px;
+}
+.tour-tip.dock-top {
+  top: 20px;
+}
+.tour-tip.dock-center {
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
 .tour-tip-head {
   display: flex;
   align-items: center;
@@ -78,28 +95,6 @@
   line-height: 1;
   flex: none;
   filter: drop-shadow(0 2px 4px rgba(18, 28, 22, 0.14));
-}
-
-/* little pointer toward the highlighted element */
-.tour-arrow {
-  position: absolute;
-  width: 14px;
-  height: 14px;
-  background: var(--card);
-  border: 1px solid var(--line);
-  transform: rotate(45deg);
-  transform-origin: center;
-  margin-inline-start: -7px; /* center on the computed left */
-}
-.place-bottom .tour-arrow {
-  top: -7px;
-  border-bottom: none;
-  border-right: none;
-}
-.place-top .tour-arrow {
-  bottom: -7px;
-  border-top: none;
-  border-left: none;
 }
 
 .tour-skip {
@@ -169,14 +164,13 @@
     opacity: 1;
   }
 }
+/* Opacity-only so it never clobbers the card's centering transform (translateX). */
 @keyframes tour-tip-in {
   from {
     opacity: 0;
-    transform: translateY(6px) scale(0.98);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
   }
 }
 @keyframes tour-pulse {

@@ -1,4 +1,5 @@
 import twilio from 'twilio';
+import { recordTwilioUsage } from './usage.js';
 
 // Round to at most 2 decimals for display (mirrors the client's helpers.fmt).
 const fmt = (n) => (Math.round(n * 100) / 100).toString();
@@ -76,11 +77,15 @@ export function verifyWebhook({ signature, url, params }) {
 }
 
 // Send a WhatsApp text back to `toPhone` (bare digits or full 'whatsapp:+…').
-export async function sendWhatsApp(toPhone, body) {
+// Pass ctx.userId when the recipient is a linked account so the outbound Twilio
+// cost is attributed to that user (unlinked recipients aren't per-user).
+export async function sendWhatsApp(toPhone, body, ctx = {}) {
   const to = String(toPhone).startsWith('whatsapp:')
     ? String(toPhone)
     : `whatsapp:+${normalizePhone(toPhone)}`;
-  return client().messages.create({ from: FROM(), to, body });
+  const msg = await client().messages.create({ from: FROM(), to, body });
+  recordTwilioUsage({ userId: ctx.userId, kind: 'whatsapp_out' });
+  return msg;
 }
 
 // Build the Hebrew receipt the user gets back after a meal is logged — mirrors

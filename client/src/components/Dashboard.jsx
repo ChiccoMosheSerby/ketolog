@@ -128,7 +128,7 @@ export default function Dashboard({ days, target = TARGET, today, ketoMonths, ch
 
   if (!a.hasData) {
     return (
-      <div className="dashboard">
+      <div className="dashboard" data-tour="insights">
         <div className="empty">
           עדיין אין נתונים לניתוח. הוסף ארוחות בלשונית "היום" והתובנות יופיעו כאן.
         </div>
@@ -138,7 +138,7 @@ export default function Dashboard({ days, target = TARGET, today, ketoMonths, ch
   }
 
   return (
-    <div className="dashboard">
+    <div className="dashboard" data-tour="insights">
       {/* daily average + streaks — kept at the top of the tab */}
       <div className="panel d-panel">
         <h2>ממוצע יומי ורצפים</h2>

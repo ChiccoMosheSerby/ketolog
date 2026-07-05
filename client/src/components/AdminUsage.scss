@@ -1,0 +1,187 @@
+/* ============================================================
+   AdminUsage — admin-only per-user AI cost dashboard (in a modal).
+   Mirrors SettingsModal's shell; adds a totals row + collapsible
+   per-user cards with a per-feature cost breakdown.
+   ============================================================ */
+.au-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.au-modal {
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg, 18px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.au-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+}
+.au-close {
+  background: transparent;
+  border: none;
+  color: var(--ink-soft);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px 8px;
+  line-height: 1;
+  &:hover { color: var(--ink); }
+}
+
+.au-note {
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  text-align: center;
+  padding: 16px 0;
+}
+
+/* ---- totals row ---- */
+.au-totals {
+  display: flex;
+  gap: 10px;
+}
+.au-total-tile {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 8px;
+  background: var(--tint, rgba(20, 154, 94, 0.08));
+  border: 1px solid var(--line);
+  border-radius: var(--r-md, 14px);
+}
+.au-total-num {
+  font-family: 'IBM Plex Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ink);
+  direction: ltr;
+}
+.au-total-lab {
+  font-size: 11px;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+/* ---- per-user cards ---- */
+.au-users {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.au-user {
+  border: 1px solid var(--line);
+  border-radius: var(--r-md, 14px);
+  overflow: hidden;
+}
+.au-user-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: transparent;
+  border: none;
+  padding: 12px 14px;
+  cursor: pointer;
+  font: inherit;
+  color: var(--ink);
+  &:hover { background: var(--tint, rgba(20, 154, 94, 0.06)); }
+}
+.au-email {
+  font-size: 13.5px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: ltr;
+}
+.au-user-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+}
+.au-30d {
+  font-size: 11px;
+  color: var(--ink-soft);
+  direction: ltr;
+}
+.au-total {
+  font-family: 'IBM Plex Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--olive, #149a5e);
+  direction: ltr;
+}
+.au-chev {
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.au-user-body {
+  padding: 4px 14px 12px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.au-kind {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 0;
+  font-size: 12.5px;
+}
+.au-kind-name { color: var(--ink); flex: 1; }
+.au-kind-calls { color: var(--ink-soft); font-size: 11.5px; }
+.au-kind-cost {
+  font-family: 'IBM Plex Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  direction: ltr;
+  min-width: 64px;
+  text-align: end;
+}
+.au-user-foot,
+.au-empty {
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  padding-top: 6px;
+  border-top: 1px dashed var(--line);
+}
+
+.au-foot {
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+  text-align: center;
+}

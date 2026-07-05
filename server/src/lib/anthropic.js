@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { recordAnthropicUsage } from './usage.js';
 
 let client = null;
 export function getClient() {
@@ -206,17 +207,18 @@ const normalizeBarcode = (r) => ({
   breakdown: cleanStr(r.breakdown),
 });
 
-export async function estimateMeal(desc, products = []) {
+export async function estimateMeal(desc, products = [], ctx = {}) {
   const message = await getClient().messages.create({
     model: MODEL(),
     max_tokens: 5000,
     system: ketoRules(products) + MEAL_FORMAT,
     messages: [{ role: 'user', content: desc }],
   });
+  recordAnthropicUsage({ userId: ctx.userId, kind: 'estimate_meal', model: MODEL(), usage: message.usage });
   return normalizeMeal(parseJsonReply(message));
 }
 
-export async function estimateImage(b64, mediaType, unit, products = []) {
+export async function estimateImage(b64, mediaType, unit, products = [], ctx = {}) {
   const message = await getClient().messages.create({
     model: MODEL(),
     max_tokens: 5000,
@@ -234,6 +236,7 @@ export async function estimateImage(b64, mediaType, unit, products = []) {
       },
     ],
   });
+  recordAnthropicUsage({ userId: ctx.userId, kind: 'estimate_image', model: MODEL(), usage: message.usage });
   return normalizeImage(parseJsonReply(message));
 }
 
@@ -241,7 +244,7 @@ export async function estimateImage(b64, mediaType, unit, products = []) {
 // (sometimes) fiber/polyols per 100g; Claude applies the app's keto rules and
 // normalizes the messy entry into our product shape. When fiber is missing it
 // estimates it from the known product, so the scan still produces a usable value.
-export async function interpretBarcode(off, unit, products = []) {
+export async function interpretBarcode(off, unit, products = [], ctx = {}) {
   const fmtNum = (v) => (v == null ? 'לא ידוע' : String(v));
   const facts = [
     off.name && `שם: ${off.name}`,
@@ -267,6 +270,7 @@ export async function interpretBarcode(off, unit, products = []) {
     system: ketoRules(products) + barcodeFormat(unit, fiberNote),
     messages: [{ role: 'user', content: facts }],
   });
+  recordAnthropicUsage({ userId: ctx.userId, kind: 'barcode', model: MODEL(), usage: message.usage });
   return normalizeBarcode(parseJsonReply(message));
 }
 

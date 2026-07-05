@@ -38,6 +38,7 @@ export default function ChatWidget() {
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef(null);
   const fileRef = useRef(null);
+  const taRef = useRef(null);
   const baseDescRef = useRef('');
 
   const speech = useSpeech({
@@ -65,6 +66,15 @@ export default function ChatWidget() {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, busy, open]);
+
+  // Grow the composer to fit its content (up to the CSS max-height), then shrink
+  // back down as text is removed or after a message is sent.
+  useEffect(() => {
+    const el = taRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+  }, [input, open]);
 
   function toggleMic() {
     if (speech.listening) speech.stop();
@@ -260,8 +270,9 @@ export default function ChatWidget() {
               </button>
             )}
             <textarea
+              ref={taRef}
               rows={1}
-              placeholder="שאל/י אותי משהו על קיטו… (אפשר גם להדביק תמונה)"
+              placeholder="שאל/י אותי על קיטו…"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={onKeyDown}

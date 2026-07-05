@@ -9,7 +9,8 @@ import { estimateMealCached } from '../lib/estimateCache.js';
 import { fetchProductByBarcode, rawKeto } from '../lib/openfoodfacts.js';
 import { runChatTurn } from '../lib/chatAgent.js';
 import { ensureDueReports, listReports, markSeen } from '../lib/insightsAgent.js';
-import { transcribeAudio, transcribeConfigured } from '../lib/transcribe.js';
+import { transcribeAudio, transcribeConfigured, TRANSCRIBE_MODEL } from '../lib/transcribe.js';
+import { recordOpenAIUsage } from '../lib/usage.js';
 import { asyncHandler } from '../lib/http.js';
 
 const router = Router();
@@ -24,7 +25,8 @@ router.post('/transcribe', async (req, res) => {
   try {
     const buffer = Buffer.from(audio, 'base64');
     if (!buffer.length) return res.status(400).json({ error: 'אודיו ריק' });
-    const text = await transcribeAudio(buffer, mimeType || 'audio/webm', 'he');
+    const { text, duration } = await transcribeAudio(buffer, mimeType || 'audio/webm', 'he');
+    recordOpenAIUsage({ userId: req.userId, kind: 'transcribe', model: TRANSCRIBE_MODEL(), seconds: duration });
     res.json({ text });
   } catch (err) {
     console.error('transcribe failed:', err.message);
@@ -61,7 +63,7 @@ router.post('/estimate-image', async (req, res) => {
   if (!image || !mediaType) return res.status(400).json({ error: 'חסרים נתוני תמונה' });
   try {
     const products = await Product.find({ user: req.userId }).lean();
-    const result = await estimateImage(image, mediaType, unit, products);
+    const result = await estimateImage(image, mediaType, unit, products, { userId: req.userId });
     res.json(result);
   } catch (err) {
     console.error('estimate-image failed:', err.message);
@@ -116,7 +118,7 @@ router.post('/barcode', async (req, res) => {
 
   try {
     const products = await Product.find({ user: req.userId }).lean();
-    const result = await interpretBarcode(off, unit, products);
+    const result = await interpretBarcode(off, unit, products, { userId: req.userId });
     res.json({
       ...result,
       found: true,

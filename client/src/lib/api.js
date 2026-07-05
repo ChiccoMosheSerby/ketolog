@@ -68,4 +68,7 @@ export const api = {
   // AI insights — auto-generated weekly/monthly report history
   getInsights: (today) => request('GET', `/ai/insights${today ? `?today=${today}` : ''}`),
   markInsightSeen: (id) => request('POST', `/ai/insights/${id}/seen`),
+
+  // admin — per-user AI cost breakdown (admin accounts only)
+  getAdminUsage: () => request('GET', '/admin/usage'),
 };

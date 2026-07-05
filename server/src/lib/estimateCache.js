@@ -35,7 +35,7 @@ export async function estimateMealCached(userId, desc, products = []) {
   const hit = await MealEstimate.findOne({ user: userId, key, fp }).lean();
   if (hit) return { result: hit.result, cached: true };
 
-  const result = await estimateMeal(desc, products);
+  const result = await estimateMeal(desc, products, { userId });
 
   // upsert so two concurrent identical requests don't create duplicates (the
   // unique index would otherwise reject the second insert).

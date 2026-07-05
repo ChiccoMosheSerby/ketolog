@@ -11,6 +11,7 @@ import dayRoutes from './routes/days.js';
 import productRoutes from './routes/products.js';
 import templateRoutes from './routes/templates.js';
 import aiRoutes from './routes/ai.js';
+import adminRoutes from './routes/admin.js';
 import whatsappRoutes from './routes/whatsapp.js';
 import { aiConfigured } from './lib/anthropic.js';
 import { whatsappConfigured } from './lib/whatsapp.js';
@@ -90,6 +91,7 @@ app.use('/api/days', dayRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/templates', templateRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/admin', adminRoutes);
 // Twilio's inbound WhatsApp webhook. Public (secured by Twilio's request
 // signature, not a bearer token) and sends application/x-www-form-urlencoded,
 // which the urlencoded parser above already handles.

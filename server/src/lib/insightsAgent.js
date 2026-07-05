@@ -7,6 +7,7 @@
 // the next time the panel loads. Reuses the shared keto "brain" (ketoRules) and
 // the resilient JSON parser from anthropic.js.
 import { getClient, CHAT_MODEL, ketoRules, parseJsonReply } from './anthropic.js';
+import { recordAnthropicUsage } from './usage.js';
 import {
   buildDigest,
   lastCompletedWeek,
@@ -132,7 +133,7 @@ function genderInstruction(gender) {
 // One Claude call for a single period's report. `prior` is the condensed history
 // of earlier same-period reports (newest first), used for trend continuity.
 // `gender` ('male'|'female'|'') controls Hebrew grammatical address.
-export async function generateReport(digest, focus, prior = [], gender = '') {
+export async function generateReport(digest, focus, prior = [], gender = '', userId = null) {
   const client = getClient();
   const periodName = focus.period === 'weekly' ? 'השבועי' : 'החודשי';
   const priorBlock = prior.length
@@ -153,6 +154,7 @@ export async function generateReport(digest, focus, prior = [], gender = '') {
       },
     ],
   });
+  recordAnthropicUsage({ userId, kind: 'insight', model: CHAT_MODEL(), usage: message.usage });
   return normalizeInsight(parseJsonReply(message));
 }
 
@@ -168,7 +170,7 @@ async function runGeneration(userId, days, opts, focus) {
   const gender = opts.gender || '';
   const digest = buildDigest(days, opts);
   const prior = await getPriorContext(userId, focus.period, focus.end);
-  const result = await generateReport(digest, focus, prior, gender);
+  const result = await generateReport(digest, focus, prior, gender, userId);
   await Insight.findOneAndUpdate(
     { user: userId, period: focus.period, periodKey: focus.key },
     {

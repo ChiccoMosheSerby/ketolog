@@ -18,6 +18,12 @@ export function isApproved(user) {
   return AUTO_APPROVED_EMAILS.has((user.email || '').toLowerCase());
 }
 
+// Admins get the in-app usage/cost dashboard and the /api/admin routes. The
+// owner's accounts (the auto-approve list) are the admins for now.
+export function isAdmin(user) {
+  return Boolean(user) && AUTO_APPROVED_EMAILS.has((user.email || '').toLowerCase());
+}
+
 // Signed, single-purpose, time-limited token embedded in the approval link.
 export function makeApprovalToken(user) {
   return jwt.sign({ sub: user._id.toString(), purpose: 'approve' }, process.env.JWT_SECRET, {
