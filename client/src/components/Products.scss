@@ -38,6 +38,17 @@
     font-family: 'IBM Plex Mono', monospace;
     font-variant-numeric: tabular-nums;
   }
+  .pname-edit {
+    width: 100%;
+    font-weight: 600;
+    font-size: 13.5px;
+    padding: 4px 8px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm, 8px);
+    background: var(--tint);
+    color: inherit;
+  }
+  .pedit,
   .pdel {
     background: none;
     border: none;
@@ -48,11 +59,16 @@
     border-radius: 999px;
     opacity: 0.55;
     transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
-    &:hover {
-      opacity: 1;
-      color: var(--red);
-      background: var(--danger-tint);
-    }
+  }
+  .pedit:hover {
+    opacity: 1;
+    color: var(--accent, var(--ink));
+    background: var(--tint);
+  }
+  .pdel:hover {
+    opacity: 1;
+    color: var(--red);
+    background: var(--danger-tint);
   }
 }
 /* preview of the photo that'll be saved with a new product */

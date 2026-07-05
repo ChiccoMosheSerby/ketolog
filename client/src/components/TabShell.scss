@@ -38,6 +38,24 @@
   }
 }
 
+/* "new report" dot on a tab — cleared once the user opens that tab */
+.tab-badge {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-inline-start: 6px;
+  vertical-align: 3px;
+  border-radius: 999px;
+  background: var(--red);
+}
+.dot .tab-badge {
+  /* sit above the pill baseline so it reads as a corner notification */
+  vertical-align: 4px;
+}
+.dot.active .tab-badge {
+  background: #fff;
+}
+
 /* mobile carousel */
 .carousel {
   margin-top: 6px;

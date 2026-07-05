@@ -12,6 +12,7 @@ import SmartInsights from './SmartInsights.jsx';
 import Header, { TargetLegend } from './Header.jsx';
 import TabShell from './TabShell.jsx';
 import { useMediaQuery, MOBILE_QUERY } from '../lib/useMediaQuery.js';
+import { useInsightsBadge, markVisited } from '../lib/insightsStore.js';
 import './Diary.scss';
 
 // strip subdoc id / extras → a clean meal payload for the API
@@ -38,6 +39,13 @@ export default function Diary() {
   const toast = useToast();
   const { user } = useAuth();
   const isMobile = useMediaQuery(MOBILE_QUERY);
+  const insightsBadge = useInsightsBadge(user?.email || '');
+  const handleTabChange = useCallback(
+    (id) => {
+      if (id === 'insights') markVisited(user?.email || '');
+    },
+    [user?.email],
+  );
   const target = user?.dailyCarbTarget ?? TARGET;
   const [days, setDays] = useState([]); // array of day docs, newest first
   const [products, setProducts] = useState([]);
@@ -120,6 +128,11 @@ export default function Diary() {
   async function addProduct(p) {
     const created = await api.addProduct(p);
     setProducts((prev) => [...prev, created]);
+  }
+  async function renameProduct(id, key) {
+    const updated = await api.updateProduct(id, { key });
+    setProducts((prev) => prev.map((p) => (p._id === id ? updated : p)));
+    toast('השם עודכן');
   }
   async function deleteProduct(id) {
     await api.deleteProduct(id);
@@ -266,7 +279,7 @@ export default function Diary() {
 
   // ---- tab contents ----
   const productsPanel = (
-    <Products products={products} onAdd={addProduct} onDelete={deleteProduct} compact={!isMobile} />
+    <Products products={products} onAdd={addProduct} onRename={renameProduct} onDelete={deleteProduct} compact={!isMobile} />
   );
 
   const historyContent = (
@@ -368,6 +381,7 @@ export default function Diary() {
     {
       id: 'insights',
       label: 'תובנות',
+      badge: insightsBadge,
       content: (
         <Dashboard
           days={days}
@@ -386,7 +400,7 @@ export default function Diary() {
     <div className="wrap">
       <Header stats={stats} onExport={exportReport} />
 
-      <TabShell tabs={tabs} />
+      <TabShell tabs={tabs} onTabChange={handleTabChange} />
 
       <div className="foot">
         {/* Desktop: the keto-balance diagram moves out of the header to here. */}

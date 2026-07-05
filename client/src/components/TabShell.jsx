@@ -3,19 +3,30 @@ import useEmblaCarousel from 'embla-carousel-react';
 import { useMediaQuery, MOBILE_QUERY } from '../lib/useMediaQuery.js';
 import './TabShell.scss';
 
-// tabs: [{ id, label, content }]
+// tabs: [{ id, label, content, badge? }]  — badge renders a "new" dot on the tab.
+// onTabChange(id): fired when the active tab changes (used to clear a badge).
 // Desktop renders a tab bar + only the active panel.
 // Mobile mounts an Embla carousel with all panels + synced dots.
 // One `active` index is shared, so switching breakpoints keeps your place.
-export default function TabShell({ tabs }) {
+export default function TabShell({ tabs, onTabChange }) {
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const [active, setActive] = useState(0);
   // The tab list can shrink across breakpoints (products is desktop-header-only),
   // so clamp to avoid indexing past the end.
   const idx = Math.min(active, tabs.length - 1);
 
+  // Single funnel for tab changes so the badge-clear fires from every entry
+  // point (desktop click, mobile dot click, mobile swipe).
+  const change = useCallback(
+    (i) => {
+      setActive(i);
+      if (tabs[i]) onTabChange?.(tabs[i].id);
+    },
+    [tabs, onTabChange],
+  );
+
   if (isMobile) {
-    return <Carousel tabs={tabs} active={idx} setActive={setActive} />;
+    return <Carousel tabs={tabs} active={idx} change={change} />;
   }
 
   return (
@@ -28,9 +39,10 @@ export default function TabShell({ tabs }) {
             aria-selected={i === idx}
             data-tour-tab={t.id}
             className={'tabbtn' + (i === idx ? ' active' : '')}
-            onClick={() => setActive(i)}
+            onClick={() => change(i)}
           >
             {t.label}
+            {t.badge && <span className="tab-badge" aria-label="חדש" />}
           </button>
         ))}
       </div>
@@ -41,14 +53,14 @@ export default function TabShell({ tabs }) {
   );
 }
 
-function Carousel({ tabs, active, setActive }) {
+function Carousel({ tabs, active, change }) {
   const [emblaRef, emblaApi] = useEmblaCarousel({ direction: 'rtl', align: 'start' });
 
   // Bind once per api: jump to the shared `active` on mount, then mirror swipes back out.
   useEffect(() => {
     if (!emblaApi) return;
     emblaApi.scrollTo(active, true);
-    const onSelect = () => setActive(emblaApi.selectedScrollSnap());
+    const onSelect = () => change(emblaApi.selectedScrollSnap());
     emblaApi.on('select', onSelect);
     return () => emblaApi.off('select', onSelect);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -69,6 +81,7 @@ function Carousel({ tabs, active, setActive }) {
             onClick={() => goTo(i)}
           >
             {t.label}
+            {t.badge && <span className="tab-badge" aria-label="חדש" />}
           </button>
         ))}
       </div>

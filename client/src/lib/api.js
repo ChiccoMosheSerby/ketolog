@@ -44,6 +44,7 @@ export const api = {
   // products
   getProducts: () => request('GET', '/products'),
   addProduct: (p) => request('POST', '/products', p),
+  updateProduct: (id, patch) => request('PATCH', `/products/${id}`, patch),
   deleteProduct: (id) => request('DELETE', `/products/${id}`),
 
   // meal templates

@@ -1,8 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
-import { todayISO, heDate } from '../lib/helpers.js';
+import { heDate } from '../lib/helpers.js';
 import { renderText } from '../lib/markdown.jsx';
+import {
+  getCache,
+  isFresh,
+  setFromResponse,
+  patchReports,
+  loadInsights,
+} from '../lib/insightsStore.js';
 import './SmartInsights.scss';
 
 // Auto-generated weekly/monthly insight reports. The user never triggers a run:
@@ -24,11 +31,9 @@ const PERIOD_LABEL = { weekly: 'שבועי', monthly: 'חודשי' };
 
 const POLL_MS = 20000;
 const POLL_MAX = 5;
-const FRESH_MS = 5 * 60 * 1000; // reuse cached data for 5 min before revalidating
 
-// Module-scoped cache: survives component unmount (tab switches) so we don't
-// refetch every time the "תובנות" tab is opened.
-let cache = null; // { key, reports, generating, aiOff, at }
+// The report cache lives in ../lib/insightsStore.js so the תובנות nav-tab badge
+// can read the same data without a second fetch.
 
 // Sections are collapsible on both desktop and mobile, and collapsed by default
 // so the panel opens compact (just the headline + section headers) and you
@@ -172,38 +177,37 @@ function Report({ ins, collapsible }) {
 export default function SmartInsights() {
   const { user } = useAuth();
   const key = user?.email || '';
-  const seeded = cache && cache.key === key;
+  const seed = getCache();
+  const seeded = seed && seed.key === key;
 
   const [status, setStatus] = useState(seeded ? 'ready' : 'loading');
-  const [reports, setReports] = useState(seeded ? cache.reports : []);
-  const [generating, setGenerating] = useState(seeded ? cache.generating : []);
-  const [aiOff, setAiOff] = useState(seeded ? cache.aiOff : false);
-  const [selectedId, setSelectedId] = useState(seeded && cache.reports[0] ? cache.reports[0].id : null);
+  const [reports, setReports] = useState(seeded ? seed.reports : []);
+  const [generating, setGenerating] = useState(seeded ? seed.generating : []);
+  const [aiOff, setAiOff] = useState(seeded ? seed.aiOff : false);
+  const [selectedId, setSelectedId] = useState(seeded && seed.reports[0] ? seed.reports[0].id : null);
   const [error, setError] = useState(null);
   const poll = useRef({ count: 0, timer: null, alive: true });
 
   const applyResponse = useCallback((res) => {
-    setAiOff(res.aiConfigured === false);
-    if (!res.enoughData) {
+    const c = setFromResponse(key, res);
+    setAiOff(c.aiOff);
+    if (!c.enoughData) {
       setReports([]);
       setGenerating([]);
       setStatus('enough-no');
-      cache = { key, reports: [], generating: [], aiOff: res.aiConfigured === false, at: Date.now() };
       return res;
     }
-    const rs = res.reports || [];
-    setReports(rs);
-    setGenerating(res.generating || []);
-    setSelectedId((cur) => cur || (rs[0] ? rs[0].id : null));
+    setReports(c.reports);
+    setGenerating(c.generating);
+    setSelectedId((cur) => cur || (c.reports[0] ? c.reports[0].id : null));
     setStatus('ready');
-    cache = { key, reports: rs, generating: res.generating || [], aiOff: res.aiConfigured === false, at: Date.now() };
     return res;
   }, [key]);
 
   const fetchOnce = useCallback(async () => {
-    const res = await api.getInsights(todayISO());
+    const res = await loadInsights(key);
     return applyResponse(res);
-  }, [applyResponse]);
+  }, [key, applyResponse]);
 
   // Load / revalidate. Reuses module cache across tab switches; only fetches
   // when there's no fresh cache, or a generation is pending (so it can land).
@@ -221,7 +225,7 @@ export default function SmartInsights() {
             p.timer = setTimeout(tick, POLL_MS);
           }
         } catch (e) {
-          if (p.alive && !cache) {
+          if (p.alive && !getCache()) {
             setError(e.message || 'שגיאה');
             setStatus('error');
           }
@@ -230,14 +234,15 @@ export default function SmartInsights() {
       tick();
     };
 
-    const fresh = cache && cache.key === key && Date.now() - cache.at < FRESH_MS;
-    const pending = cache && cache.key === key && (cache.generating || []).length > 0;
+    const c = getCache();
+    const fresh = isFresh(key);
+    const pending = c && c.key === key && (c.generating || []).length > 0;
 
     if (fresh && !pending) {
       // cached & fresh & nothing generating → show as-is, no fetch
-      setStatus(cache.reports.length || cache.aiOff ? 'ready' : 'ready');
+      setStatus('ready');
     } else {
-      if (!cache || cache.key !== key) setStatus('loading');
+      if (!c || c.key !== key) setStatus('loading');
       startPolling();
     }
 
@@ -258,7 +263,7 @@ export default function SmartInsights() {
         await api.markInsightSeen(selectedId);
         const upd = (rs) => rs.map((x) => (x.id === selectedId ? { ...x, seen: true } : x));
         setReports(upd);
-        if (cache && cache.key === key) cache = { ...cache, reports: upd(cache.reports) };
+        patchReports(key, upd);
       } catch {
         /* ignore */
       }

@@ -39,7 +39,9 @@ export default function MealShortcuts({
               {!products || products.length === 0 ? (
                 <span className="sc-empty">— הוסיפו בלשונית "המוצרים שלי"</span>
               ) : (
-                products.map((p) => (
+                [...products]
+                  .sort((a, b) => (Number(a.carbs) || 0) - (Number(b.carbs) || 0))
+                  .map((p) => (
                   <button
                     className="sc-chip"
                     key={p._id}
@@ -48,6 +50,7 @@ export default function MealShortcuts({
                   >
                     <span className="plus">+</span>
                     {p.unit} {p.key}
+                    <small>{fmt(p.carbs)}</small>
                   </button>
                 ))
               )}

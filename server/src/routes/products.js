@@ -36,6 +36,19 @@ router.post('/', asyncHandler(async (req, res) => {
   res.status(201).json(product);
 }));
 
+// PATCH /api/products/:id -> rename (only the display name / key)
+router.patch('/:id', asyncHandler(async (req, res) => {
+  const { key } = req.body;
+  if (!key || !String(key).trim()) return res.status(400).json({ error: 'תן/י שם למוצר' });
+  const product = await Product.findOneAndUpdate(
+    { _id: req.params.id, user: req.userId },
+    { key: String(key).trim() },
+    { new: true }
+  );
+  if (!product) return res.status(404).json({ error: 'מוצר לא נמצא' });
+  res.json(product);
+}));
+
 // DELETE /api/products/:id
 router.delete('/:id', asyncHandler(async (req, res) => {
   const result = await Product.deleteOne({ _id: req.params.id, user: req.userId });

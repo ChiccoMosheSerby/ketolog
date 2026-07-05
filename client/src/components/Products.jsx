@@ -9,9 +9,11 @@ import './Products.scss';
 const BarcodeScanner = lazy(() => import('./BarcodeScanner.jsx'));
 const CameraCapture = lazy(() => import('./CameraCapture.jsx'));
 
-export default function Products({ products, onAdd, onDelete, compact }) {
+export default function Products({ products, onAdd, onRename, onDelete, compact }) {
   const toast = useToast();
   const [open, setOpen] = useState(false);
+  const [editId, setEditId] = useState(null); // product being renamed inline
+  const [editName, setEditName] = useState('');
   const [form, setForm] = useState({
     key: '', label: '', unit: '', perPack: '', carb: '', fat: '', prot: '', image: '',
   });
@@ -52,6 +54,21 @@ export default function Products({ products, onAdd, onDelete, compact }) {
     setForm({ key: '', label: '', unit: '', perPack: '', carb: '', fat: '', prot: '', image: '' });
     setNote(null);
     toast('המוצר נוסף');
+  }
+
+  function startEdit(p) {
+    setEditId(p._id);
+    setEditName(p.key);
+  }
+  async function saveEdit(id) {
+    const name = editName.trim();
+    if (!name) {
+      toast('תן/י שם למוצר');
+      return;
+    }
+    await onRename(id, name);
+    setEditId(null);
+    setEditName('');
   }
 
   function pickImage() {
@@ -214,16 +231,45 @@ export default function Products({ products, onAdd, onDelete, compact }) {
                       <span className="pthumb pthumb-ph" aria-hidden="true">🍽️</span>
                     )}
                     <div className="pinfo">
-                      <div className="pname">
-                        {p.key} — <span style={{ fontWeight: 300 }}>{p.label}</span>
-                      </div>
+                      {editId === p._id ? (
+                        <input
+                          className="pname-edit"
+                          value={editName}
+                          autoFocus
+                          onChange={(e) => setEditName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') saveEdit(p._id);
+                            if (e.key === 'Escape') setEditId(null);
+                          }}
+                        />
+                      ) : (
+                        <div className="pname">
+                          {p.key} — <span style={{ fontWeight: 300 }}>{p.label}</span>
+                        </div>
+                      )}
                       <div className="pmeta">
                         ל{p.unit}: {fmt(p.carbs)} פחמ' · {fmt(p.fat)} שומן · {fmt(p.protein)} חלבון
                       </div>
                     </div>
-                    <button className="pdel" title="מחק" onClick={() => onDelete(p._id)}>
-                      ✕
-                    </button>
+                    {editId === p._id ? (
+                      <>
+                        <button className="pedit" title="שמור" onClick={() => saveEdit(p._id)}>
+                          ✓
+                        </button>
+                        <button className="pdel" title="ביטול" onClick={() => setEditId(null)}>
+                          ✕
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button className="pedit" title="ערוך שם" onClick={() => startEdit(p)}>
+                          ✎
+                        </button>
+                        <button className="pdel" title="מחק" onClick={() => onDelete(p._id)}>
+                          ✕
+                        </button>
+                      </>
+                    )}
                   </div>
                 ))
               )}
