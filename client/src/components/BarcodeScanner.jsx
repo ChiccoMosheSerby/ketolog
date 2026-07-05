@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import { DecodeHintType, BarcodeFormat } from '@zxing/library';
@@ -17,6 +18,7 @@ const FORMATS = [
 // native BarcodeDetector API is absent). Always offers manual numeric entry as a
 // fallback for when the camera is unavailable or the code won't scan.
 export default function BarcodeScanner({ onResult, onClose }) {
+  const { t } = useTranslation();
   const videoRef = useRef(null);
   const controlsRef = useRef(null);
   const doneRef = useRef(false); // guard against double-firing onResult
@@ -88,8 +90,8 @@ export default function BarcodeScanner({ onResult, onClose }) {
     <div className="bc-overlay" role="dialog" aria-modal="true" onClick={onClose}>
       <div className="bc-modal" onClick={(e) => e.stopPropagation()}>
         <div className="bc-head">
-          <span>סריקת ברקוד</span>
-          <button className="bc-x" onClick={onClose} aria-label="סגור">
+          <span>{t('barcode.title')}</span>
+          <button className="bc-x" onClick={onClose} aria-label={t('barcode.close')}>
             ✕
           </button>
         </div>
@@ -98,9 +100,9 @@ export default function BarcodeScanner({ onResult, onClose }) {
           <video ref={videoRef} className="bc-video" muted playsInline />
           {status !== 'error' && <div className="bc-frame" />}
           <div className={'bc-hint' + (status === 'error' ? ' bc-err' : '')}>
-            {status === 'starting' && 'מפעיל מצלמה…'}
-            {status === 'scanning' && 'כוון/י את הברקוד אל תוך המסגרת'}
-            {status === 'error' && 'אין גישה למצלמה — הקלד/י את מספר הברקוד למטה'}
+            {status === 'starting' && t('barcode.starting')}
+            {status === 'scanning' && t('barcode.aimHint')}
+            {status === 'error' && t('barcode.noCameraError')}
           </div>
         </div>
 
@@ -108,13 +110,13 @@ export default function BarcodeScanner({ onResult, onClose }) {
           <input
             type="text"
             inputMode="numeric"
-            placeholder="או הקלד/י מספר ברקוד"
+            placeholder={t('barcode.manualPlaceholder')}
             value={manual}
             onChange={(e) => setManual(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && submitManual()}
           />
           <button className="btn" onClick={submitManual} disabled={!manualValid}>
-            חפש
+            {t('barcode.search')}
           </button>
         </div>
       </div>

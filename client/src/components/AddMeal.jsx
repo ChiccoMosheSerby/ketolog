@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { api } from "../lib/api.js";
 import { useToast } from "../lib/toast.jsx";
 import { useSpeech, speechErrorMessage } from "../lib/useSpeech.js";
@@ -24,6 +25,7 @@ export default function AddMeal({
   canRepeat,
 }) {
   const toast = useToast();
+  const { t } = useTranslation();
   const [time, setTime] = useState(nowHM());
   const [carb, setCarb] = useState("");
   const [desc, setDesc] = useState("");
@@ -134,14 +136,14 @@ export default function AddMeal({
       const chunk = unitKey(p);
       setDesc((d) => (d.trim() ? d.trim() + ", " + chunk : chunk));
     }
-    toast(p.key + " נוסף לפירוט");
+    toast(t("addMeal.addedToBreakdown", { name: p.key }));
   }
 
   // A template (full meal) fills the form with its saved macros when the
   // description is empty (ready to log); if combined with text, it appends and
   // forces a recalc. Either way the meal is no longer a pure product sum.
-  function applyTemplate(t) {
-    const text = (t.desc || t.name || "").trim();
+  function applyTemplate(tpl) {
+    const text = (tpl.desc || tpl.name || "").trim();
     const had = desc.trim();
     if (had) {
       setDesc(had + ", " + text);
@@ -149,17 +151,17 @@ export default function AddMeal({
       setPendingMacro({ fat: null, protein: null });
     } else {
       setDesc(text);
-      setCarb(t.carbs != null && t.carbs !== "" ? String(t.carbs) : "");
-      setPendingMacro({ fat: t.fat ?? null, protein: t.protein ?? null });
+      setCarb(tpl.carbs != null && tpl.carbs !== "" ? String(tpl.carbs) : "");
+      setPendingMacro({ fat: tpl.fat ?? null, protein: tpl.protein ?? null });
     }
     markManual();
     setNote(null);
-    toast("התבנית נוספה לפירוט");
+    toast(t("addMeal.templateAddedToBreakdown"));
   }
 
   async function doAdd(carbsValue, macro, mealItems) {
     if (!date) {
-      toast("בחר/י תאריך");
+      toast(t("addMeal.pickDate"));
       return;
     }
     const meal = {
@@ -176,33 +178,33 @@ export default function AddMeal({
     setPicked([]);
     setDescIsPure(true);
     clearNote();
-    toast("הארוחה נרשמה");
+    toast(t("addMeal.mealLogged"));
   }
 
   async function runCalc(thenLog) {
     const d = desc.trim();
     if (!d) {
-      toast("כתוב/י קודם מה אכלת");
+      toast(t("addMeal.writeWhatYouAte"));
       return;
     }
     // Pure saved-products meal → total it locally, no AI call, no cost.
     if (canSumLocally()) {
-      const t = sumPicked(picked);
-      setCarb(fmt(t.carbs));
-      setPendingMacro({ fat: t.fat, protein: t.protein });
-      setItems(t.items);
+      const tot = sumPicked(picked);
+      setCarb(fmt(tot.carbs));
+      setPendingMacro({ fat: tot.fat, protein: tot.protein });
+      setItems(tot.items);
       setNote({
-        carbs: fmt(t.carbs),
-        fat: t.fat == null ? "?" : fmt(t.fat),
-        protein: t.protein == null ? "?" : fmt(t.protein),
+        carbs: fmt(tot.carbs),
+        fat: tot.fat == null ? "?" : fmt(tot.fat),
+        protein: tot.protein == null ? "?" : fmt(tot.protein),
         mp:
-          t.fat != null && t.protein != null
-            ? macroPct({ carb: t.carbs, fat: t.fat, protein: t.protein })
+          tot.fat != null && tot.protein != null
+            ? macroPct({ carb: tot.carbs, fat: tot.fat, protein: tot.protein })
             : null,
-        items: t.items,
+        items: tot.items,
         local: true,
       });
-      if (thenLog) await doAdd(t.carbs, { fat: t.fat, protein: t.protein }, t.items);
+      if (thenLog) await doAdd(tot.carbs, { fat: tot.fat, protein: tot.protein }, tot.items);
       return;
     }
     setBusy(true);
@@ -235,8 +237,7 @@ export default function AddMeal({
       if (thenLog && !isNaN(n)) await doAdd(carbsValue, macro, mealItems);
     } catch {
       setNote({
-        error:
-          "לא הצלחתי לחשב אוטומטית כרגע — אפשר להזין מספר פחמימות ידנית ולרשום.",
+        error: t("addMeal.calcFailed"),
       });
     } finally {
       setBusy(false);
@@ -258,15 +259,15 @@ export default function AddMeal({
     setPicked([]);
     setDescIsPure(true);
     clearNote();
-    toast("הטופס אופס");
+    toast(t("addMeal.formReset"));
   }
 
   return (
     <div className="panel" data-tour="add-meal">
-      <h2>הוספת ארוחה</h2>
+      <h2>{t("addMeal.title")}</h2>
       <div className="row">
         <div className="fld">
-          <label>תאריך</label>
+          <label>{t("addMeal.date")}</label>
           <input
             type="date"
             value={date}
@@ -276,7 +277,7 @@ export default function AddMeal({
             <button
               type="button"
               className="date-arrow"
-              title="יום הבא"
+              title={t("addMeal.nextDay")}
               disabled={date >= todayISO()}
               onClick={() => onDateChange(nextISO(date))}
             >
@@ -285,7 +286,7 @@ export default function AddMeal({
             <button
               type="button"
               className="date-arrow"
-              title="יום קודם"
+              title={t("addMeal.prevDay")}
               onClick={() => onDateChange(prevISO(date))}
             >
               ›
@@ -293,7 +294,7 @@ export default function AddMeal({
           </div>
         </div>
         <div className="fld">
-          <label>שעה</label>
+          <label>{t("addMeal.time")}</label>
           <input
             type="time"
             value={time}
@@ -301,12 +302,12 @@ export default function AddMeal({
           />
         </div>
         <div className="fld">
-          <label>פחמימות נטו (גרם)</label>
+          <label>{t("addMeal.netCarbsGrams")}</label>
           <input
             type="number"
             step="0.1"
             min="0"
-            placeholder="חישוב אוטומטי"
+            placeholder={t("addMeal.autoCalc")}
             value={carb}
             onChange={(e) => setCarb(e.target.value)}
           />
@@ -315,26 +316,26 @@ export default function AddMeal({
       <div className="row" style={{ marginTop: 10 }}>
         <div className="fld wide">
           <label className="desc-label">
-            <span>פירוט (מה אכלת) — תיאור חופשי, המערכת תחשב לבד</span>
+            <span>{t("addMeal.breakdownLabel")}</span>
             {speech.supported && (
               <button
                 type="button"
                 className={"mic" + (speech.listening ? " rec" : "")}
                 onClick={toggleMic}
                 disabled={speech.transcribing}
-                title={speech.listening ? "עצור הקלטה" : "הקלט במקום להקליד"}
+                title={speech.listening ? t("addMeal.stopRecording") : t("addMeal.recordInstead")}
               >
                 <span className="mic-dot">🎤</span>
                 {speech.transcribing
-                  ? "מתמלל…"
+                  ? t("addMeal.transcribing")
                   : speech.listening
-                    ? "מקליט… הקש/י לעצירה"
-                    : "הקלטה קולית"}
+                    ? t("addMeal.recordingTapToStop")
+                    : t("addMeal.voiceRecording")}
               </button>
             )}
           </label>
           <textarea
-            placeholder="לדוגמה: חביתה מ-3 ביצים, פרוסת גאודה, מלפפון לא קלוף, חופן שרי"
+            placeholder={t("addMeal.descPlaceholder")}
             value={desc}
             onChange={(e) => {
               setDesc(e.target.value);
@@ -357,26 +358,32 @@ export default function AddMeal({
 
       {note && (
         <div className="calc-note">
-          {note.loading && "מחשב מאקרו (פחמימות, שומן, חלבון)…"}
+          {note.loading && t("addMeal.calculatingMacros")}
           {note.error}
           {note.carbs && (
             <>
               <strong>
-                {note.carbs} ג' פחמימות נטו · {note.fat} ג' שומן ·{" "}
-                {note.protein} ג' חלבון
+                {t("addMeal.macroSummary", {
+                  carbs: note.carbs,
+                  fat: note.fat,
+                  protein: note.protein,
+                })}
               </strong>
               {note.mp && (
                 <span className="bd">
                   <br />
-                  חלוקה קלורית: שומן {note.mp.fat}% · חלבון {note.mp.protein}% ·
-                  פחמ' {note.mp.carb}% (~
-                  {note.mp.kcal} קק"ל)
+                  {t("addMeal.calorieBreakdown", {
+                    fat: note.mp.fat,
+                    protein: note.mp.protein,
+                    carb: note.mp.carb,
+                    kcal: note.mp.kcal,
+                  })}
                 </span>
               )}
               {note.local && (
                 <span className="bd">
                   <br />
-                  חושב מהמוצרים השמורים שלך — ללא AI.
+                  {t("addMeal.computedFromSaved")}
                 </span>
               )}
               {note.items && note.items.length > 0 && (
@@ -388,7 +395,9 @@ export default function AddMeal({
                         {it.name}
                       </span>
                       <span className="ci-carb">
-                        {fmt((Number(it.carbs) || 0) * (it.qty || 1))} ג' פחמ'
+                        {t("addMeal.itemCarbs", {
+                          carbs: fmt((Number(it.carbs) || 0) * (it.qty || 1)),
+                        })}
                       </span>
                     </li>
                   ))}
@@ -401,22 +410,22 @@ export default function AddMeal({
 
       <div className="row" style={{ marginTop: 12, alignItems: "center" }}>
         <button className="btn" disabled={busy} onClick={onAddClick}>
-          {busy ? "מחשב…" : "חשב ורשום ארוחה"}
+          {busy ? t("addMeal.calculating") : t("addMeal.calcAndLog")}
         </button>
         <button
           className="btn ghost"
           disabled={busy}
           onClick={() => runCalc(false)}
         >
-          חשב פחמימות בלבד
+          {t("addMeal.calcCarbsOnly")}
         </button>
         <button
           className="btn ghost"
           disabled={busy}
           onClick={resetForm}
-          title="איפוס: היום, שעה נוכחית, ניקוי שדות"
+          title={t("addMeal.resetTitle")}
         >
-          איפוס
+          {t("addMeal.reset")}
         </button>
       </div>
     </div>

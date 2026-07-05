@@ -3,8 +3,9 @@
 // renders. No network, no state — just math over the days array, so it stays
 // trivially testable and re-runs cheaply inside a useMemo.
 import { dayTotal, dayMacroGrams, macroPct, hasMacros, TARGET } from './helpers.js';
+import i18n from './i18n.js';
 
-// A logged weight is free text ("82.5", "82,4 ק\"ג", "‎81"). Pull the first
+// A logged weight is free text ("82.5", "82,4 kg", "81"). Pull the first
 // number out of it (comma or dot decimal), or null when there's nothing usable.
 export function parseWeight(w) {
   if (w == null) return null;
@@ -24,6 +25,12 @@ const pad2 = (n) => String(n).padStart(2, '0');
 function addMonthsISO(iso, months) {
   const [y, m, d] = iso.split('-').map(Number);
   const dt = new Date(y, m - 1 + months, d);
+  return `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
+}
+// ISO date `n` days after `iso`.
+function addDaysISO(iso, n) {
+  const [y, m, d] = iso.split('-').map(Number);
+  const dt = new Date(y, m - 1, d + n);
   return `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
 }
 // Whole days between two ISO dates (b - a). ISO strings parse as UTC midnight,
@@ -48,6 +55,33 @@ export function buildKetoProgress(days, goal, today, target = TARGET) {
     (d) => mealsOf(d).length > 0 && d.date >= start && d.date < today && d.date <= end
   );
   const inTarget = inWindow.filter((d) => dayTotal(d) <= target).length;
+
+  // A cell per calendar day across the whole period (start … start+months),
+  // each tagged with its status so the dashboard can paint a day-by-day strip:
+  //   good   — logged, at/under target
+  //   over   — logged, over target
+  //   missed — a past day with no meals logged
+  //   today  — the current (in-progress) day
+  //   future — still ahead
+  const totalByDate = new Map();
+  days.forEach((d) => {
+    if (mealsOf(d).length > 0) totalByDate.set(d.date, dayTotal(d));
+  });
+  const strip = [];
+  for (let i = 0; i < totalDays; i++) {
+    const date = addDaysISO(start, i);
+    let status;
+    if (date > today) status = 'future';
+    else if (date === today) status = 'today';
+    else if (totalByDate.has(date)) status = totalByDate.get(date) <= target ? 'good' : 'over';
+    else status = 'missed';
+    strip.push({
+      date,
+      status,
+      total: totalByDate.has(date) ? round1(totalByDate.get(date)) : null,
+    });
+  }
+
   return {
     start,
     end,
@@ -60,6 +94,7 @@ export function buildKetoProgress(days, goal, today, target = TARGET) {
     loggedInPeriod: inWindow.length,
     inTargetInPeriod: inTarget,
     adherence: inWindow.length ? Math.round((inTarget / inWindow.length) * 100) : 0,
+    strip,
   };
 }
 
@@ -160,7 +195,7 @@ export function buildAnalytics(days, target = TARGET, opts = {}) {
 
   const catMap = new Map();
   allMeals.forEach((m) => {
-    const key = (m.cat || '').trim() || 'ללא קטגוריה';
+    const key = (m.cat || '').trim() || i18n.t('analytics.uncategorized');
     const e = catMap.get(key) || { cat: key, count: 0, carbs: 0 };
     e.count += 1;
     e.carbs += Number(m.carbs) || 0;
@@ -177,7 +212,7 @@ export function buildAnalytics(days, target = TARGET, opts = {}) {
     .map((m) => ({
       date: m.date,
       carbs: round1(Number(m.carbs) || 0),
-      label: (m.desc || m.cat || 'ארוחה').trim(),
+      label: (m.desc || m.cat || i18n.t('analytics.meal')).trim(),
     }));
 
   // ---- carb load by hour-of-day (only meals that carry a HH:MM time) ----
@@ -198,11 +233,12 @@ export function buildAnalytics(days, target = TARGET, opts = {}) {
 
   // ---- coffee/day — detect coffee meals and bucket by type ----
   // A meal only counts as coffee when it actually mentions coffee, so a stray
-  // "נס" elsewhere never registers. Order matters: espresso → instant → black.
-  const COFFEE = /קפה|אספרסו|espresso|קפוצ['׳]?ינו|cappuccino|לאטה|latte|מקיאטו|אמריקנו/i;
+  // Hebrew "nes" fragment elsewhere never registers. Order: espresso → instant →
+  // black. Patterns cover both Hebrew and English wording.
+  const COFFEE = /קפה|אספרסו|espresso|קפוצ['׳]?ינו|cappuccino|לאטה|latte|מקיאטו|macchiato|אמריקנו|americano|\bcoffee\b|flat\s?white|mocha/i;
   const ESPRESSO = /אספרסו|espresso/i;
-  const INSTANT = /נס[\s-]?קפה|נסקפה|נסטל[ה]?|\bנס\b/u;
-  const BLACK = /שחור|שחורה/;
+  const INSTANT = /נס[\s-]?קפה|נסקפה|נסטל[ה]?|\bנס\b|instant\s?coffee/iu;
+  const BLACK = /שחור|שחורה|\bblack\b/i;
   const coffeeTypes = { black: 0, espresso: 0, instant: 0, other: 0 };
   let coffeeTotal = 0;
   allMeals.forEach((m) => {

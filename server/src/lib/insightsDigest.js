@@ -80,10 +80,12 @@ function addMonthsISO(iso, months) {
 }
 const diffDays = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
 
-const COFFEE = /קפה|אספרסו|espresso|קפוצ['׳]?ינו|cappuccino|לאטה|latte|מקיאטו|אמריקנו/i;
+// Coffee detection covers both languages so the coffee insight works for English
+// meals too ("coffee", "latte", "americano", …) as well as Hebrew.
+const COFFEE = /קפה|אספרסו|espresso|קפוצ['׳]?ינו|cappuccino|לאטה|latte|מקיאטו|macchiato|אמריקנו|americano|\bcoffee\b|flat\s?white|mocha/i;
 const ESPRESSO = /אספרסו|espresso/i;
-const INSTANT = /נס[\s-]?קפה|נסקפה|נסטל[ה]?|\bנס\b/u;
-const BLACK = /שחור|שחורה/;
+const INSTANT = /נס[\s-]?קפה|נסקפה|נסטל[ה]?|\bנס\b|instant\s?coffee/iu;
+const BLACK = /שחור|שחורה|\bblack\b/i;
 
 // Aggregate a set of logged days into { loggedDays, avgNetCarbs, inTargetRate, weightDelta }.
 function bucketStats(daysInBucket, target) {
@@ -130,7 +132,9 @@ function ketoProgress(days, ketoGoalMonths, today, target) {
  * @param {Array} days  raw Day documents (lean) for one user
  * @param {{target:number, ketoGoalMonths:number, today:string}} opts
  */
-export function buildDigest(days, { target = 20, ketoGoalMonths = 0, today } = {}) {
+export function buildDigest(days, { target = 20, ketoGoalMonths = 0, today, lang = 'he' } = {}) {
+  const noCat = lang === 'en' ? 'Uncategorized' : 'ללא קטגוריה';
+  const mealFallback = lang === 'en' ? 'meal' : 'ארוחה';
   // Only completed days count for stats — today is still in progress.
   const all = asc(days).filter((d) => !today || d.date < today);
   const logged = all.filter((d) => mealsOf(d).length > 0);
@@ -213,7 +217,7 @@ export function buildDigest(days, { target = 20, ketoGoalMonths = 0, today } = {
   const allMeals = logged.flatMap((d) => mealsOf(d).map((m) => ({ ...m, date: d.date })));
   const catMap = new Map();
   allMeals.forEach((m) => {
-    const key = (m.cat || '').trim() || 'ללא קטגוריה';
+    const key = (m.cat || '').trim() || noCat;
     const e = catMap.get(key) || { cat: key, count: 0, carbs: 0 };
     e.count += 1;
     e.carbs += Number(m.carbs) || 0;
@@ -228,7 +232,7 @@ export function buildDigest(days, { target = 20, ketoGoalMonths = 0, today } = {
     .filter((m) => (Number(m.carbs) || 0) > 0)
     .sort((a, b) => (Number(b.carbs) || 0) - (Number(a.carbs) || 0))
     .slice(0, 5)
-    .map((m) => ({ date: m.date, carbs: round1(Number(m.carbs) || 0), label: (m.desc || m.cat || 'ארוחה').trim() }));
+    .map((m) => ({ date: m.date, carbs: round1(Number(m.carbs) || 0), label: (m.desc || m.cat || mealFallback).trim() }));
 
   const hourMap = new Map();
   allMeals.forEach((m) => {
@@ -329,25 +333,40 @@ const HE_MONTHS = [
   'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
   'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר',
 ];
+const EN_MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+const EN_MONTHS_SHORT = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
 
 // The most recent fully-completed week (Sunday–Saturday) before `today`.
-export function lastCompletedWeek(today) {
+// `lang` picks the human label ('he' | 'en'); the ISO fields are unchanged.
+export function lastCompletedWeek(today, lang = 'he') {
   const start = addDaysISO(weekStartISO(today), -7); // Sunday of the previous week
   const end = addDaysISO(start, 6);
   const [, sm, sd] = start.split('-').map(Number);
   const [, em, ed] = end.split('-').map(Number);
   const label =
-    sm === em ? `${sd}–${ed} ב${HE_MONTHS[em - 1]}` : `${sd} ב${HE_MONTHS[sm - 1]} – ${ed} ב${HE_MONTHS[em - 1]}`;
+    lang === 'en'
+      ? sm === em
+        ? `${EN_MONTHS_SHORT[em - 1]} ${sd}–${ed}`
+        : `${EN_MONTHS_SHORT[sm - 1]} ${sd} – ${EN_MONTHS_SHORT[em - 1]} ${ed}`
+      : sm === em
+        ? `${sd}–${ed} ב${HE_MONTHS[em - 1]}`
+        : `${sd} ב${HE_MONTHS[sm - 1]} – ${ed} ב${HE_MONTHS[em - 1]}`;
   return { period: 'weekly', key: start, start, end, label };
 }
 
 // The most recent fully-completed calendar month before `today`.
-export function lastCompletedMonth(today) {
+export function lastCompletedMonth(today, lang = 'he') {
   const firstOfThis = `${today.slice(0, 7)}-01`;
   const start = addMonthsISO(firstOfThis, -1); // first of previous month
   const end = addDaysISO(firstOfThis, -1); // last day of previous month
   const [y, m] = start.split('-').map(Number);
-  return { period: 'monthly', key: start.slice(0, 7), start, end, label: `${HE_MONTHS[m - 1]} ${y}` };
+  const label = lang === 'en' ? `${EN_MONTHS[m - 1]} ${y}` : `${HE_MONTHS[m - 1]} ${y}`;
+  return { period: 'monthly', key: start.slice(0, 7), start, end, label };
 }
 
 // Does the user have any logged meals within [start, end]?

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import MealTemplate from '../models/MealTemplate.js';
 import { requireAuth } from '../middleware/auth.js';
 import { asyncHandler } from '../lib/http.js';
+import { msg, reqLang, defaultCat } from '../lib/i18n.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -15,12 +16,13 @@ router.get('/', asyncHandler(async (req, res) => {
 // POST /api/templates -> create a template
 router.post('/', asyncHandler(async (req, res) => {
   const { name, time, cat, desc, carbs, fat, protein } = req.body;
-  if (!name || !String(name).trim()) return res.status(400).json({ error: 'תן/י שם לתבנית' });
+  if (!name || !String(name).trim())
+    return res.status(400).json({ error: msg(req, 'תן/י שם לתבנית', 'Give the template a name') });
   const template = await MealTemplate.create({
     user: req.userId,
     name: String(name).trim(),
     time: time || '',
-    cat: cat || 'נשנוש / ביניים',
+    cat: cat || defaultCat(reqLang(req)),
     desc: desc || '',
     carbs: Number(carbs) || 0,
     fat: fat == null ? null : Number(fat),
@@ -32,7 +34,7 @@ router.post('/', asyncHandler(async (req, res) => {
 // DELETE /api/templates/:id
 router.delete('/:id', asyncHandler(async (req, res) => {
   const result = await MealTemplate.deleteOne({ _id: req.params.id, user: req.userId });
-  if (result.deletedCount === 0) return res.status(404).json({ error: 'תבנית לא נמצאה' });
+  if (result.deletedCount === 0) return res.status(404).json({ error: msg(req, 'תבנית לא נמצאה', 'Template not found') });
   res.json({ ok: true });
 }));
 

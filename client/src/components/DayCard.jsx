@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   dayTotal, dayMacroGrams, macroPct, hasMacros, fmt, heDate, zoneInfo, maxRange, TARGET,
 } from '../lib/helpers.js';
@@ -18,6 +19,7 @@ export default function DayCard({
   onSaveItemProduct,
   target = TARGET,
 }) {
+  const { t } = useTranslation();
   const mt = day.metrics || {};
   const [weight, setWeight] = useState(mt.weight || '');
   const [status, setStatus] = useState(mt.status || '');
@@ -38,7 +40,7 @@ export default function DayCard({
         </span>
         <span className="day-hright">
           <span className="day-total" style={{ color: zi.color }}>
-            {fmt(total)} <small>ג' נטו</small>
+            {fmt(total)} <small>{t('dayCard.netGrams')}</small>
           </span>
           <span className="chev"></span>
         </span>
@@ -46,11 +48,11 @@ export default function DayCard({
 
       <div className="meter">
         <span style={{ width: zi.pct + '%', background: zi.color }}></span>
-        <i className="meter-mark" title={'גבול היעד: ' + fmt(target) + ' גרם'}></i>
+        <i className="meter-mark" title={t('dayCard.targetLimit', { value: fmt(target) })}></i>
       </div>
       <div className="meter-scale">
         <span className="s0">0</span>
-        <span className="s20">יעד {fmt(target)}</span>
+        <span className="s20">{t('dayCard.targetLabel', { value: fmt(target) })}</span>
         <span className="s50">{fmt(maxr)}</span>
       </div>
       <div className="meter-cap">{zi.cap}</div>
@@ -66,28 +68,28 @@ export default function DayCard({
               </div>
               <div className="macro-legend">
                 <span>
-                  <span className="dot" style={{ background: 'var(--olive)' }}></span>שומן{' '}
-                  <b>{mp.fat}%</b> · {fmt(g.fat)} ג'
+                  <span className="dot" style={{ background: 'var(--olive)' }}></span>{t('dayCard.macroFat')}{' '}
+                  <b>{mp.fat}%</b> · {t('dayCard.grams', { value: fmt(g.fat) })}
                 </span>
                 <span>
-                  <span className="dot" style={{ background: 'var(--protein)' }}></span>חלבון{' '}
-                  <b>{mp.protein}%</b> · {fmt(g.protein)} ג'
+                  <span className="dot" style={{ background: 'var(--protein)' }}></span>{t('dayCard.macroProtein')}{' '}
+                  <b>{mp.protein}%</b> · {t('dayCard.grams', { value: fmt(g.protein) })}
                 </span>
                 <span>
-                  <span className="dot" style={{ background: 'var(--amber)' }}></span>פחמ'{' '}
-                  <b>{mp.carb}%</b> · {fmt(g.carb)} ג'
+                  <span className="dot" style={{ background: 'var(--amber)' }}></span>{t('dayCard.macroCarb')}{' '}
+                  <b>{mp.carb}%</b> · {t('dayCard.grams', { value: fmt(g.carb) })}
                 </span>
-                <span style={{ marginInlineStart: 'auto' }}>~{mp.kcal} קק"ל</span>
+                <span style={{ marginInlineStart: 'auto' }}>{t('dayCard.kcal', { value: mp.kcal })}</span>
               </div>
             </div>
           ) : (
-            <div className="macro-na">מאקרו (שומן/חלבון) לא תועד ליום זה</div>
+            <div className="macro-na">{t('dayCard.macroNa')}</div>
           )}
 
           <div className="meals">
             {meals.length === 0 ? (
               <div className="desc" style={{ padding: '10px 0', color: 'var(--ink-soft)' }}>
-                עדיין אין ארוחות ליום הזה.
+                {t('dayCard.noMeals')}
               </div>
             ) : (
               meals.map((m) => {
@@ -105,12 +107,12 @@ export default function DayCard({
                               {it.qty > 1 && <b className="mi-qty">{fmt(it.qty)}×</b>} {it.name}
                             </span>
                             <span className="mi-carb">
-                              {fmt((Number(it.carbs) || 0) * (it.qty || 1))} ג'
+                              {t('dayCard.grams', { value: fmt((Number(it.carbs) || 0) * (it.qty || 1)) })}
                             </span>
                             {onSaveItemProduct && (
                               <button
                                 className="mi-save"
-                                title="הוסף למוצרים שלי"
+                                title={t('dayCard.saveToProducts')}
                                 onClick={() => onSaveItemProduct(it)}
                               >
                                 📦
@@ -121,28 +123,28 @@ export default function DayCard({
                       </ul>
                     )}
                   </div>
-                  <div className="carb">{fmt(Number(m.carbs) || 0)} ג'</div>
+                  <div className="carb">{t('dayCard.grams', { value: fmt(Number(m.carbs) || 0) })}</div>
                   <div className="meal-acts">
                     {onSaveTemplate && (
-                      <button className="mact" title="שמור כתבנית" onClick={() => onSaveTemplate(m)}>
+                      <button className="mact" title={t('dayCard.saveTemplate')} onClick={() => onSaveTemplate(m)}>
                         ★
                       </button>
                     )}
                     {onSaveProduct && (
                       <button
                         className="mact"
-                        title="הוסף למוצרים שלי"
+                        title={t('dayCard.saveToProducts')}
                         onClick={() => onSaveProduct(m)}
                       >
                         📦
                       </button>
                     )}
                     {onCopyMeal && (
-                      <button className="mact" title="שכפל ליום הנבחר" onClick={() => onCopyMeal(m)}>
+                      <button className="mact" title={t('dayCard.copyToDay')} onClick={() => onCopyMeal(m)}>
                         ⧉
                       </button>
                     )}
-                    <button className="del" title="מחק" onClick={() => onDeleteMeal(iso, m._id)}>
+                    <button className="del" title={t('dayCard.deleteMeal')} onClick={() => onDeleteMeal(iso, m._id)}>
                       ✕
                     </button>
                   </div>
@@ -153,10 +155,10 @@ export default function DayCard({
           </div>
 
           <div className="metrics">
-            <div className="mlabel">מדדים פיזיולוגיים</div>
+            <div className="mlabel">{t('dayCard.metricsTitle')}</div>
             <div className="mrow">
               <div className="mfld">
-                <label>משקל בוקר (ק"ג)</label>
+                <label>{t('dayCard.weightLabel')}</label>
                 <input
                   type="number"
                   step="0.1"
@@ -172,7 +174,7 @@ export default function DayCard({
                   checked={!!mt.run}
                   onChange={(e) => onSetMetric(iso, 'run', e.target.checked)}
                 />{' '}
-                ריצה 10 דק'
+                {t('dayCard.run10min')}
               </label>
               <label className="mfld">
                 <input
@@ -180,12 +182,12 @@ export default function DayCard({
                   checked={!!mt.abs}
                   onChange={(e) => onSetMetric(iso, 'abs', e.target.checked)}
                 />{' '}
-                תרגילי בטן 5 דק'
+                {t('dayCard.abs5min')}
               </label>
             </div>
             <div className="status">
               <textarea
-                placeholder="הרגשה, אנרגיה, סטטוס קטוזיס..."
+                placeholder={t('dayCard.statusPlaceholder')}
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
                 onBlur={() => onSetMetric(iso, 'status', status)}

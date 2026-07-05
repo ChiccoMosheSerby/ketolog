@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../lib/auth.jsx';
 import { useToast } from '../lib/toast.jsx';
 import { useTheme } from '../lib/theme.js';
@@ -9,6 +10,7 @@ import './SettingsModal.scss';
 // a single Save button. Secondary actions (theme, guided tour, export) live
 // below a divider. Opened from the gear button in the header.
 export default function SettingsModal({ open, onClose, onExport }) {
+  const { t } = useTranslation();
   const { user, updateProfile, startOnboarding } = useAuth();
   const { theme, toggle } = useTheme();
   const toast = useToast();
@@ -38,19 +40,19 @@ export default function SettingsModal({ open, onClose, onExport }) {
   if (!open) return null;
 
   async function save() {
-    const t = Number(target);
-    if (!Number.isFinite(t) || t < 5 || t > 200) return toast('יעד יומי לא תקין (5–200 גרם)');
+    const tgt = Number(target);
+    if (!Number.isFinite(tgt) || tgt < 5 || tgt > 200) return toast(t('settings.invalidDailyTarget'));
     const m = Number(keto);
-    if (!Number.isInteger(m) || m < 0 || m > 60) return toast('יעד קיטו לא תקין (0–60 חודשים)');
+    if (!Number.isInteger(m) || m < 0 || m > 60) return toast(t('settings.invalidKetoGoal'));
     const digits = wa.replace(/\D/g, '');
-    if (digits && (digits.length < 8 || digits.length > 15)) return toast('מספר WhatsApp לא תקין');
+    if (digits && (digits.length < 8 || digits.length > 15)) return toast(t('settings.invalidWhatsapp'));
     setSaving(true);
     try {
-      await updateProfile({ gender, dailyCarbTarget: t, ketoGoalMonths: m, whatsappPhone: digits });
-      toast('ההגדרות נשמרו');
+      await updateProfile({ gender, dailyCarbTarget: tgt, ketoGoalMonths: m, whatsappPhone: digits });
+      toast(t('settings.saved'));
       onClose();
     } catch (e) {
-      toast(e.message || 'השמירה נכשלה');
+      toast(e.message || t('settings.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -60,25 +62,25 @@ export default function SettingsModal({ open, onClose, onExport }) {
     <div className="settings-scrim" onClick={onClose}>
       <div className="settings-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
         <div className="settings-head">
-          <h2>הגדרות</h2>
-          <button className="settings-close" aria-label="סגור" onClick={onClose}>✕</button>
+          <h2>{t('settings.title')}</h2>
+          <button className="settings-close" aria-label={t('common.close')} onClick={onClose}>✕</button>
         </div>
 
         <div className="settings-field">
-          <span className="settings-lab">פנייה</span>
+          <span className="settings-lab">{t('settings.address')}</span>
           <span className="settings-seg">
-            <button className={gender === 'male' ? 'active' : ''} onClick={() => setGender('male')}>זכר</button>
-            <button className={gender === 'female' ? 'active' : ''} onClick={() => setGender('female')}>נקבה</button>
+            <button className={gender === 'male' ? 'active' : ''} onClick={() => setGender('male')}>{t('settings.male')}</button>
+            <button className={gender === 'female' ? 'active' : ''} onClick={() => setGender('female')}>{t('settings.female')}</button>
           </span>
         </div>
 
         <label className="settings-field">
-          <span className="settings-lab">יעד יומי (גרם נטו)</span>
+          <span className="settings-lab">{t('settings.dailyTargetLabel')}</span>
           <input type="number" min="5" max="200" value={target} onChange={(e) => setTarget(e.target.value)} />
         </label>
 
         <label className="settings-field">
-          <span className="settings-lab">יעד קיטו (חודשים · 0 = ללא)</span>
+          <span className="settings-lab">{t('settings.ketoGoalLabel')}</span>
           <input type="number" min="0" max="60" value={keto} onChange={(e) => setKeto(e.target.value)} />
         </label>
 
@@ -88,20 +90,20 @@ export default function SettingsModal({ open, onClose, onExport }) {
         </label>
 
         <button className="settings-save" onClick={save} disabled={saving}>
-          {saving ? 'שומר…' : 'שמור'}
+          {saving ? t('settings.saving') : t('common.save')}
         </button>
 
         <div className="settings-divider" />
 
         <div className="settings-actions">
           <button className="btn ghost mini" onClick={toggle}>
-            {theme === 'dark' ? '☀️ מצב בהיר' : '🌙 מצב כהה'}
+            {theme === 'dark' ? t('settings.lightMode') : t('settings.darkMode')}
           </button>
           <button className="btn ghost mini" onClick={() => { startOnboarding(); onClose(); }}>
-            סיור מודרך
+            {t('settings.guidedTour')}
           </button>
           <button className="btn ghost mini" onClick={() => { onExport?.(); onClose(); }}>
-            ייצוא דוח
+            {t('settings.exportReport')}
           </button>
         </div>
       </div>

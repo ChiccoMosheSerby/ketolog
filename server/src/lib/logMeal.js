@@ -4,6 +4,7 @@ import { estimateMealCached } from './estimateCache.js';
 
 // Sunday-indexed, matching JS getDay() / the Intl 'short' weekday order below.
 const HE_DAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+const EN_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 // The server runs in UTC (Render), but the journal is a personal Israeli diary:
 // a meal texted at 00:30 local time must land on the correct local day and carry
@@ -31,13 +32,13 @@ export function israelTimeHM() {
   }).format(new Date());
 }
 
-// Hebrew weekday name for an ISO date, computed in the Israel zone.
-function weekday(iso) {
+// Weekday name for an ISO date, computed in the Israel zone. `lang` picks He/En.
+function weekday(iso, lang = 'he') {
   const name = new Intl.DateTimeFormat('en-US', { timeZone: IL_TZ, weekday: 'short' }).format(
     new Date(iso + 'T12:00:00Z')
   );
   const idx = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(name);
-  return HE_DAYS[idx] || '';
+  return (lang === 'en' ? EN_DAYS : HE_DAYS)[idx] || '';
 }
 
 // Estimate a free-text meal and append it to the user's log for `date`, creating
@@ -45,10 +46,10 @@ function weekday(iso) {
 // the in-app description box drives (estimate → POST /days/:date/meals), factored
 // out so the WhatsApp webhook logs meals identically. Returns the AI estimate,
 // the meal document as stored, and the updated day.
-export async function logMealFromDesc({ userId, desc, date, time }) {
+export async function logMealFromDesc({ userId, desc, date, time, lang = 'he' }) {
   const day0 = date || israelDateISO();
   const products = await Product.find({ user: userId }).lean();
-  const { result } = await estimateMealCached(userId, desc, products);
+  const { result } = await estimateMealCached(userId, desc, products, lang);
 
   const meal = {
     time: time || israelTimeHM(),
@@ -64,7 +65,7 @@ export async function logMealFromDesc({ userId, desc, date, time }) {
   const setOnInsert = { user: userId, date: day0 };
   if (!existing) {
     const count = await Day.countDocuments({ user: userId });
-    setOnInsert.label = 'יום ' + (count + 1) + ' · ' + weekday(day0);
+    setOnInsert.label = (lang === 'en' ? 'Day ' : 'יום ') + (count + 1) + ' · ' + weekday(day0, lang);
   }
   const day = await Day.findOneAndUpdate(
     { user: userId, date: day0 },

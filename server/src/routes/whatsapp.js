@@ -72,28 +72,41 @@ router.post('/inbound', async (req, res) => {
   try {
     const user = await User.findOne({ whatsappPhone: phone }).lean();
     if (!user) {
+      // Unlinked sender — language unknown, so answer bilingually.
       await sendWhatsApp(
         from,
-        'המספר הזה עדיין לא מקושר לחשבון KetoLog. היכנס/י לאפליקציה → הגדרות ← "מספר WhatsApp" והוסף/י את המספר הזה כדי להתחיל לרשום ארוחות בהודעה.'
+        'המספר הזה עדיין לא מקושר לחשבון KetoLog. היכנס/י לאפליקציה → הגדרות ← "מספר WhatsApp" והוסף/י את המספר הזה כדי להתחיל לרשום ארוחות בהודעה.\n\n' +
+          'This number isn’t linked to a KetoLog account yet. Open the app → Settings → "WhatsApp number" and add this number to start logging meals by message.'
       );
       return;
     }
     userId = user._id.toString();
+    const lang = user.language === 'en' ? 'en' : 'he';
     // Count the inbound WhatsApp message against this user (Twilio cost).
     recordTwilioUsage({ userId, kind: 'whatsapp_in' });
 
     if (!text) {
-      await sendWhatsApp(from, 'שלח/י תיאור חופשי של הארוחה ואחשב ואשמור אותה ביומן. לדוגמה: "חביתה מ-3 ביצים, פרוסת גאודה, מלפפון".', { userId });
+      await sendWhatsApp(
+        from,
+        lang === 'en'
+          ? 'Send a free-text description of the meal and I’ll calculate and save it to your journal. Example: "omelette with 3 eggs, a slice of gouda, cucumber".'
+          : 'שלח/י תיאור חופשי של הארוחה ואחשב ואשמור אותה ביומן. לדוגמה: "חביתה מ-3 ביצים, פרוסת גאודה, מלפפון".',
+        { userId }
+      );
       return;
     }
 
     if (tooMany(phone)) {
-      await sendWhatsApp(from, 'יותר מדי הודעות ברצף — נסה/י שוב בעוד רגע.', { userId });
+      await sendWhatsApp(
+        from,
+        lang === 'en' ? 'Too many messages in a row — try again in a moment.' : 'יותר מדי הודעות ברצף — נסה/י שוב בעוד רגע.',
+        { userId }
+      );
       return;
     }
 
-    const logged = await logMealFromDesc({ userId, desc: text });
-    await sendWhatsApp(from, formatMealReceipt(logged), { userId });
+    const logged = await logMealFromDesc({ userId, desc: text, lang });
+    await sendWhatsApp(from, formatMealReceipt(logged, lang), { userId });
   } catch (err) {
     // Surface Twilio's real error code/status/moreInfo — 'Authenticate' alone
     // hides whether it's a bad SID, bad token, or a wrong From number.
@@ -105,7 +118,14 @@ router.post('/inbound', async (req, res) => {
       err.moreInfo ? 'moreInfo=' + err.moreInfo : ''
     );
     try {
-      await sendWhatsApp(from, 'החישוב נכשל כרגע — נסה/י שוב בעוד רגע, או רשום/רשמי דרך האפליקציה.', { userId });
+      // `lang` may be out of scope if the failure happened before we resolved
+      // the user, so answer bilingually here.
+      await sendWhatsApp(
+        from,
+        'החישוב נכשל כרגע — נסה/י שוב בעוד רגע, או רשום/רשמי דרך האפליקציה.\n' +
+          'The calculation failed right now — try again in a moment, or log it via the app.',
+        { userId }
+      );
     } catch {
       /* nothing more we can do */
     }

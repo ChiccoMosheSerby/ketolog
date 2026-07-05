@@ -26,16 +26,20 @@ function productsFingerprint(products = []) {
 }
 
 // Return a cached meal estimate when one exists for this (user, description,
-// products-context); otherwise call the AI estimator, cache the result, and
-// return it. The `cached` flag lets callers see whether AI was hit.
-export async function estimateMealCached(userId, desc, products = []) {
+// products-context, language); otherwise call the AI estimator, cache the
+// result, and return it. The `cached` flag lets callers see whether AI was hit.
+// `lang` is folded into the fingerprint so en/he estimates never collide (an
+// English user must never be served a Hebrew breakdown from cache).
+export async function estimateMealCached(userId, desc, products = [], lang = 'he') {
   const key = normKey(desc);
-  const fp = productsFingerprint(products);
+  const fp = createHash('sha1')
+    .update(`${lang}\n${productsFingerprint(products)}`)
+    .digest('hex');
 
   const hit = await MealEstimate.findOne({ user: userId, key, fp }).lean();
   if (hit) return { result: hit.result, cached: true };
 
-  const result = await estimateMeal(desc, products, { userId });
+  const result = await estimateMeal(desc, products, { userId, lang });
 
   // upsert so two concurrent identical requests don't create duplicates (the
   // unique index would otherwise reject the second insert).

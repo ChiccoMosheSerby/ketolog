@@ -23,7 +23,39 @@ const PROMPT_VERSION = 3;
 const MAX_JOBS_PER_LOAD = 3; // cap background generations per request (cost/concurrency)
 const enoughData = (days) => days.filter((d) => (d.meals || []).length > 0).length >= MIN_DAYS;
 
-const SYSTEM = `${ketoRules()}
+const SYSTEM_EN = `${ketoRules([], 'en')}
+
+Beyond that, you are also a personal analyst of the user's keto journal in the KetoLog app. You'll receive:
+1. "digest" — a numeric summary of the data (averages, streaks, weekly/monthly breakdown, weight trend, categories, peak hours, coffee, outlier days, and the most recent days with meal details).
+2. The period (week or month) to focus on.
+3. "priorInsights" (optional) — your earlier reports for the same period type, newest to oldest. This is your memory.
+
+Your job: produce a personal insight report for that period — not a dry summary of numbers, but a **story of a trend**.
+
+Writing principles (very important):
+- **Trends above all**: every number must be placed on a timeline — not "18.4 g" but "18.4 g, down from 19.7 last month". Always compare to the previous period and describe the direction.
+- **Continuity with priorInsights**: if prior reports are attached — build on them explicitly. State what changed since, whether earlier recommendations were applied and had an effect, and which patterns recur or broke. Talk like a coach who remembers last week ("last week I flagged X — here's what happened").
+- **Clarity**: short, clear sentences, conclusion first. No clichés, no filler, no generalities ("you should eat healthy"). Every sentence must add concrete value.
+- **Don't repeat counters already visible to the user**: the dashboard already shows the raw numbers — current streak, daily average, % of days on target, high/low. You must **not** produce an "insight", "trend" or "point to watch" whose entire content just restates such a number (e.g. "your current streak is one day" or "your average is 18 g"). Every item must add a layer not visible from the number itself: **why** it happened, what **pattern** or **behavior** hides behind the number, what **changed** over time, or what **action** to take. If an item has no such added value — drop it. Better a few sharp, useful items than many empty ones; returning empty arrays is allowed.
+- **Ignore logging-coverage artifacts**: the number of days logged in a given week/month depends on the period boundaries — the first/last week/month in the range is usually partial because the journal started/ended mid-way. **Draw no conclusions from this** and don't treat "full coverage", "the only week with 7 days", "how many days you logged" etc. as an insight or praise — it's a technical fact, not a behavior. Focus only on **what was eaten** and the keto trends.
+- **Address the user in the second person** consistently throughout the report.
+- **Natural language only — never expose internal terms**: the words "digest", "priorInsights", "JSON", "field", "object", "raw data" are internal and must not appear in the output. Don't reference the data structure. Write as if speaking directly to the user about **their journal**. E.g. "on the first day you logged" — not "the first day in the digest"; "from your entries" — not "from the digest".
+- **Accuracy**: rely **only** on the data you received (the journal and the prior reports). Do not invent numbers, dates or meals.
+- Focus on the specified period; use the rest of the digest as context.
+- If there isn't enough data for a section — return an empty string/array, don't invent.
+- Light markdown only in the text fields (**bold**, lists with "- ").
+- Return **only valid JSON** in the following schema, with no extra text and no code fence:
+{
+  "highlight": "one sharp sentence — the most important insight/trend for the period, including a comparison to the past (short markdown)",
+  "summary": "a summary of the period as a story of a trend: where you started, where you got to, and what changed from the previous period",
+  "trends": [{"title": "short title", "body": "explanation with numbers and comparison to the past", "direction": "up|down|flat", "metric": "what was measured"}],
+  "forecast": {"body": "trend-based forecast: where this is heading if the current trend continues", "outlook": "positive|neutral|negative"},
+  "recommendations": [{"title": "short recommendation", "body": "practical detail, ideally linked to a prior recommendation if there was one", "priority": "high|med|low"}],
+  "pointsToWatch": [{"title": "point to watch", "body": "explanation"}],
+  "anomalies": [{"date": "YYYY-MM-DD", "title": "what stood out", "body": "explanation", "severity": "info|watch|alert"}]
+}`;
+
+const SYSTEM_HE = `${ketoRules()}
 
 מעבר לכך, אתה גם אנליסט/ית אישי/ת של יומן הקטו של המשתמש/ת באפליקציית KetoLog. תקבל/י:
 1. "digest" — סיכום מספרי של הנתונים (ממוצעים, רצפים, פירוק שבועי/חודשי, מגמת משקל, קטגוריות, שעות שיא, קפה, ימים חריגים, והימים האחרונים עם פירוט הארוחות).
@@ -54,6 +86,8 @@ const SYSTEM = `${ketoRules()}
   "pointsToWatch": [{"title": "נקודה לתשומת לב", "body": "הסבר"}],
   "anomalies": [{"date": "YYYY-MM-DD", "title": "מה חרג", "body": "הסבר", "severity": "info|watch|alert"}]
 }`;
+
+const buildInsightSystem = (lang) => (lang === 'en' ? SYSTEM_EN : SYSTEM_HE);
 
 const cleanStr = (v) => (typeof v === 'string' ? v.trim() : '');
 const arr = (v, n) => (Array.isArray(v) ? v.slice(0, n) : []);
@@ -123,8 +157,11 @@ export async function getPriorContext(userId, period, beforeEnd, limit = 3) {
   return docs.map(condenseReport);
 }
 
-// Instruction for how to address the user grammatically in Hebrew.
-function genderInstruction(gender) {
+// Instruction for how to address the user grammatically in Hebrew. English isn't
+// grammatically gendered, so for 'en' this is a no-op (second person is already
+// specified in the system prompt).
+function genderInstruction(gender, lang = 'he') {
+  if (lang === 'en') return '';
   if (gender === 'male') return 'פנה/י אל המשתמש בלשון **זכר** באופן עקבי לאורך כל הדוח (אכלת, שמרת, כדאי לך).';
   if (gender === 'female') return 'פני אל המשתמשת בלשון **נקבה** באופן עקבי לאורך כל הדוח (אכלת, שמרת, כדאי לך — בנקבה).';
   return 'מגדר המשתמש/ת אינו ידוע — כתוב/י בלשון ניטרלית/כפולה (אכלת, שמרת) והימנע/י מהטיה מגדרית מובהקת.';
@@ -132,27 +169,34 @@ function genderInstruction(gender) {
 
 // One Claude call for a single period's report. `prior` is the condensed history
 // of earlier same-period reports (newest first), used for trend continuity.
-// `gender` ('male'|'female'|'') controls Hebrew grammatical address.
-export async function generateReport(digest, focus, prior = [], gender = '', userId = null) {
+// `gender` ('male'|'female'|'') controls Hebrew grammatical address (ignored for
+// English). `lang` ('he'|'en') selects the report language.
+export async function generateReport(digest, focus, prior = [], gender = '', userId = null, lang = 'he') {
   const client = getClient();
-  const periodName = focus.period === 'weekly' ? 'השבועי' : 'החודשי';
+  const en = lang === 'en';
+  const periodName = en
+    ? focus.period === 'weekly' ? 'weekly' : 'monthly'
+    : focus.period === 'weekly' ? 'השבועי' : 'החודשי';
   const priorBlock = prior.length
-    ? `\n\nהדוחות הקודמים שלך (priorInsights, מהחדש לישן) — התבסס/י עליהם לתיאור המגמה:\n${JSON.stringify(prior)}`
-    : '\n\n(אין דוחות קודמים — זהו הדוח הראשון מסוגו.)';
+    ? en
+      ? `\n\nYour prior reports (priorInsights, newest to oldest) — build on them to describe the trend:\n${JSON.stringify(prior)}`
+      : `\n\nהדוחות הקודמים שלך (priorInsights, מהחדש לישן) — התבסס/י עליהם לתיאור המגמה:\n${JSON.stringify(prior)}`
+    : en
+      ? '\n\n(No prior reports — this is the first of its kind.)'
+      : '\n\n(אין דוחות קודמים — זהו הדוח הראשון מסוגו.)';
+  const content = en
+    ? `This is the ${periodName} report. Focus on the period "${focus.label}" (from ${focus.start} to ${focus.end}), ` +
+      `and use the rest of the digest as context. ${genderInstruction(gender, lang)} Produce the report per the schema.\n\n` +
+      `digest:\n${JSON.stringify(digest)}${priorBlock}`
+    : `זהו הדוח ${periodName}. התמקד/י בתקופה "${focus.label}" (מ-${focus.start} עד ${focus.end}), ` +
+      `והשתמש/י בשאר ה-digest כהקשר. ${genderInstruction(gender, lang)} הפק/י את הדוח לפי הסכמה.\n\n` +
+      `digest:\n${JSON.stringify(digest)}${priorBlock}`;
   const message = await client.messages.create({
     model: CHAT_MODEL(),
     max_tokens: 6000,
     thinking: { type: 'adaptive' },
-    system: SYSTEM,
-    messages: [
-      {
-        role: 'user',
-        content:
-          `זהו הדוח ${periodName}. התמקד/י בתקופה "${focus.label}" (מ-${focus.start} עד ${focus.end}), ` +
-          `והשתמש/י בשאר ה-digest כהקשר. ${genderInstruction(gender)} הפק/י את הדוח לפי הסכמה.\n\n` +
-          `digest:\n${JSON.stringify(digest)}${priorBlock}`,
-      },
-    ],
+    system: buildInsightSystem(lang),
+    messages: [{ role: 'user', content }],
   });
   recordAnthropicUsage({ userId, kind: 'insight', model: CHAT_MODEL(), usage: message.usage });
   return normalizeInsight(parseJsonReply(message));
@@ -168,9 +212,10 @@ const inFlight = new Set();
 // a new notification).
 async function runGeneration(userId, days, opts, focus) {
   const gender = opts.gender || '';
+  const lang = opts.lang === 'en' ? 'en' : 'he';
   const digest = buildDigest(days, opts);
   const prior = await getPriorContext(userId, focus.period, focus.end);
-  const result = await generateReport(digest, focus, prior, gender, userId);
+  const result = await generateReport(digest, focus, prior, gender, userId, lang);
   await Insight.findOneAndUpdate(
     { user: userId, period: focus.period, periodKey: focus.key },
     {
@@ -195,7 +240,8 @@ async function runGeneration(userId, days, opts, focus) {
 export async function ensureDueReports(userId, days, opts) {
   if (!enoughData(days)) return { enoughData: false, generating: [] };
   const today = opts.today;
-  const candidates = [lastCompletedWeek(today), lastCompletedMonth(today)].filter((p) =>
+  const lang = opts.lang === 'en' ? 'en' : 'he';
+  const candidates = [lastCompletedWeek(today, lang), lastCompletedMonth(today, lang)].filter((p) =>
     periodHasData(days, p.start, p.end)
   );
 

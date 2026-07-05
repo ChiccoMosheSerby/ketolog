@@ -110,16 +110,23 @@ export async function sendApprovalRequest({ email, approveUrl }) {
 // Send a password-reset link to the account owner. Like sendApprovalRequest,
 // falls back to logging the link when no email backend is configured so the
 // flow still works in development.
-export async function sendPasswordReset({ email, resetUrl }) {
-  const subject = 'KetoLog — איפוס סיסמה';
-  const text =
-    `התקבלה בקשה לאיפוס הסיסמה של החשבון ${email} ב-KetoLog.\n\n` +
-    `כדי לבחור סיסמה חדשה, לחץ על הקישור הבא (בתוקף לשעה אחת):\n${resetUrl}\n\n` +
-    `אם לא ביקשת לאפס את הסיסמה, אפשר להתעלם מהמייל — הסיסמה לא תשתנה.`;
-  const html =
-    `<p>התקבלה בקשה לאיפוס הסיסמה של החשבון <strong>${escapeHtml(email)}</strong> ב-KetoLog.</p>` +
-    `<p><a href="${escapeHtml(resetUrl)}">לחץ כאן כדי לבחור סיסמה חדשה</a> (הקישור בתוקף לשעה אחת).</p>` +
-    `<p style="color:#888;font-size:13px">אם לא ביקשת לאפס את הסיסמה, אפשר להתעלם מהמייל — הסיסמה לא תשתנה.</p>`;
+export async function sendPasswordReset({ email, resetUrl, lang = 'he' }) {
+  const en = lang === 'en';
+  const subject = en ? 'KetoLog — password reset' : 'KetoLog — איפוס סיסמה';
+  const text = en
+    ? `A password-reset request was made for the KetoLog account ${email}.\n\n` +
+      `To choose a new password, click the following link (valid for one hour):\n${resetUrl}\n\n` +
+      `If you didn't request a reset, you can ignore this email — your password won't change.`
+    : `התקבלה בקשה לאיפוס הסיסמה של החשבון ${email} ב-KetoLog.\n\n` +
+      `כדי לבחור סיסמה חדשה, לחץ על הקישור הבא (בתוקף לשעה אחת):\n${resetUrl}\n\n` +
+      `אם לא ביקשת לאפס את הסיסמה, אפשר להתעלם מהמייל — הסיסמה לא תשתנה.`;
+  const html = en
+    ? `<p>A password-reset request was made for the KetoLog account <strong>${escapeHtml(email)}</strong>.</p>` +
+      `<p><a href="${escapeHtml(resetUrl)}">Click here to choose a new password</a> (the link is valid for one hour).</p>` +
+      `<p style="color:#888;font-size:13px">If you didn't request a reset, you can ignore this email — your password won't change.</p>`
+    : `<p>התקבלה בקשה לאיפוס הסיסמה של החשבון <strong>${escapeHtml(email)}</strong> ב-KetoLog.</p>` +
+      `<p><a href="${escapeHtml(resetUrl)}">לחץ כאן כדי לבחור סיסמה חדשה</a> (הקישור בתוקף לשעה אחת).</p>` +
+      `<p style="color:#888;font-size:13px">אם לא ביקשת לאפס את הסיסמה, אפשר להתעלם מהמייל — הסיסמה לא תשתנה.</p>`;
 
   const r = await deliver({ to: email, subject, text, html });
   if (!r.delivered) {

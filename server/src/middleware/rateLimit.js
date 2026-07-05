@@ -3,6 +3,8 @@
 // process memory: they reset on restart and are NOT shared across instances, so
 // if you ever scale to more than one instance, swap this for a Redis-backed
 // limiter (e.g. rate-limit-redis) to enforce the limit globally.
+import { reqLang } from '../lib/i18n.js';
+
 const buckets = new Map();
 
 // Periodically drop expired buckets so memory can't grow unbounded under a flood
@@ -15,10 +17,14 @@ const sweep = setInterval(() => {
 }, 60_000);
 sweep.unref?.();
 
-const DEFAULT_MSG = 'יותר מדי בקשות — נסה/י שוב בעוד רגע';
+const DEFAULT_MSG = {
+  he: 'יותר מדי בקשות — נסה/י שוב בעוד רגע',
+  en: 'Too many requests — please try again in a moment',
+};
 
 // Fixed-window limiter. Keyed by client IP (requires app.set('trust proxy', …)
 // so req.ip is the real client behind Render's proxy, not the proxy itself).
+// `message` may be a plain string or a { he, en } pair (localized per request).
 export function rateLimit({ windowMs, max, name = 'rl', message = DEFAULT_MSG }) {
   return function rateLimiter(req, res, next) {
     const now = Date.now();
@@ -31,7 +37,8 @@ export function rateLimit({ windowMs, max, name = 'rl', message = DEFAULT_MSG })
     entry.count++;
     if (entry.count > max) {
       res.set('Retry-After', String(Math.ceil((entry.reset - now) / 1000)));
-      return res.status(429).json({ error: message });
+      const text = typeof message === 'string' ? message : message[reqLang(req)] || message.he;
+      return res.status(429).json({ error: text });
     }
     next();
   };

@@ -88,26 +88,33 @@ export async function sendWhatsApp(toPhone, body, ctx = {}) {
   return msg;
 }
 
-// Build the Hebrew receipt the user gets back after a meal is logged — mirrors
-// the app's calc-note: total macros, calorie split, the per-item breakdown, and
-// where it landed (which day + the running day total).
-export function formatMealReceipt({ meal, day, date }) {
+// Build the receipt the user gets back after a meal is logged — mirrors the
+// app's calc-note: total macros, calorie split, the per-item breakdown, and
+// where it landed (which day + the running day total). `lang` ('he'|'en')
+// selects the receipt language (driven by the linked account's language).
+export function formatMealReceipt({ meal, day, date }, lang = 'he') {
+  const en = lang === 'en';
   const n = Number(meal.carbs) || 0;
   const fat = meal.fat == null ? null : Number(meal.fat);
   const prot = meal.protein == null ? null : Number(meal.protein);
 
   const lines = [];
-  lines.push('✅ נרשם ליומן');
+  lines.push(en ? '✅ Logged' : '✅ נרשם ליומן');
   lines.push(`🍽️ ${meal.desc}`);
 
-  let head = `📊 ${fmt(n)} ג' פחמימות נטו`;
-  if (fat != null) head += ` · ${fmt(fat)} ג' שומן`;
-  if (prot != null) head += ` · ${fmt(prot)} ג' חלבון`;
+  let head = en ? `📊 ${fmt(n)} g net carbs` : `📊 ${fmt(n)} ג' פחמימות נטו`;
+  if (fat != null) head += en ? ` · ${fmt(fat)} g fat` : ` · ${fmt(fat)} ג' שומן`;
+  if (prot != null) head += en ? ` · ${fmt(prot)} g protein` : ` · ${fmt(prot)} ג' חלבון`;
   lines.push(head);
 
   if (fat != null && prot != null) {
     const mp = macroPct({ carb: n, fat, protein: prot });
-    if (mp) lines.push(`   חלוקה קלורית: שומן ${mp.fat}% · חלבון ${mp.protein}% · פחמ' ${mp.carb}% (~${mp.kcal} קק"ל)`);
+    if (mp)
+      lines.push(
+        en
+          ? `   Calorie split: fat ${mp.fat}% · protein ${mp.protein}% · carbs ${mp.carb}% (~${mp.kcal} kcal)`
+          : `   חלוקה קלורית: שומן ${mp.fat}% · חלבון ${mp.protein}% · פחמ' ${mp.carb}% (~${mp.kcal} קק"ל)`
+      );
   }
 
   const items = Array.isArray(meal.items) ? meal.items : [];
@@ -117,13 +124,17 @@ export function formatMealReceipt({ meal, day, date }) {
       const qty = Number(it.qty) || 1;
       const carbs = (Number(it.carbs) || 0) * qty;
       const q = qty > 1 ? `${fmt(qty)}× ` : '';
-      lines.push(`• ${q}${it.name} — ${fmt(carbs)} ג' פחמ'`);
+      lines.push(en ? `• ${q}${it.name} — ${fmt(carbs)} g carbs` : `• ${q}${it.name} — ${fmt(carbs)} ג' פחמ'`);
     }
   }
 
   const dayTotal = (day?.meals || []).reduce((s, m) => s + (Number(m.carbs) || 0), 0);
   lines.push('');
-  lines.push(`🗓️ ${date} · ${meal.time} — סה"כ היום: ${fmt(dayTotal)} ג' פחמימות`);
+  lines.push(
+    en
+      ? `🗓️ ${date} · ${meal.time} — today's total: ${fmt(dayTotal)} g carbs`
+      : `🗓️ ${date} · ${meal.time} — סה"כ היום: ${fmt(dayTotal)} ג' פחמימות`
+  );
 
   return lines.join('\n');
 }

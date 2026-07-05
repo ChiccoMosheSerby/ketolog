@@ -1,4 +1,6 @@
 // Keto math + date helpers, ported from keto-log.html.
+import i18n from './i18n.js';
+
 export const CEIL = 20;
 export const TARGET = 20;
 export const MAXR = 50;
@@ -83,22 +85,28 @@ export function nowHM() {
   return String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
 }
 
+// Long human date for a diary header, in the active UI language.
+// he: (localized long date)  ·  en: "Sunday, July 5, 2026"
 export function heDate(iso) {
   const [y, m, dd] = iso.split('-');
   const dt = new Date(y, m - 1, dd);
-  const days = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
-  const mon = [
-    'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
-    'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר',
-  ];
-  return 'יום ' + days[dt.getDay()] + ', ' + Number(dd) + ' ב' + mon[m - 1] + ' ' + y;
+  return new Intl.DateTimeFormat(i18n.language, {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(dt);
 }
 
+// Weekday name for an ISO date, in the active UI language. In Hebrew, Intl
+// returns "יום ראשון"; the diary label already prefixes "יום {{num}}", so strip
+// the leading "יום " here to avoid the doubled word ("יום 5 · ראשון", not
+// "יום 5 · יום ראשון"). English is returned unchanged ("Sunday").
 export function dayHebrewName(iso) {
   const [y, m, dd] = iso.split('-');
   const dt = new Date(y, m - 1, dd);
-  const days = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
-  return days[dt.getDay()];
+  const name = new Intl.DateTimeFormat(i18n.language, { weekday: 'long' }).format(dt);
+  return name.replace(/^יום\s+/, '');
 }
 
 // gradual red transition for the carb meter
@@ -123,22 +131,23 @@ export function zoneInfo(total, target = TARGET) {
   const maxr = maxRange(target);
   const redStart = maxr * 0.9; // 45 when target=20
   const pct = Math.min((total / maxr) * 100, 100);
+  const t = i18n.t;
   let color, cap;
   if (total <= target - 4) {
     color = 'var(--olive)';
-    cap = 'ביעד — נשארו ' + fmt(target - total) + ' גרם עד הגבול (' + fmt(target) + ')';
+    cap = t('meter.onTarget', { left: fmt(target - total), target: fmt(target) });
   } else if (total <= target) {
     color = 'var(--olive)';
-    cap = 'ביעד, אך מתקרב לגבול — נשארו ' + fmt(target - total) + ' גרם עד ' + fmt(target);
+    cap = t('meter.nearLimit', { left: fmt(target - total), target: fmt(target) });
   } else if (total <= redStart) {
     color = 'var(--amber)';
-    cap = 'מעל היעד (' + fmt(target) + ') — אזור זהירות, עדיין בטווח קיטו';
+    cap = t('meter.overTarget', { target: fmt(target) });
   } else if (total <= maxr) {
     color = mix(COL_RED1, COL_RED2, (total - redStart) / (maxr - redStart));
-    cap = 'אזור אדום — נשארו ' + fmt(maxr - total) + ' גרם עד חריגה (' + fmt(maxr) + ')';
+    cap = t('meter.redZone', { left: fmt(maxr - total), max: fmt(maxr) });
   } else {
     color = hex(COL_REDX);
-    cap = 'חריגה — מעל ' + fmt(maxr) + ' גרם פחמימות נטו';
+    cap = t('meter.exceeded', { max: fmt(maxr) });
   }
   return { pct, color, cap };
 }

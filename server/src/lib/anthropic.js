@@ -30,54 +30,109 @@ export const CHAT_MODEL = () => process.env.CHAT_MODEL || 'claude-opus-4-8';
 // appends its own output-format instruction (below), so there is no need to
 // strip a baked-in format back off — the meal/image/barcode shapes stay distinct
 // and explicit. Ported from keto-log.html; products injected as context.
-export function ketoRules(products = []) {
+// `lang` ('he' | 'en') selects the language of the prompt AND of any free-text
+// the model returns (the JSON *keys* are always English — see the format specs).
+export function ketoRules(products = [], lang = 'he') {
   let base =
-    'אתה מומחה/ית התזונה הקטוגנית הטוב/ה בעולם — דיאטן/ית קליני/ת עם דיוק של מעבדה. ' +
-    'העריך/י בדיוק הגבוה ביותר האפשרי עבור הכמויות המתוארות: (1) פחמימות נטו בגרמים, (2) שומן בגרמים, (3) חלבון בגרמים. ' +
-    'בסס/י על ידע תזונתי מעמיק (כמו USDA ותוויות יצרן ישראליות), חשב/י לפי המרכיבים והכמויות בפועל, ושקלל/י את שיטת ההכנה. ' +
-    'אם הכמות לא ברורה — הנח/י מנה בינונית סבירה, ועדיף לדייק בהיגיון מאשר להמציא דיוק מזויף. ' +
-    'פחמימות נטו = סך הפחמימות, פחות סיבים תזונתיים (אינם הופכים לגלוקוז), פחות אריתריטול ואלולוז (אינם מעלים סוכר בדם). ' +
-    'ממתיקים סטיביה/טרוביה = 0 פחמימות. מלטיטול או כוהל סוכר אחר שמעלה סוכר חלקית — ספור כמחצית מערכו. ' +
-    'בשר/דג/ביצים = 0 פחמימות; שמן וחמאה = 0 פחמימות וגם 0 חלבון; גבינות קשות מיושנות ≈ 0 פחמימות; ' +
-    'אם כמות לא צוינה, הנח מנה בינונית סבירה. ' +
-    // Consistency + portion scaling: the same base food must always map to the same
-    // per-unit reference, and size/fraction words scale it linearly — so "half" can
-    // never come out larger than the "whole" of the same food.
-    'עקביות מחייבת: לאותו מאכל בסיסי השתמש/י תמיד באותו ערך ייחוס קבוע ליחידה שלמה (למשל מלפפון בינוני, ביצה L), ' +
-    'ללא תלות בארוחה או בניסוח. מילות כמות וגודל משנות את הערך באופן ליניארי מתוך אותו ערך בסיס: ' +
-    '"חצי" = מחצית הערך, "רבע" = רבע, "שלם"/"שלמה" = יחידה מלאה, "גדול" / "קטן" ביחס למנה בינונית. ' +
-    'לכן מנה חלקית של מאכל לעולם אינה יכולה להיות גדולה ממנה שלמה של אותו מאכל — בדוק/י זאת לפני התשובה.';
+    lang === 'en'
+      ? 'You are the world’s best ketogenic-nutrition expert — a clinical dietitian with lab-grade precision. ' +
+        'Estimate as accurately as possible for the described amounts: (1) net carbs in grams, (2) fat in grams, (3) protein in grams. ' +
+        'Base it on deep nutritional knowledge (e.g. USDA and manufacturer labels), compute from the actual ingredients and amounts, and account for the preparation method. ' +
+        'If the amount is unclear, assume a reasonable medium portion — better a sensible estimate than fake precision. ' +
+        'Net carbs = total carbohydrates, minus dietary fiber (does not turn into glucose), minus erythritol and allulose (do not raise blood sugar). ' +
+        'Stevia/truvia sweeteners = 0 carbs. Maltitol or other sugar alcohols that partially raise blood sugar — count as half their value. ' +
+        'Meat/fish/eggs = 0 carbs; oil and butter = 0 carbs and 0 protein; aged hard cheeses ≈ 0 carbs; ' +
+        'if no amount is given, assume a reasonable medium portion. ' +
+        'Consistency is required: for the same base food always use the same fixed per-whole-unit reference (e.g. a medium cucumber, a large egg), ' +
+        'regardless of the meal or the wording. Quantity and size words scale that value linearly from the same base: ' +
+        '"half" = half the value, "quarter" = a quarter, "whole" = a full unit, "large"/"small" relative to a medium portion. ' +
+        'So a partial portion of a food can never be larger than a whole portion of the same food — verify this before answering.'
+      : 'אתה מומחה/ית התזונה הקטוגנית הטוב/ה בעולם — דיאטן/ית קליני/ת עם דיוק של מעבדה. ' +
+        'העריך/י בדיוק הגבוה ביותר האפשרי עבור הכמויות המתוארות: (1) פחמימות נטו בגרמים, (2) שומן בגרמים, (3) חלבון בגרמים. ' +
+        'בסס/י על ידע תזונתי מעמיק (כמו USDA ותוויות יצרן ישראליות), חשב/י לפי המרכיבים והכמויות בפועל, ושקלל/י את שיטת ההכנה. ' +
+        'אם הכמות לא ברורה — הנח/י מנה בינונית סבירה, ועדיף לדייק בהיגיון מאשר להמציא דיוק מזויף. ' +
+        'פחמימות נטו = סך הפחמימות, פחות סיבים תזונתיים (אינם הופכים לגלוקוז), פחות אריתריטול ואלולוז (אינם מעלים סוכר בדם). ' +
+        'ממתיקים סטיביה/טרוביה = 0 פחמימות. מלטיטול או כוהל סוכר אחר שמעלה סוכר חלקית — ספור כמחצית מערכו. ' +
+        'בשר/דג/ביצים = 0 פחמימות; שמן וחמאה = 0 פחמימות וגם 0 חלבון; גבינות קשות מיושנות ≈ 0 פחמימות; ' +
+        'אם כמות לא צוינה, הנח מנה בינונית סבירה. ' +
+        // Consistency + portion scaling: the same base food must always map to the same
+        // per-unit reference, and size/fraction words scale it linearly — so "half" can
+        // never come out larger than the "whole" of the same food.
+        'עקביות מחייבת: לאותו מאכל בסיסי השתמש/י תמיד באותו ערך ייחוס קבוע ליחידה שלמה (למשל מלפפון בינוני, ביצה L), ' +
+        'ללא תלות בארוחה או בניסוח. מילות כמות וגודל משנות את הערך באופן ליניארי מתוך אותו ערך בסיס: ' +
+        '"חצי" = מחצית הערך, "רבע" = רבע, "שלם"/"שלמה" = יחידה מלאה, "גדול" / "קטן" ביחס למנה בינונית. ' +
+        'לכן מנה חלקית של מאכל לעולם אינה יכולה להיות גדולה ממנה שלמה של אותו מאכל — בדוק/י זאת לפני התשובה.';
 
   if (products.length) {
     base +=
-      ' חשוב: למשתמש יש מוצרים קבועים. אם הם מופיעים — גם בקיצור או בשם הכינוי — השתמש בדיוק בערכים האלה לכל יחידה, ואל תניח מוצר גנרי: ' +
-      products
-        .map(
-          (p) =>
-            `"${p.key}" = ${p.label}, ל${p.unit}: ${p.carbs} פחמ' נטו / ${p.fat} שומן / ${p.protein} חלבון`
-        )
-        .join('; ') +
-      '.';
+      lang === 'en'
+        ? ' Important: the user has saved products. If any appear — even by an abbreviation or nickname — use these exact per-unit values and do not assume a generic product: ' +
+          products
+            .map((p) => `"${p.key}" = ${p.label}, per ${p.unit}: ${p.carbs} net carbs / ${p.fat} fat / ${p.protein} protein`)
+            .join('; ') +
+          '.'
+        : ' חשוב: למשתמש יש מוצרים קבועים. אם הם מופיעים — גם בקיצור או בשם הכינוי — השתמש בדיוק בערכים האלה לכל יחידה, ואל תניח מוצר גנרי: ' +
+          products
+            .map(
+              (p) =>
+                `"${p.key}" = ${p.label}, ל${p.unit}: ${p.carbs} פחמ' נטו / ${p.fat} שומן / ${p.protein} חלבון`
+            )
+            .join('; ') +
+          '.';
   }
 
   return base;
 }
 
 // ---- per-task output-format instructions (appended after ketoRules) --------
-const MEAL_FORMAT =
-  ' פרק/י את הארוחה לפריטים נפרדים בדיוק כפי שנרשמו — אל תאחד/י פריטים זהים. ' +
-  'אם הפריט נכתב כמה פעמים (למשל "נקניקיה, נקניקיה, נקניקיה"), החזר/י שורה נפרדת לכל מופע, ולא פריט אחד עם כמות. ' +
-  'לכל פריט ציין/י את הערכים ל‏יחידה אחת, ואת מספר היחידות (qty) רק כאשר המשתמש ציין במפורש כמות לאותה שורה ' +
-  '(למשל "3 ביצים" = qty=3); אחרת qty=1. היחידה (unit) תהיה בלשון יחיד וקצרה ' +
-  '(למשל "נקניקיה", "פרוסה", "כף", "ביצה", "מנה"). net_carbs/fat/protein הם סך הכל לכל הארוחה, ' +
-  'וחייבים להיות שווים לסכום של qty×ערך-ליחידה על פני כל הפריטים. ' +
-  ' השב/י אך ורק ב-JSON תקין בפורמט: ' +
-  '{"items": [{"name": "<שם הפריט>", "qty": <מספר היחידות>, "unit": "<יחידה ביחיד>", ' +
-  '"carbs": <פחמ\' נטו ליחידה>, "fat": <שומן ליחידה>, "protein": <חלבון ליחידה>}], ' +
-  '"net_carbs": <סך פחמ\' נטו>, "fat": <סך שומן>, "protein": <סך חלבון>}' +
-  ' ללא שום טקסט נוסף וללא סימוני markdown.';
+// The JSON keys are identical in both languages (so parseJsonReply / normalize*
+// never depend on language); only the instruction text and the free-text
+// `breakdown`/`name`/`label` VALUES switch to the requested language.
+function mealFormat(lang = 'he') {
+  if (lang === 'en') {
+    return (
+      ' Break the meal into separate items exactly as written — do not merge identical items. ' +
+      'If an item is written several times (e.g. "sausage, sausage, sausage"), return a separate row for each occurrence, not one item with a quantity. ' +
+      'For each item give the values for ONE unit, and set the unit count (qty) only when the user explicitly stated a quantity for that row ' +
+      '(e.g. "3 eggs" = qty=3); otherwise qty=1. The unit must be singular and short ' +
+      '(e.g. "sausage", "slice", "tbsp", "egg", "serving"). net_carbs/fat/protein are the totals for the whole meal, ' +
+      'and must equal the sum of qty×per-unit-value across all items. ' +
+      ' Respond only with valid JSON in the format: ' +
+      '{"items": [{"name": "<item name>", "qty": <unit count>, "unit": "<singular unit>", ' +
+      '"carbs": <net carbs per unit>, "fat": <fat per unit>, "protein": <protein per unit>}], ' +
+      '"net_carbs": <total net carbs>, "fat": <total fat>, "protein": <total protein>}' +
+      ' with no extra text and no markdown. Write all names and units in English.'
+    );
+  }
+  return (
+    ' פרק/י את הארוחה לפריטים נפרדים בדיוק כפי שנרשמו — אל תאחד/י פריטים זהים. ' +
+    'אם הפריט נכתב כמה פעמים (למשל "נקניקיה, נקניקיה, נקניקיה"), החזר/י שורה נפרדת לכל מופע, ולא פריט אחד עם כמות. ' +
+    'לכל פריט ציין/י את הערכים ל‏יחידה אחת, ואת מספר היחידות (qty) רק כאשר המשתמש ציין במפורש כמות לאותה שורה ' +
+    '(למשל "3 ביצים" = qty=3); אחרת qty=1. היחידה (unit) תהיה בלשון יחיד וקצרה ' +
+    '(למשל "נקניקיה", "פרוסה", "כף", "ביצה", "מנה"). net_carbs/fat/protein הם סך הכל לכל הארוחה, ' +
+    'וחייבים להיות שווים לסכום של qty×ערך-ליחידה על פני כל הפריטים. ' +
+    ' השב/י אך ורק ב-JSON תקין בפורמט: ' +
+    '{"items": [{"name": "<שם הפריט>", "qty": <מספר היחידות>, "unit": "<יחידה ביחיד>", ' +
+    '"carbs": <פחמ\' נטו ליחידה>, "fat": <שומן ליחידה>, "protein": <חלבון ליחידה>}], ' +
+    '"net_carbs": <סך פחמ\' נטו>, "fat": <סך שומן>, "protein": <סך חלבון>}' +
+    ' ללא שום טקסט נוסף וללא סימוני markdown. כתוב/י את שמות הפריטים והיחידות בעברית.'
+  );
+}
 
-function imageFormat(unit) {
+function imageFormat(unit, lang = 'he') {
+  if (lang === 'en') {
+    const unitRule = unit ? ` The requested unit is "${unit}".` : '';
+    return (
+      ' Identify the product in the image and read the nutrition-facts table if present.' +
+      ' Return the values for the whole package/product in the image (not per 100 g), and separately state how many units of the requested type you estimate are in the package' +
+      ' (if the image shows a division into rows/squares — count them; otherwise estimate by the size and type of product).' +
+      unitRule +
+      ' Respond only with valid JSON: {"name": "<short nickname>", "label": "<full description>", "unit": "<the unit>", ' +
+      '"pack_net_carbs": <for the whole package>, "pack_fat": <for the whole package>, "pack_protein": <for the whole package>, ' +
+      '"units_per_pack": <estimated units per package>, "breakdown": "<short breakdown including package size>"} ' +
+      'with no extra text and no markdown. Write name/label/breakdown in English.'
+    );
+  }
   const unitRule = unit ? ` היחידה המבוקשת היא "${unit}".` : '';
   return (
     ' זהה את המוצר בתמונה וקרא את טבלת הערכים התזונתיים אם קיימת.' +
@@ -91,7 +146,20 @@ function imageFormat(unit) {
   );
 }
 
-function barcodeFormat(unit, fiberNote) {
+function barcodeFormat(unit, fiberNote, lang = 'he') {
+  if (lang === 'en') {
+    const unitRule = unit ? ` The requested unit is "${unit}".` : '';
+    return (
+      ' Below is data for a packaged product scanned by barcode, from the Open Food Facts database.' +
+      ' Compute net carbs per the keto rules above (subtract fiber; erythritol/allulose = 0; maltitol = half).' +
+      fiberNote +
+      ' Return values per 100 g unless the user requested a different unit.' +
+      unitRule +
+      ' Respond only with valid JSON: {"name": "<short nickname>", "label": "<full description including brand>", ' +
+      '"unit": "<the unit, default \\"100 g\\">", "net_carbs": <number>, "fat": <number>, ' +
+      '"protein": <number>, "breakdown": "<short breakdown in English>"} with no extra text and no markdown.'
+    );
+  }
   const unitRule = unit ? ` היחידה המבוקשת היא "${unit}".` : '';
   return (
     ' להלן נתוני מוצר ארוז שנסרק לפי ברקוד, מתוך מסד הנתונים Open Food Facts.' +
@@ -208,10 +276,11 @@ const normalizeBarcode = (r) => ({
 });
 
 export async function estimateMeal(desc, products = [], ctx = {}) {
+  const lang = ctx.lang === 'en' ? 'en' : 'he';
   const message = await getClient().messages.create({
     model: MODEL(),
     max_tokens: 5000,
-    system: ketoRules(products) + MEAL_FORMAT,
+    system: ketoRules(products, lang) + mealFormat(lang),
     messages: [{ role: 'user', content: desc }],
   });
   recordAnthropicUsage({ userId: ctx.userId, kind: 'estimate_meal', model: MODEL(), usage: message.usage });
@@ -219,19 +288,21 @@ export async function estimateMeal(desc, products = [], ctx = {}) {
 }
 
 export async function estimateImage(b64, mediaType, unit, products = [], ctx = {}) {
+  const lang = ctx.lang === 'en' ? 'en' : 'he';
+  const userText =
+    lang === 'en'
+      ? 'Identify the product. If a label or nutrition-facts table is visible — read it and base the whole-package calculation on it.'
+      : 'זהה את המוצר. אם מופיעה תווית או טבלת ערכים תזונתיים — קרא אותה ובסס עליה את החישוב לאריזה השלמה.';
   const message = await getClient().messages.create({
     model: MODEL(),
     max_tokens: 5000,
-    system: ketoRules(products) + imageFormat(unit),
+    system: ketoRules(products, lang) + imageFormat(unit, lang),
     messages: [
       {
         role: 'user',
         content: [
           { type: 'image', source: { type: 'base64', media_type: mediaType, data: b64 } },
-          {
-            type: 'text',
-            text: 'זהה את המוצר. אם מופיעה תווית או טבלת ערכים תזונתיים — קרא אותה ובסס עליה את החישוב לאריזה השלמה.',
-          },
+          { type: 'text', text: userText },
         ],
       },
     ],
@@ -245,29 +316,47 @@ export async function estimateImage(b64, mediaType, unit, products = [], ctx = {
 // normalizes the messy entry into our product shape. When fiber is missing it
 // estimates it from the known product, so the scan still produces a usable value.
 export async function interpretBarcode(off, unit, products = [], ctx = {}) {
-  const fmtNum = (v) => (v == null ? 'לא ידוע' : String(v));
-  const facts = [
-    off.name && `שם: ${off.name}`,
-    off.brands && `מותג: ${off.brands}`,
-    off.quantity && `גודל אריזה: ${off.quantity}`,
-    off.servingSize && `גודל מנה: ${off.servingSize}`,
-    `ערכים ל-100 גרם — פחמימות: ${fmtNum(off.per100.carbs)}, סיבים: ${fmtNum(
-      off.per100.fiber
-    )}, סוכרים: ${fmtNum(off.per100.sugars)}, כוהלי סוכר (פוליאולים): ${fmtNum(
-      off.per100.polyols
-    )}, שומן: ${fmtNum(off.per100.fat)}, חלבון: ${fmtNum(off.per100.protein)}`,
-  ]
-    .filter(Boolean)
-    .join('\n');
+  const lang = ctx.lang === 'en' ? 'en' : 'he';
+  const fmtNum = (v) => (v == null ? (lang === 'en' ? 'unknown' : 'לא ידוע') : String(v));
+  const facts =
+    lang === 'en'
+      ? [
+          off.name && `Name: ${off.name}`,
+          off.brands && `Brand: ${off.brands}`,
+          off.quantity && `Package size: ${off.quantity}`,
+          off.servingSize && `Serving size: ${off.servingSize}`,
+          `Per 100 g — carbs: ${fmtNum(off.per100.carbs)}, fiber: ${fmtNum(off.per100.fiber)}, sugars: ${fmtNum(
+            off.per100.sugars
+          )}, sugar alcohols (polyols): ${fmtNum(off.per100.polyols)}, fat: ${fmtNum(
+            off.per100.fat
+          )}, protein: ${fmtNum(off.per100.protein)}`,
+        ]
+          .filter(Boolean)
+          .join('\n')
+      : [
+          off.name && `שם: ${off.name}`,
+          off.brands && `מותג: ${off.brands}`,
+          off.quantity && `גודל אריזה: ${off.quantity}`,
+          off.servingSize && `גודל מנה: ${off.servingSize}`,
+          `ערכים ל-100 גרם — פחמימות: ${fmtNum(off.per100.carbs)}, סיבים: ${fmtNum(
+            off.per100.fiber
+          )}, סוכרים: ${fmtNum(off.per100.sugars)}, כוהלי סוכר (פוליאולים): ${fmtNum(
+            off.per100.polyols
+          )}, שומן: ${fmtNum(off.per100.fat)}, חלבון: ${fmtNum(off.per100.protein)}`,
+        ]
+          .filter(Boolean)
+          .join('\n');
 
   const fiberNote =
     off.per100.fiber == null
-      ? ' שים לב: ערך הסיבים חסר במסד הנתונים — הערך אותו לפי סוג המוצר הידוע, וציין בפירוט שהסיבים הוערכו.'
+      ? lang === 'en'
+        ? ' Note: the fiber value is missing from the database — estimate it by the known product type, and note in the breakdown that fiber was estimated.'
+        : ' שים לב: ערך הסיבים חסר במסד הנתונים — הערך אותו לפי סוג המוצר הידוע, וציין בפירוט שהסיבים הוערכו.'
       : '';
   const message = await getClient().messages.create({
     model: MODEL(),
     max_tokens: 5000,
-    system: ketoRules(products) + barcodeFormat(unit, fiberNote),
+    system: ketoRules(products, lang) + barcodeFormat(unit, fiberNote, lang),
     messages: [{ role: 'user', content: facts }],
   });
   recordAnthropicUsage({ userId: ctx.userId, kind: 'barcode', model: MODEL(), usage: message.usage });

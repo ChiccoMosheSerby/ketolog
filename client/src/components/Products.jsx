@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../lib/api.js';
 import { useToast } from '../lib/toast.jsx';
 import { fmt } from '../lib/helpers.js';
@@ -10,6 +11,7 @@ const BarcodeScanner = lazy(() => import('./BarcodeScanner.jsx'));
 const CameraCapture = lazy(() => import('./CameraCapture.jsx'));
 
 export default function Products({ products, onAdd, onRename, onDelete, compact }) {
+  const { t } = useTranslation();
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState(null); // product being renamed inline
@@ -39,13 +41,13 @@ export default function Products({ products, onAdd, onRename, onDelete, compact 
 
   async function submit() {
     if (!form.key.trim()) {
-      toast('תן/י שם למוצר');
+      toast(t('products.nameProduct'));
       return;
     }
     await onAdd({
       key: form.key.trim(),
       label: form.label.trim() || form.key.trim(),
-      unit: form.unit.trim() || 'מנה',
+      unit: form.unit.trim() || t('products.defaultUnit'),
       carbs: Number(form.carb) || 0,
       fat: Number(form.fat) || 0,
       protein: Number(form.prot) || 0,
@@ -53,7 +55,7 @@ export default function Products({ products, onAdd, onRename, onDelete, compact 
     });
     setForm({ key: '', label: '', unit: '', perPack: '', carb: '', fat: '', prot: '', image: '' });
     setNote(null);
-    toast('המוצר נוסף');
+    toast(t('products.productAdded'));
   }
 
   function startEdit(p) {
@@ -63,7 +65,7 @@ export default function Products({ products, onAdd, onRename, onDelete, compact 
   async function saveEdit(id) {
     const name = editName.trim();
     if (!name) {
-      toast('תן/י שם למוצר');
+      toast(t('products.nameProduct'));
       return;
     }
     await onRename(id, name);
@@ -86,7 +88,7 @@ export default function Products({ products, onAdd, onRename, onDelete, compact 
     if (!file) return;
     const mt = file.type || 'image/jpeg';
     if (!/^image\/(jpeg|png|gif|webp)$/.test(mt)) {
-      toast('פורמט נתמך: JPG, PNG, GIF, WEBP');
+      toast(t('products.unsupportedFormat'));
       e.target.value = '';
       return;
     }
@@ -117,7 +119,7 @@ export default function Products({ products, onAdd, onRename, onDelete, compact 
       const next = {
         key: r.name || form.key,
         label: r.label || r.name || form.label,
-        unit: typedUnit || r.unit || 'יחידה',
+        unit: typedUnit || r.unit || t('products.defaultUnitSingle'),
         perPack: !form.perPack && per > 1 ? String(per) : form.perPack,
         carb: isNaN(c) ? '' : fmt(c),
         fat: isNaN(f) ? '' : fmt(f),
@@ -125,16 +127,21 @@ export default function Products({ products, onAdd, onRename, onDelete, compact 
       };
       // keep the thumbnail captured above (its setState may race this one)
       setForm((prev) => ({ ...next, image: prev.image }));
-      const src = userPP > 0 ? 'לפי הכמות שציינת' : modelPP > 0 ? 'הערכה אוטומטית' : 'אריזה שלמה';
+      const src = userPP > 0 ? t('products.srcByQuantity') : modelPP > 0 ? t('products.srcAutoEstimate') : t('products.srcFullPack');
       setNote({
-        name: r.name || 'מוצר',
-        line: `ל${next.unit} (מתוך ${fmt(per)} באריזה · ${src}): ${next.carb || '?'} פחמ' · ${
-          next.fat || '?'
-        } שומן · ${next.prot || '?'} חלבון`,
+        name: r.name || t('products.defaultProductName'),
+        line: t('products.estimateLine', {
+          unit: next.unit,
+          per: fmt(per),
+          src,
+          carb: next.carb || '?',
+          fat: next.fat || '?',
+          prot: next.prot || '?',
+        }),
         breakdown: r.breakdown,
       });
     } catch {
-      setNote({ error: 'לא הצלחתי לזהות מהתמונה — נסה תמונה ברורה יותר או הזן ידנית.' });
+      setNote({ error: t('products.imageError') });
     } finally {
       setImgBusy(false);
     }
@@ -148,7 +155,7 @@ export default function Products({ products, onAdd, onRename, onDelete, compact 
     if (!code) return;
     const typedUnit = form.unit.trim();
     setBarBusy(true);
-    setNote({ loading: true, loadingText: `מחפש ברקוד ${code} במסד הנתונים…` });
+    setNote({ loading: true, loadingText: t('products.searchingBarcode', { code }) });
     try {
       const r = await api.scanBarcode(code, typedUnit);
       const c = Number(r.net_carbs),
@@ -158,7 +165,7 @@ export default function Products({ products, onAdd, onRename, onDelete, compact 
         ...form,
         key: r.name || form.key,
         label: r.label || r.name || form.label,
-        unit: typedUnit || r.unit || '100 גרם',
+        unit: typedUnit || r.unit || t('products.default100g'),
         carb: isNaN(c) ? '' : fmt(c),
         fat: isNaN(f) ? '' : fmt(f),
         prot: isNaN(p) ? '' : fmt(p),
@@ -166,20 +173,24 @@ export default function Products({ products, onAdd, onRename, onDelete, compact 
       setForm(next);
       const src =
         r.source === 'off'
-          ? 'ממסד הנתונים'
+          ? t('products.srcDatabase')
           : r.source === 'off+ai'
-          ? 'מסד נתונים + השלמת AI (סיבים חסרו)'
-          : 'הערכה';
+          ? t('products.srcDatabaseAi')
+          : t('products.srcEstimate');
       setNote({
-        name: r.name || 'מוצר',
-        line: `ל${next.unit} (${src}): ${next.carb || '?'} פחמ' · ${next.fat || '?'} שומן · ${
-          next.prot || '?'
-        } חלבון`,
+        name: r.name || t('products.defaultProductName'),
+        line: t('products.barcodeLine', {
+          unit: next.unit,
+          src,
+          carb: next.carb || '?',
+          fat: next.fat || '?',
+          prot: next.prot || '?',
+        }),
         breakdown: r.breakdown,
       });
     } catch (err) {
-      const msg = err?.message && err.message !== 'שגיאה' ? err.message : 'הסריקה נכשלה';
-      setNote({ error: `${msg} — אפשר לצלם את האריזה או להזין ידנית.` });
+      const msg = err?.message && err.message !== t('common.error') ? err.message : t('products.scanFailed');
+      setNote({ error: t('products.scanError', { msg }) });
     } finally {
       setBarBusy(false);
     }
@@ -203,24 +214,23 @@ export default function Products({ products, onAdd, onRename, onDelete, compact 
           />
         </Suspense>
       )}
-      <h2>המוצרים שלי</h2>
+      <h2>{t('products.title')}</h2>
       <div className="phelp" style={{ fontSize: 12, color: 'var(--ink-soft)', margin: '-8px 0 12px' }}>
-        מוצרים קבועים שלך. הם מופיעים כתגיות מתחת לתיבת הפירוט — קליק מוסיף אותם לתיאור הארוחה, ואז
-        מחשבים ורושמים. גם כשתכתוב אותם בפירוט, החישוב יזהה אותם.
+        {t('products.help')}
       </div>
 
       <div className="prod-actions">
         <div className="prod-dd" ref={ddRef}>
           <button className={'prod-toggle' + (open ? ' open' : '')} onClick={() => setOpen(!open)}>
             <span className="chev"></span>
-            <span>{open ? 'הסתר את רשימת המוצרים' : 'הצג את רשימת המוצרים'}</span>
+            <span>{open ? t('products.hideList') : t('products.showList')}</span>
             <span className="pcount">{products.length}</span>
           </button>
           {open && (
             <div id="prodList">
               {products.length === 0 ? (
                 <div style={{ fontSize: 12, color: 'var(--ink-soft)', padding: '6px 0' }}>
-                  אין מוצרים שמורים עדיין.
+                  {t('products.emptyList')}
                 </div>
               ) : (
                 products.map((p) => (
@@ -248,24 +258,29 @@ export default function Products({ products, onAdd, onRename, onDelete, compact 
                         </div>
                       )}
                       <div className="pmeta">
-                        ל{p.unit}: {fmt(p.carbs)} פחמ' · {fmt(p.fat)} שומן · {fmt(p.protein)} חלבון
+                        {t('products.productMeta', {
+                          unit: p.unit,
+                          carbs: fmt(p.carbs),
+                          fat: fmt(p.fat),
+                          protein: fmt(p.protein),
+                        })}
                       </div>
                     </div>
                     {editId === p._id ? (
                       <>
-                        <button className="pedit" title="שמור" onClick={() => saveEdit(p._id)}>
+                        <button className="pedit" title={t('common.save')} onClick={() => saveEdit(p._id)}>
                           ✓
                         </button>
-                        <button className="pdel" title="ביטול" onClick={() => setEditId(null)}>
+                        <button className="pdel" title={t('common.cancel')} onClick={() => setEditId(null)}>
                           ✕
                         </button>
                       </>
                     ) : (
                       <>
-                        <button className="pedit" title="ערוך שם" onClick={() => startEdit(p)}>
+                        <button className="pedit" title={t('products.editName')} onClick={() => startEdit(p)}>
                           ✎
                         </button>
-                        <button className="pdel" title="מחק" onClick={() => onDelete(p._id)}>
+                        <button className="pdel" title={t('common.delete')} onClick={() => onDelete(p._id)}>
                           ✕
                         </button>
                       </>
@@ -283,13 +298,13 @@ export default function Products({ products, onAdd, onRename, onDelete, compact 
             data-tour="barcode"
             onClick={() => setScanning(true)}
           >
-            {barBusy ? 'מחפש…' : 'ברקוד'}
+            {barBusy ? t('products.searching') : t('products.barcode')}
           </button>
           <button className="btn ghost" disabled={busy} onClick={() => setCapturing(true)}>
-            {imgBusy ? 'מזהה…' : '📷 צילום'}
+            {imgBusy ? t('products.recognizing') : t('products.photo')}
           </button>
           <button className="btn ghost" disabled={busy} onClick={pickImage}>
-            {imgBusy ? 'מזהה…' : '🖼️ תמונה'}
+            {imgBusy ? t('products.recognizing') : t('products.image')}
           </button>
           <input
             type="file"
@@ -306,11 +321,11 @@ export default function Products({ products, onAdd, onRename, onDelete, compact 
           <div className="calc-note">
             {note.loading &&
               (note.loadingText ||
-                (note.unit ? `מזהה ומחשב ל"${note.unit}"…` : 'מזהה את המוצר בתמונה…'))}
+                (note.unit ? t('products.recognizingUnit', { unit: note.unit }) : t('products.recognizingImage')))}
             {note.error}
             {note.name && (
               <>
-                <strong>זוהה: {note.name}</strong>
+                <strong>{t('products.recognized', { name: note.name })}</strong>
                 <span className="bd">
                   <br />
                   {note.line}
@@ -328,15 +343,15 @@ export default function Products({ products, onAdd, onRename, onDelete, compact 
 
         {form.image && (
           <div className="prod-img-preview">
-            <img src={form.image} alt="תצוגה מקדימה של המוצר" />
+            <img src={form.image} alt={t('products.imagePreviewAlt')} />
             <div className="pip-text">
-              <strong>תמונת המוצר</strong>
-              <span>תישמר ותוצג ברשימת המוצרים</span>
+              <strong>{t('products.productImage')}</strong>
+              <span>{t('products.imageWillBeSaved')}</span>
             </div>
             <button
               type="button"
               className="pip-x"
-              title="הסר תמונה"
+              title={t('products.removeImage')}
               onClick={() => setForm((f) => ({ ...f, image: '' }))}
             >
               ✕
@@ -346,35 +361,35 @@ export default function Products({ products, onAdd, onRename, onDelete, compact 
 
         <div className="row prod-fields">
           <div className="fld" style={{ flex: 2 }}>
-            <label>שם / כינוי</label>
-            <input placeholder="שוקולד" value={form.key} onChange={set('key')} />
+            <label>{t('products.nameLabel')}</label>
+            <input placeholder={t('products.namePlaceholder')} value={form.key} onChange={set('key')} />
           </div>
           <div className="fld" style={{ flex: 3 }}>
-            <label>תיאור מלא</label>
-            <input placeholder="שוקולד 62% עם אלולוז" value={form.label} onChange={set('label')} />
+            <label>{t('products.descriptionLabel')}</label>
+            <input placeholder={t('products.descriptionPlaceholder')} value={form.label} onChange={set('label')} />
           </div>
           <div className="fld">
-            <label>יחידה</label>
-            <input placeholder="שורה" value={form.unit} onChange={set('unit')} />
+            <label>{t('products.unitLabel')}</label>
+            <input placeholder={t('products.unitPlaceholder')} value={form.unit} onChange={set('unit')} />
           </div>
           <div className="fld">
-            <label>באריזה</label>
+            <label>{t('products.perPackLabel')}</label>
             <input type="number" step="1" min="1" placeholder="6" value={form.perPack} onChange={set('perPack')} />
           </div>
           <div className="fld">
-            <label>פחמ' נטו</label>
+            <label>{t('products.netCarbsLabel')}</label>
             <input type="number" step="0.1" placeholder="0" value={form.carb} onChange={set('carb')} />
           </div>
           <div className="fld">
-            <label>שומן</label>
+            <label>{t('products.fatLabel')}</label>
             <input type="number" step="0.1" placeholder="0" value={form.fat} onChange={set('fat')} />
           </div>
           <div className="fld">
-            <label>חלבון</label>
+            <label>{t('products.proteinLabel')}</label>
             <input type="number" step="0.1" placeholder="0" value={form.prot} onChange={set('prot')} />
           </div>
           <button className="btn" onClick={submit}>
-            הוסף מוצר
+            {t('products.addProduct')}
           </button>
         </div>
       </div>

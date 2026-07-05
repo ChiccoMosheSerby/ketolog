@@ -2,6 +2,7 @@ import { Router } from 'express';
 import Day from '../models/Day.js';
 import { requireAuth } from '../middleware/auth.js';
 import { asyncHandler } from '../lib/http.js';
+import { msg } from '../lib/i18n.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -31,7 +32,7 @@ router.patch('/:date/metrics', asyncHandler(async (req, res) => {
   const { date } = req.params;
   const { field, value } = req.body;
   const allowed = ['weight', 'run', 'abs', 'status'];
-  if (!allowed.includes(field)) return res.status(400).json({ error: 'שדה לא חוקי' });
+  if (!allowed.includes(field)) return res.status(400).json({ error: msg(req, 'שדה לא חוקי', 'Invalid field') });
   const day = await Day.findOneAndUpdate(
     { user: req.userId, date },
     { $set: { [`metrics.${field}`]: value }, $setOnInsert: { user: req.userId, date } },
@@ -80,7 +81,7 @@ router.delete('/:date/meals/:mealId', asyncHandler(async (req, res) => {
     { $pull: { meals: { _id: mealId } } },
     { new: true }
   );
-  if (!day) return res.status(404).json({ error: 'יום לא נמצא' });
+  if (!day) return res.status(404).json({ error: msg(req, 'יום לא נמצא', 'Day not found') });
   res.json(day);
 }));
 

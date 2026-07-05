@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../lib/auth.jsx';
 import { useMediaQuery, MOBILE_QUERY } from '../lib/useMediaQuery.js';
 import CarbRing from './CarbRing.jsx';
@@ -9,15 +10,16 @@ import './Header.scss';
 // The 3 live day summaries. `mini` shrinks them for the mobile top bar.
 // "Today so far" is a circular gauge of today's net carbs against the budget.
 function Stats({ stats, mini }) {
+  const { t } = useTranslation();
   return (
     <div className={'stats' + (mini ? ' stats-mini' : '')}>
       <div className="stat">
         <span className="num">{stats.avg}</span>
-        <span className="lab">ממוצע יומי (גרם נטו)</span>
+        <span className="lab">{t('header.avgDaily')}</span>
       </div>
       <div className="stat">
         <span className="num">{stats.days}</span>
-        <span className="lab">ימים מתועדים</span>
+        <span className="lab">{t('header.daysLogged')}</span>
       </div>
       <div className="stat stat-today" data-tour="carb-ring">
         <CarbRing
@@ -28,7 +30,7 @@ function Stats({ stats, mini }) {
         >
           <span className="ring-num">{stats.today}</span>
         </CarbRing>
-        <span className="lab">היום מתוך {stats.target}</span>
+        <span className="lab">{t('header.todayOutOf', { target: stats.target })}</span>
       </div>
     </div>
   );
@@ -38,9 +40,10 @@ function Stats({ stats, mini }) {
 // the footer (its header slot is taken by the compact products panel); on mobile
 // it stays in the drawer.
 export function TargetLegend() {
+  const { t } = useTranslation();
   return (
     <div className="target target-mini">
-      <div className="tt">היעד המאוזן בקיטו</div>
+      <div className="tt">{t('header.balancedKetoTarget')}</div>
       <div className="target-bar">
         <i style={{ width: '72%', background: 'var(--olive)' }}></i>
         <i style={{ width: '23%', background: 'var(--protein)' }}></i>
@@ -48,13 +51,13 @@ export function TargetLegend() {
       </div>
       <div className="target-legend">
         <span className="it">
-          <span className="dot" style={{ background: 'var(--olive)' }}></span>שומן <b>70–75%</b>
+          <span className="dot" style={{ background: 'var(--olive)' }}></span>{t('header.fat')} <b>70–75%</b>
         </span>
         <span className="it">
-          <span className="dot" style={{ background: 'var(--protein)' }}></span>חלבון <b>20–25%</b>
+          <span className="dot" style={{ background: 'var(--protein)' }}></span>{t('header.protein')} <b>20–25%</b>
         </span>
         <span className="it">
-          <span className="dot" style={{ background: 'var(--amber)' }}></span>פחמ' <b>5–10%</b>
+          <span className="dot" style={{ background: 'var(--amber)' }}></span>{t('header.carbsShort')} <b>5–10%</b>
         </span>
       </div>
     </div>
@@ -65,26 +68,28 @@ export function TargetLegend() {
 // Everything else (target, keto goal, WhatsApp, gender, theme, tour, export)
 // lives inside the settings modal now.
 function UserBar({ onOpenSettings, onOpenAdmin }) {
+  const { t } = useTranslation();
   const { user, logout } = useAuth();
   return (
     <div className="userbar">
       <span className="uemail">{user?.email}</span>
       {user?.isAdmin && (
-        <button className="btn ghost mini" onClick={onOpenAdmin} title="שימוש ועלויות">
-          💰 שימוש
+        <button className="btn ghost mini" onClick={onOpenAdmin} title={t('header.usageAndCosts')}>
+          💰 {t('header.usage')}
         </button>
       )}
-      <button className="btn ghost mini" onClick={onOpenSettings} title="הגדרות" data-tour="settings">
-        ⚙ הגדרות
+      <button className="btn ghost mini" onClick={onOpenSettings} title={t('header.settings')} data-tour="settings">
+        ⚙ {t('header.settings')}
       </button>
       <button className="btn ghost mini" onClick={logout}>
-        התנתק
+        {t('header.logout')}
       </button>
     </div>
   );
 }
 
 export default function Header({ stats, onExport }) {
+  const { t } = useTranslation();
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -132,7 +137,7 @@ export default function Header({ stats, onExport }) {
       <div className="mbar">
         <button
           className="hamburger"
-          aria-label="תפריט"
+          aria-label={t('header.menu')}
           aria-expanded={drawerOpen}
           data-tour="menu"
           onClick={() => setDrawerOpen(true)}
@@ -146,7 +151,7 @@ export default function Header({ stats, onExport }) {
 
       <div className={'drawer-scrim' + (drawerOpen ? ' show' : '')} onClick={() => setDrawerOpen(false)} />
       <aside className={'drawer' + (drawerOpen ? ' open' : '')} aria-hidden={!drawerOpen}>
-        <button className="drawer-close" aria-label="סגור" onClick={() => setDrawerOpen(false)}>
+        <button className="drawer-close" aria-label={t('header.close')} onClick={() => setDrawerOpen(false)}>
           ✕
         </button>
         <UserBar

@@ -1,4 +1,6 @@
 // Thin fetch wrapper. Stores the JWT in localStorage and attaches it to every request.
+import i18n from './i18n.js';
+
 const TOKEN_KEY = 'ketolog:token';
 
 export function getToken() {
@@ -9,8 +11,13 @@ export function setToken(t) {
   else localStorage.removeItem(TOKEN_KEY);
 }
 
-async function request(method, path, body) {
+// `langOverride` lets the caller pin the request language regardless of the
+// current UI language — used by register(), whose response language must follow
+// the sign-up form's selection before any account language exists (X-App-Lang
+// ordering). All other calls derive it from the active UI language.
+async function request(method, path, body, langOverride) {
   const headers = { 'Content-Type': 'application/json' };
+  headers['X-App-Lang'] = langOverride || i18n.language || 'he';
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(`/api${path}`, {
@@ -21,14 +28,15 @@ async function request(method, path, body) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     if (res.status === 401) setToken(null);
-    throw new Error(data.error || 'שגיאה');
+    throw new Error(data.error || i18n.t('common.error'));
   }
   return data;
 }
 
 export const api = {
   // auth
-  register: (email, password) => request('POST', '/auth/register', { email, password }),
+  register: (email, password, language) =>
+    request('POST', '/auth/register', { email, password, language }, language),
   login: (email, password) => request('POST', '/auth/login', { email, password }),
   forgotPassword: (email) => request('POST', '/auth/forgot-password', { email }),
   me: () => request('GET', '/auth/me'),

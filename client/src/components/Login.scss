@@ -62,7 +62,8 @@
 /* "Forgot password?" — a lighter, right-aligned link under the password field. */
 .auth-forgot {
   display: block;
-  margin: 10px 0 0 auto;
+  margin-block: 10px 0;
+  margin-inline: auto 0;
   background: none;
   border: none;
   color: var(--muted, #888);
@@ -72,5 +73,27 @@
   padding: 0;
   &:hover {
     text-decoration: underline;
+  }
+}
+
+/* Sign-up language toggle — two pill buttons, the active one highlighted. */
+.auth-lang {
+  display: flex;
+  gap: 8px;
+  button {
+    flex: 1;
+    padding: 9px 10px;
+    border: 1px solid var(--line, #2a332f);
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text, #e8efe9);
+    font-family: inherit;
+    font-size: 14px;
+    cursor: pointer;
+    &.on {
+      border-color: var(--brand, #149a5e);
+      background: color-mix(in srgb, var(--brand, #149a5e) 16%, transparent);
+      font-weight: 600;
+    }
   }
 }

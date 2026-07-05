@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import './CameraCapture.scss';
 
 // Live camera capture modal. Uses getUserMedia (works on desktop webcams and
-// mobile rear cameras) and grabs a frame to a canvas on "צלם". This is a real
+// mobile rear cameras) and grabs a frame to a canvas on "Capture". This is a real
 // photo capture — unlike <input capture>, which silently falls back to a file
 // picker on desktop. Portaled to <body> to escape the carousel's CSS transform.
 export default function CameraCapture({ onCapture, onClose, onUpload }) {
+  const { t } = useTranslation();
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const [status, setStatus] = useState('starting'); // starting | ready | error
@@ -24,7 +26,7 @@ export default function CameraCapture({ onCapture, onClose, onUpload }) {
 
     // getUserMedia only exists in a secure context (https or localhost).
     if (!navigator.mediaDevices?.getUserMedia) {
-      fail('המצלמה זמינה רק בחיבור מאובטח (https). אפשר להעלות תמונה במקום.');
+      fail(t('camera.secureContextError'));
       return;
     }
 
@@ -53,8 +55,8 @@ export default function CameraCapture({ onCapture, onClose, onUpload }) {
             const denied = err?.name === 'NotAllowedError' || err?.name === 'SecurityError';
             fail(
               denied
-                ? 'אין הרשאה למצלמה. אשר/י גישה בדפדפן, או העלה/י תמונה במקום.'
-                : 'לא נמצאה מצלמה זמינה. אפשר להעלות תמונה במקום.'
+                ? t('camera.deniedError')
+                : t('camera.noCameraError')
             );
           })
       );
@@ -93,15 +95,15 @@ export default function CameraCapture({ onCapture, onClose, onUpload }) {
     <div className="cam-overlay" role="dialog" aria-modal="true" onClick={onClose}>
       <div className="cam-modal" onClick={(e) => e.stopPropagation()}>
         <div className="cam-head">
-          <span>צילום מוצר</span>
-          <button className="cam-x" onClick={onClose} aria-label="סגור">
+          <span>{t('camera.title')}</span>
+          <button className="cam-x" onClick={onClose} aria-label={t('common.close')}>
             ✕
           </button>
         </div>
 
         <div className="cam-stage">
           <video ref={videoRef} className="cam-video" autoPlay muted playsInline />
-          {status === 'starting' && <div className="cam-hint">מפעיל מצלמה…</div>}
+          {status === 'starting' && <div className="cam-hint">{t('camera.starting')}</div>}
           {status === 'error' && <div className="cam-hint cam-err">{errMsg}</div>}
         </div>
 
@@ -116,16 +118,16 @@ export default function CameraCapture({ onCapture, onClose, onUpload }) {
                     onUpload();
                   }}
                 >
-                  🖼️ העלה תמונה
+                  🖼️ {t('camera.uploadImage')}
                 </button>
               )}
               <button className="btn ghost" onClick={onClose}>
-                סגור
+                {t('common.close')}
               </button>
             </>
           ) : (
             <button className="btn" onClick={capture} disabled={status !== 'ready'}>
-              📷 צלם
+              📷 {t('camera.capture')}
             </button>
           )}
         </div>

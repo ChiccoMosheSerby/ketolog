@@ -10,6 +10,7 @@
 // only after the user taps "add". The model is told it can only *propose*.
 import { getClient, CHAT_MODEL } from './anthropic.js';
 import { recordAnthropicUsage } from './usage.js';
+import { defaultCat, defaultUnit } from './i18n.js';
 import Day from '../models/Day.js';
 import Product from '../models/Product.js';
 import User from '../models/User.js';
@@ -21,12 +22,36 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
-async function getCarbTarget(userId) {
-  const u = await User.findById(userId).select('dailyCarbTarget').lean();
-  return u?.dailyCarbTarget ?? DEFAULT_TARGET;
+// Fetch both the carb target and the account language in one query — the chat
+// loop needs the language to pick the system prompt + proposal defaults.
+async function getChatContext(userId) {
+  const u = await User.findById(userId).select('dailyCarbTarget language').lean();
+  return {
+    target: u?.dailyCarbTarget ?? DEFAULT_TARGET,
+    lang: u?.language === 'en' ? 'en' : 'he',
+  };
 }
 
-const buildSystem = (target) => `אתה "קֶטוֹ", הדיאטן/ית הקטוגני/ת האישי/ת של המשתמש/ת באפליקציית KetoLog — יומן תזונה קטוגנית בעברית.
+const buildSystemEn = (target) => `You are "Keto", the user's personal ketogenic dietitian in the KetoLog app — a ketogenic food journal.
+
+Who you are: a top-tier expert in ketogenic nutrition and nutrition in general. You deeply understand metabolism, ketosis, insulin, macro- and micronutrients, fiber, sugar alcohols and sweeteners, as well as the practical side — products on the market, brands, restaurants, cooking and substitutes. You think like a real expert: not a shallow answer, but a deep analysis, explaining the "why" and reaching a clear, confident conclusion. Don't hesitate to give a decisive professional opinion when it's well-founded.
+
+Net-carb calculation rules (identical to the journal):
+- Net carbs = total carbohydrates, minus dietary fiber, minus erythritol and allulose.
+- Stevia/truvia = 0 carbs. Maltitol/other sugar alcohols — count as half their value.
+- Meat/fish/eggs = 0 carbs; oil and butter = 0 carbs and 0 protein; aged hard cheeses ≈ 0 carbs.
+- When you estimate values, use your best nutritional knowledge. If there's uncertainty, give a short range and a reasonable assumption — don't invent fake precision.
+- The user's personal daily target: under ${target} g net carbs per day. Always refer to this target (not a generic value) when computing how much is left or whether they've exceeded it.
+
+Working with the journal:
+- To see what's been logged — use the tools get_today_log, get_log, get_recent_days, list_products. Always check the actual data before answering "what did I eat", "how much do I have left today", or questions about trends — don't guess from memory.
+- You cannot write to the journal yourself. To add a meal use propose_meal, and to save a personal product use propose_product. These tools only *propose* — the user is shown a confirmation card and approves before it's saved.
+- Never say "I added" or "I saved". Say "I've prepared a proposal — approve it to save it to the journal".
+- When proposing a meal, compute the net carbs (and fat/protein if possible) and fill them into the proposal. If no date is given, use today's date.
+
+Style: speak English, warm and down-to-earth, but with real professional depth. Give as full and useful an answer as needed — explain the reasoning, offer concrete alternatives, and break down calculations when it helps. Don't cut short at the expense of usefulness, but don't pad with fluff either — every sentence should add value. Use markdown (lists, **bold**, short tables) to keep answers clear and easy to read.`;
+
+const buildSystemHe = (target) => `אתה "קֶטוֹ", הדיאטן/ית הקטוגני/ת האישי/ת של המשתמש/ת באפליקציית KetoLog — יומן תזונה קטוגנית בעברית.
 
 מי אתה: מומחה/ית ברמה הגבוהה ביותר לתזונה קטוגנית ולתזונה בכלל. אתה מבין/ה לעומק מטבוליזם, קטוזיס, אינסולין, מאקרו ומיקרו-נוטריינטים, סיבים, כוהלי סוכר וממתיקים, וגם את ההיבטים המעשיים — מוצרים בשוק הישראלי, מותגים, מסעדות, בישול ותחליפים. אתה חושב/ת כמו מומחה/ית אמיתי/ת: לא נותן/ת תשובה שטחית, אלא מנתח/ת לעומק, מסביר/ה את ה"למה", ומגיע/ה למסקנה ברורה ובטוחה. אל תהסס/י לתת דעה מקצועית חד-משמעית כשהיא מבוססת.
 
@@ -45,66 +70,104 @@ const buildSystem = (target) => `אתה "קֶטוֹ", הדיאטן/ית הקטו
 
 סגנון: דבר/י עברית, בחום ובגובה העיניים, אבל בעומק מקצועי אמיתי. תן/י תשובה מלאה ומועילה ככל שצריך — הסבר/י את ההיגיון, הצע/י חלופות קונקרטיות, ופרק/י חישובים כשזה עוזר. אל תקצר/י על חשבון התועלת, אבל גם אל תמלא/י במלל מיותר — כל משפט צריך להוסיף ערך. השתמש/י ב-markdown (רשימות, **הדגשה**, טבלאות קצרות) כדי שהתשובה תהיה ברורה וקלה לקריאה.`;
 
-const TOOLS = [
+const buildSystem = (target, lang) => (lang === 'en' ? buildSystemEn(target) : buildSystemHe(target));
+
+// Tool schema is localized so the model's understanding + example values match
+// the user's language (a Hebrew `cat` example would nudge English chats to emit
+// Hebrew categories). Tool *names* and property *keys* are language-independent.
+const T = (lang, he, en) => (lang === 'en' ? en : he);
+const buildTools = (lang) => [
   {
     name: 'get_today_log',
-    description: 'מחזיר את כל הארוחות והמדדים של היום הנוכחי, כולל סך הפחמימות נטו עד כה.',
+    description: T(
+      lang,
+      'מחזיר את כל הארוחות והמדדים של היום הנוכחי, כולל סך הפחמימות נטו עד כה.',
+      "Returns today's meals and metrics, including the net-carb total so far."
+    ),
     input_schema: { type: 'object', properties: {} },
   },
   {
     name: 'get_log',
-    description: 'מחזיר את היומן (ארוחות + מדדים) של תאריך מסוים.',
+    description: T(lang, 'מחזיר את היומן (ארוחות + מדדים) של תאריך מסוים.', 'Returns the journal (meals + metrics) for a given date.'),
     input_schema: {
       type: 'object',
-      properties: { date: { type: 'string', description: 'תאריך בפורמט YYYY-MM-DD' } },
+      properties: {
+        date: { type: 'string', description: T(lang, 'תאריך בפורמט YYYY-MM-DD', 'Date in YYYY-MM-DD format') },
+      },
       required: ['date'],
     },
   },
   {
     name: 'get_recent_days',
-    description: 'מחזיר סיכום של הימים האחרונים (תאריך, תווית, וסך פחמימות נטו ליום). שימושי לשאלות על מגמות וממוצעים.',
+    description: T(
+      lang,
+      'מחזיר סיכום של הימים האחרונים (תאריך, תווית, וסך פחמימות נטו ליום). שימושי לשאלות על מגמות וממוצעים.',
+      'Returns a summary of recent days (date, label, and net-carb total per day). Useful for questions about trends and averages.'
+    ),
     input_schema: {
       type: 'object',
-      properties: { limit: { type: 'number', description: 'כמה ימים אחרונים להחזיר (ברירת מחדל 7)' } },
+      properties: {
+        limit: { type: 'number', description: T(lang, 'כמה ימים אחרונים להחזיר (ברירת מחדל 7)', 'How many recent days to return (default 7)') },
+      },
     },
   },
   {
     name: 'list_products',
-    description: 'מחזיר את רשימת המוצרים האישיים השמורים של המשתמש/ת עם הערכים התזונתיים שלהם.',
+    description: T(
+      lang,
+      'מחזיר את רשימת המוצרים האישיים השמורים של המשתמש/ת עם הערכים התזונתיים שלהם.',
+      "Returns the user's saved personal products with their nutrition values."
+    ),
     input_schema: { type: 'object', properties: {} },
   },
   {
     name: 'propose_meal',
-    description:
+    description: T(
+      lang,
       'מציע להוסיף ארוחה ליומן. מציג למשתמש/ת כרטיסיית אישור. אינו שומר עד לאישור. מלא ערכים תזונתיים מחושבים.',
+      'Proposes adding a meal to the journal. Shows the user a confirmation card. Does not save until approved. Fill in computed nutrition values.'
+    ),
     input_schema: {
       type: 'object',
       properties: {
-        date: { type: 'string', description: 'YYYY-MM-DD. ברירת מחדל: היום' },
-        time: { type: 'string', description: 'שעה HH:MM (אופציונלי)' },
-        cat: { type: 'string', description: 'סוג הארוחה, למשל "ארוחת בוקר", "נשנוש / ביניים"' },
-        desc: { type: 'string', description: 'תיאור מה נאכל' },
-        net_carbs: { type: 'number', description: 'פחמימות נטו בגרמים' },
-        fat: { type: 'number', description: 'שומן בגרמים (אופציונלי)' },
-        protein: { type: 'number', description: 'חלבון בגרמים (אופציונלי)' },
+        date: { type: 'string', description: T(lang, 'YYYY-MM-DD. ברירת מחדל: היום', 'YYYY-MM-DD. Default: today') },
+        time: { type: 'string', description: T(lang, 'שעה HH:MM (אופציונלי)', 'Time HH:MM (optional)') },
+        cat: {
+          type: 'string',
+          description: T(
+            lang,
+            'סוג הארוחה, למשל "ארוחת בוקר", "נשנוש / ביניים"',
+            'Meal type, e.g. "Breakfast", "Snack / other"'
+          ),
+        },
+        desc: { type: 'string', description: T(lang, 'תיאור מה נאכל', 'Description of what was eaten') },
+        net_carbs: { type: 'number', description: T(lang, 'פחמימות נטו בגרמים', 'Net carbs in grams') },
+        fat: { type: 'number', description: T(lang, 'שומן בגרמים (אופציונלי)', 'Fat in grams (optional)') },
+        protein: { type: 'number', description: T(lang, 'חלבון בגרמים (אופציונלי)', 'Protein in grams (optional)') },
       },
       required: ['desc', 'net_carbs'],
     },
   },
   {
     name: 'propose_product',
-    description:
+    description: T(
+      lang,
       'מציע לשמור מוצר אישי. מציג למשתמש/ת כרטיסיית אישור. אינו שומר עד לאישור.',
+      'Proposes saving a personal product. Shows the user a confirmation card. Does not save until approved.'
+    ),
     input_schema: {
       type: 'object',
       properties: {
-        key: { type: 'string', description: 'שם קצר/כינוי למוצר' },
-        label: { type: 'string', description: 'תיאור מלא (אופציונלי)' },
-        unit: { type: 'string', description: 'יחידת מידה, למשל "מנה", "100 גרם", "כף"' },
-        cat: { type: 'string', description: 'קטגוריה (אופציונלי)' },
-        carbs: { type: 'number', description: 'פחמימות נטו ליחידה' },
-        fat: { type: 'number', description: 'שומן ליחידה (אופציונלי)' },
-        protein: { type: 'number', description: 'חלבון ליחידה (אופציונלי)' },
+        key: { type: 'string', description: T(lang, 'שם קצר/כינוי למוצר', 'Short name/nickname for the product') },
+        label: { type: 'string', description: T(lang, 'תיאור מלא (אופציונלי)', 'Full description (optional)') },
+        unit: {
+          type: 'string',
+          description: T(lang, 'יחידת מידה, למשל "מנה", "100 גרם", "כף"', 'Unit of measure, e.g. "serving", "100 g", "tbsp"'),
+        },
+        cat: { type: 'string', description: T(lang, 'קטגוריה (אופציונלי)', 'Category (optional)') },
+        carbs: { type: 'number', description: T(lang, 'פחמימות נטו ליחידה', 'Net carbs per unit') },
+        fat: { type: 'number', description: T(lang, 'שומן ליחידה (אופציונלי)', 'Fat per unit (optional)') },
+        protein: { type: 'number', description: T(lang, 'חלבון ליחידה (אופציונלי)', 'Protein per unit (optional)') },
       },
       required: ['key', 'carbs'],
     },
@@ -177,7 +240,7 @@ async function runReadTool(name, input, userId, target) {
 }
 
 // Normalize a proposal tool_use into the action card the client renders + commits.
-function buildAction(toolUseId, name, input) {
+function buildAction(toolUseId, name, input, lang = 'he') {
   if (name === 'propose_meal') {
     return {
       id: toolUseId,
@@ -186,7 +249,7 @@ function buildAction(toolUseId, name, input) {
       payload: {
         date: input.date || todayISO(),
         time: input.time || '',
-        cat: input.cat || 'נשנוש / ביניים',
+        cat: input.cat || defaultCat(lang),
         desc: input.desc || '',
         carbs: Number(input.net_carbs) || 0,
         fat: input.fat == null ? null : Number(input.fat),
@@ -202,8 +265,8 @@ function buildAction(toolUseId, name, input) {
     payload: {
       key: input.key || '',
       label: input.label || input.key || '',
-      unit: input.unit || 'מנה',
-      cat: input.cat || 'נשנוש / ביניים',
+      unit: input.unit || defaultUnit(lang),
+      cat: input.cat || defaultCat(lang),
       carbs: Number(input.carbs) || 0,
       fat: Number(input.fat) || 0,
       protein: Number(input.protein) || 0,
@@ -257,8 +320,9 @@ function withCacheBreakpoint(messages) {
 
 export async function runChatTurn(messages, userId) {
   const client = getClient();
-  const target = await getCarbTarget(userId);
-  const system = buildSystem(target);
+  const { target, lang } = await getChatContext(userId);
+  const system = buildSystem(target, lang);
+  const tools = buildTools(lang);
   const actions = [];
   let finalText = '';
 
@@ -270,7 +334,7 @@ export async function runChatTurn(messages, userId) {
       max_tokens: 8000,
       thinking: { type: 'adaptive' },
       system,
-      tools: TOOLS,
+      tools,
       messages: withCacheBreakpoint(messages),
     });
 
@@ -291,12 +355,14 @@ export async function runChatTurn(messages, userId) {
     const results = [];
     for (const tu of toolUses) {
       if (tu.name === 'propose_meal' || tu.name === 'propose_product') {
-        actions.push(buildAction(tu.id, tu.name, tu.input || {}));
+        actions.push(buildAction(tu.id, tu.name, tu.input || {}, lang));
         results.push({
           type: 'tool_result',
           tool_use_id: tu.id,
           content:
-            'הכרטיסייה הוצגה למשתמש/ת לאישור. ההצעה טרם נשמרה — אל תניח שהיא נשמרה. סכם בקצרה ובקש/י אישור.',
+            lang === 'en'
+              ? 'The confirmation card was shown to the user. The proposal has NOT been saved yet — do not assume it was. Summarize briefly and ask for approval.'
+              : 'הכרטיסייה הוצגה למשתמש/ת לאישור. ההצעה טרם נשמרה — אל תניח שהיא נשמרה. סכם בקצרה ובקש/י אישור.',
         });
       } else {
         let out;

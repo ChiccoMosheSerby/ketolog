@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../lib/api.js';
 import { useToast } from '../lib/toast.jsx';
 import { useAuth } from '../lib/auth.jsx';
@@ -37,6 +38,7 @@ const cleanMeal = (m) => ({
 
 export default function Diary() {
   const toast = useToast();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const insightsBadge = useInsightsBadge(user?.email || '');
@@ -60,10 +62,10 @@ export default function Diary() {
   const reload = useCallback(
     (firstLoad = false) =>
       Promise.all([api.getDays(), api.getProducts(), api.getTemplates()])
-        .then(([d, p, t]) => {
+        .then(([d, p, tpl]) => {
           setDays(d);
           setProducts(p);
-          setTemplates(t);
+          setTemplates(tpl);
           if (firstLoad && d.length) setExpanded(new Set([d[0].date])); // newest open by default
         })
         .catch((e) => toast(e.message)),
@@ -93,17 +95,17 @@ export default function Diary() {
     });
   }
 
-  // build a "יום N · <weekday>" label when a day is first created
+  // build a "Day N · <weekday>" label when a day is first created
   function nextLabel(date) {
-    return 'יום ' + (days.length + 1) + ' · ' + dayHebrewName(date);
+    return t('diary.dayLabel', { num: days.length + 1, name: dayHebrewName(date) });
   }
 
-  // Chronological day index: the earliest logged date is "יום 1", regardless of
+  // Chronological day index: the earliest logged date is "Day 1", regardless of
   // the order days were added. Computed live so it stays correct when a day is
   // inserted out of order. Counts existing dates earlier than `iso`, plus one
   // (so a brand-new date that isn't in `days` yet also gets the right number).
   const dayNumber = (iso) => days.reduce((n, d) => (d.date < iso ? n + 1 : n), 1);
-  const dayTitle = (iso) => 'יום ' + dayNumber(iso) + ' · ' + dayHebrewName(iso);
+  const dayTitle = (iso) => t('diary.dayLabel', { num: dayNumber(iso), name: dayHebrewName(iso) });
 
   async function addMeal(date, meal) {
     const existing = days.find((d) => d.date === date);
@@ -116,13 +118,13 @@ export default function Diary() {
   async function deleteMeal(date, mealId) {
     const day = await api.deleteMeal(date, mealId);
     mergeDay(day);
-    toast('הארוחה נמחקה');
+    toast(t('diary.mealDeleted'));
   }
 
   async function setMetric(date, field, value) {
     const day = await api.setMetric(date, field, value);
     mergeDay(day);
-    if (field === 'run' || field === 'abs') toast('נשמר');
+    if (field === 'run' || field === 'abs') toast(t('diary.saved'));
   }
 
   async function addProduct(p) {
@@ -132,12 +134,12 @@ export default function Diary() {
   async function renameProduct(id, key) {
     const updated = await api.updateProduct(id, { key });
     setProducts((prev) => prev.map((p) => (p._id === id ? updated : p)));
-    toast('השם עודכן');
+    toast(t('diary.nameUpdated'));
   }
   async function deleteProduct(id) {
     await api.deleteProduct(id);
     setProducts((prev) => prev.filter((p) => p._id !== id));
-    toast('המוצר נמחק');
+    toast(t('diary.productDeleted'));
   }
 
   // Add one or more meals to a day (used by copy-meal, repeat-yesterday, templates).
@@ -157,66 +159,66 @@ export default function Diary() {
     const yISO = prevISO(activeDate);
     const yday = days.find((d) => d.date === yISO);
     if (!yday || !(yday.meals || []).length) {
-      toast('אין ארוחות מאתמול לשכפול');
+      toast(t('diary.noMealsYesterday'));
       return;
     }
     await applyMeals(activeDate, yday.meals);
-    toast('הארוחות מאתמול שוכפלו');
+    toast(t('diary.yesterdayCopied'));
   }
 
   async function copyMealToActive(meal) {
     await applyMeals(activeDate, [meal]);
-    toast('הארוחה שוכפלה ליום הנבחר');
+    toast(t('diary.mealCopiedToDay'));
   }
 
   async function saveMealAsTemplate(meal) {
-    const def = (meal.desc || meal.cat || 'תבנית').slice(0, 30);
-    const name = window.prompt('שם לתבנית:', def);
+    const def = (meal.desc || meal.cat || t('diary.templateDefault')).slice(0, 30);
+    const name = window.prompt(t('diary.templateNamePrompt'), def);
     if (name == null || !name.trim()) return;
     const created = await api.addTemplate({ name: name.trim(), ...cleanMeal(meal) });
     setTemplates((prev) => [...prev, created]);
-    toast('התבנית נשמרה');
+    toast(t('diary.templateSaved'));
   }
 
   // Turn a logged meal into a reusable personal product (name + description +
   // macros), the same way "copy to day" / "save as template" work per row.
   async function saveMealAsProduct(meal) {
-    const def = (meal.desc || meal.cat || 'מוצר').slice(0, 30);
-    const name = window.prompt('שם קצר למוצר חדש:', def);
+    const def = (meal.desc || meal.cat || t('diary.productDefault')).slice(0, 30);
+    const name = window.prompt(t('diary.productNamePrompt'), def);
     if (name == null || !name.trim()) return;
     await addProduct({
       key: name.trim(),
       label: (meal.desc || meal.cat || name).trim(),
-      unit: 'מנה',
+      unit: t('diary.unitPortion'),
       carbs: Number(meal.carbs) || 0,
       fat: Number(meal.fat) || 0,
       protein: Number(meal.protein) || 0,
     });
-    toast('המוצר נוסף לרשימה שלך');
+    toast(t('diary.productAdded'));
   }
 
   // Turn a single part of a meal into a reusable product. Its macros are already
   // per-unit, so the product maps onto it 1:1 (the unit becomes the product unit,
-  // e.g. one "נקניקיה"), ready to one-click add to future meals.
+  // e.g. one "sausage"), ready to one-click add to future meals.
   async function saveItemAsProduct(item) {
-    const def = (item.name || 'מוצר').slice(0, 30);
-    const name = window.prompt('שם קצר למוצר חדש:', def);
+    const def = (item.name || t('diary.productDefault')).slice(0, 30);
+    const name = window.prompt(t('diary.productNamePrompt'), def);
     if (name == null || !name.trim()) return;
     await addProduct({
       key: name.trim(),
       label: (item.name || name).trim(),
-      unit: (item.unit || '').trim() || 'מנה',
+      unit: (item.unit || '').trim() || t('diary.unitPortion'),
       carbs: Number(item.carbs) || 0,
       fat: Number(item.fat) || 0,
       protein: Number(item.protein) || 0,
     });
-    toast('המוצר נוסף לרשימה שלך');
+    toast(t('diary.productAdded'));
   }
 
   async function deleteTemplate(id) {
     await api.deleteTemplate(id);
-    setTemplates((prev) => prev.filter((t) => t._id !== id));
-    toast('התבנית נמחקה');
+    setTemplates((prev) => prev.filter((tpl) => tpl._id !== id));
+    toast(t('diary.templateDeleted'));
   }
 
   function toggle(date) {
@@ -240,21 +242,21 @@ export default function Diary() {
         ketoMonths: user?.ketoGoalMonths || 0,
         generatedAt: todayISO(),
       });
-      toast('הדוח יוצא');
+      toast(t('diary.reportExported'));
     } catch {
-      toast('ייצוא הדוח נכשל');
+      toast(t('diary.reportExportFailed'));
     }
   }
 
   // ---- summary (persistent header) ----
-  const t = todayISO();
+  const todayStr = todayISO();
   // Average over *past* logged days only — today is still in progress, so
   // counting it would drag the average down (matches the insights tab).
   const totals = days
-    .filter((d) => d.date < t && (d.meals || []).length > 0)
+    .filter((d) => d.date < todayStr && (d.meals || []).length > 0)
     .map(dayTotal);
   const avg = totals.length ? totals.reduce((a, b) => a + b, 0) / totals.length : 0;
-  const today = days.find((d) => d.date === t);
+  const today = days.find((d) => d.date === todayStr);
   const stats = {
     avg: totals.length ? fmt(avg) : '–',
     days: days.length || '–',
@@ -285,19 +287,19 @@ export default function Diary() {
   const historyContent = (
     <>
       <div className="toolbar">
-        <label style={{ fontSize: 12, color: 'var(--ink-soft)' }}>קפיצה ליום:</label>
+        <label style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{t('diary.jumpToDay')}</label>
         <input type="date" value={jump} onChange={(e) => setJump(e.target.value)} />
         <button className="btn ghost mini" onClick={() => jump && setViewDate(jump)}>
-          הצג יום
+          {t('diary.showDay')}
         </button>
         <button className="btn ghost mini" onClick={() => setViewDate('')}>
-          כל הימים
+          {t('diary.allDays')}
         </button>
       </div>
       <div id="days">
         {!loaded ? null : shown.length === 0 ? (
           <div className="empty">
-            {viewDate ? 'אין רישום ליום שנבחר.' : 'אין עדיין ימים קודמים ביומן.'}
+            {viewDate ? t('diary.noRecordForDay') : t('diary.noPreviousDays')}
           </div>
         ) : (
           shown.map((d) => (
@@ -362,8 +364,8 @@ export default function Diary() {
           data-tour="journal"
         >
           <span className="journal-htext">
-            <span className="journal-title">יומן</span>
-            <span className="journal-sub">כל הימים הקודמים</span>
+            <span className="journal-title">{t('diary.journal')}</span>
+            <span className="journal-sub">{t('diary.allPreviousDays')}</span>
           </span>
           <span className="journal-hright">
             <span className="journal-count">{journalCount}</span>
@@ -377,10 +379,10 @@ export default function Diary() {
 
   // Products lives at the top of the today grid on desktop, so it's only a tab on mobile.
   const tabs = [
-    { id: 'today', label: 'היום', content: todayTab },
+    { id: 'today', label: t('diary.today'), content: todayTab },
     {
       id: 'insights',
-      label: 'תובנות',
+      label: t('diary.insights'),
       badge: insightsBadge,
       content: (
         <Dashboard
@@ -393,7 +395,7 @@ export default function Diary() {
         </Dashboard>
       ),
     },
-    ...(isMobile ? [{ id: 'products', label: 'המוצרים שלי', content: productsPanel }] : []),
+    ...(isMobile ? [{ id: 'products', label: t('diary.myProducts'), content: productsPanel }] : []),
   ];
 
   return (
@@ -409,9 +411,9 @@ export default function Diary() {
             <TargetLegend />
           </div>
         )}
-        הנתונים נשמרים בענן (MongoDB) ומסונכרנים לחשבון שלך בכל מכשיר.
+        {t('diary.cloudNote')}
         <br />
-        הערכים הם הערכות (±2–3 גרם למנות בית). היעד היומי שלך הוא מתחת ל-{fmt(target)} גרם פחמימות נטו ביום.
+        {t('diary.targetNote', { target: fmt(target) })}
       </div>
     </div>
   );

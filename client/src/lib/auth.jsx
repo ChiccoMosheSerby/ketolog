@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { api, setToken } from './api.js';
+import { applyLang } from './i18n.js';
 
 const AuthContext = createContext(null);
 
@@ -37,6 +38,8 @@ export function AuthProvider({ children }) {
       .me()
       .then((r) => {
         setUser(r.user);
+        // Flip the whole UI (language + RTL/LTR) to the account's language.
+        applyLang(r.user?.language);
         // Resume an unfinished tour after a reload.
         if (readOnb(r.user?.email) === 'pending') setNeedsOnboarding(true);
       })
@@ -48,15 +51,17 @@ export function AuthProvider({ children }) {
     const r = await api.login(email, password);
     setToken(r.token);
     setUser(r.user);
+    applyLang(r.user?.language);
     if (readOnb(r.user?.email) === 'pending') setNeedsOnboarding(true);
   }
-  async function register(email, password) {
-    const r = await api.register(email, password);
+  async function register(email, password, language) {
+    const r = await api.register(email, password, language);
     // Non-admin sign-ups come back without a token — the account is created but
     // awaits admin approval. Surface the message instead of logging them in.
     if (!r.token) return { pending: true, message: r.message };
     setToken(r.token);
     setUser(r.user);
+    applyLang(r.user?.language);
     writeOnb(r.user?.email, 'pending');
     setNeedsOnboarding(true);
     return { pending: false };

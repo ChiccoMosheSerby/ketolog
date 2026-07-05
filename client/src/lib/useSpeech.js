@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { api } from './api';
+import i18n from './i18n.js';
 
 // Voice input: record audio with MediaRecorder and transcribe it server-side
 // (OpenAI Whisper). We moved off the browser Web Speech API because it's
@@ -14,20 +15,19 @@ const SUPPORTED =
 // Stop runaway recordings (e.g. user walks away) — also keeps the upload small.
 const MAX_MS = 60_000;
 
-// Human-readable Hebrew message for a voice-input error code.
+// Human-readable message (in the active UI language) for a voice-input error
+// code. Server-provided messages (which contain spaces) are already localized by
+// the server, so they pass through as-is.
 export function speechErrorMessage(code) {
   switch (code) {
     case 'not-allowed':
-      return 'אין הרשאה למיקרופון — אשר/י גישה בהגדרות הדפדפן';
+      return i18n.t('speech.notAllowed');
     case 'no-speech':
-      return 'לא זוהה דיבור — קרב/י את המיקרופון ונסה/י שוב';
+      return i18n.t('speech.noSpeech');
     case 'network':
-      return 'התמלול נכשל — בדוק/י את החיבור ונסה/י שוב';
+      return i18n.t('speech.network');
     default:
-      // A server-provided message (has spaces) — show it as-is.
-      return typeof code === 'string' && code.trim().includes(' ')
-        ? code
-        : 'ההקלטה נכשלה — נסה/י שוב';
+      return typeof code === 'string' && code.trim().includes(' ') ? code : i18n.t('speech.failed');
   }
 }
 

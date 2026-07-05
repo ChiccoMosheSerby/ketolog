@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 import { heDate } from '../lib/helpers.js';
@@ -22,17 +23,14 @@ import './SmartInsights.scss';
 // is still pending.
 
 const DIR = { up: '↑', down: '↓', flat: '→' };
-const PRIORITY_LABEL = { high: 'עדיפות גבוהה', med: 'עדיפות בינונית', low: 'עדיפות נמוכה' };
 const PRIORITY_TONE = { high: 'red', med: 'amber', low: 'olive' };
-const SEVERITY_LABEL = { alert: 'חריגה', watch: 'לב', info: 'שים לב' };
 const SEVERITY_TONE = { alert: 'red', watch: 'amber', info: 'olive' };
 const OUTLOOK_TONE = { positive: 'olive', neutral: 'soft', negative: 'red' };
-const PERIOD_LABEL = { weekly: 'שבועי', monthly: 'חודשי' };
 
 const POLL_MS = 20000;
 const POLL_MAX = 5;
 
-// The report cache lives in ../lib/insightsStore.js so the תובנות nav-tab badge
+// The report cache lives in ../lib/insightsStore.js so the insights nav-tab badge
 // can read the same data without a second fetch.
 
 // Sections are collapsible on both desktop and mobile, and collapsed by default
@@ -87,6 +85,7 @@ function Card({ title, body, tone, badge }) {
 }
 
 function Report({ ins, collapsible }) {
+  const { t } = useTranslation();
   const trends = ins.trends || [];
   const recs = ins.recommendations || [];
   const points = ins.pointsToWatch || [];
@@ -95,12 +94,12 @@ function Report({ ins, collapsible }) {
     <>
       {ins.highlight && (
         <div className="si-highlight">
-          <span className="si-highlight-tag">המגמה</span>
+          <span className="si-highlight-tag">{t('insights.highlightTag')}</span>
           <div className="si-highlight-body">{renderText(ins.highlight)}</div>
         </div>
       )}
       {ins.summary && (
-        <Section icon="📊" title="סיכום" collapsible={collapsible}>
+        <Section icon="📊" title={t('insights.summary')} collapsible={collapsible}>
           <div className="si-body si-summary">{renderText(ins.summary)}</div>
         </Section>
       )}
@@ -108,7 +107,7 @@ function Report({ ins, collapsible }) {
       {trends.length > 0 && (
         <Section
           icon="📈"
-          title="מגמות"
+          title={t('insights.trends')}
           collapsible={collapsible}
           previewTitles={trends.map((t) => t.title).filter(Boolean)}
         >
@@ -121,7 +120,7 @@ function Report({ ins, collapsible }) {
       )}
 
       {ins.forecast?.body && (
-        <Section icon="🔮" title="צפי להמשך" collapsible={collapsible}>
+        <Section icon="🔮" title={t('insights.forecast')} collapsible={collapsible}>
           <Card body={ins.forecast.body} tone={OUTLOOK_TONE[ins.forecast.outlook] || 'soft'} />
         </Section>
       )}
@@ -129,13 +128,13 @@ function Report({ ins, collapsible }) {
       {recs.length > 0 && (
         <Section
           icon="🎯"
-          title="המלצות"
+          title={t('insights.recommendations')}
           collapsible={collapsible}
           previewTitles={recs.map((r) => r.title).filter(Boolean)}
         >
           <div className="si-grid">
             {recs.map((r, i) => (
-              <Card key={i} title={r.title} body={r.body} tone={PRIORITY_TONE[r.priority]} badge={PRIORITY_LABEL[r.priority]} />
+              <Card key={i} title={r.title} body={r.body} tone={PRIORITY_TONE[r.priority]} badge={r.priority ? t(`insights.priority.${r.priority}`, { defaultValue: '' }) : ''} />
             ))}
           </div>
         </Section>
@@ -144,7 +143,7 @@ function Report({ ins, collapsible }) {
       {points.length > 0 && (
         <Section
           icon="👀"
-          title="נקודות לתשומת לב"
+          title={t('insights.pointsToWatch')}
           collapsible={collapsible}
           previewTitles={points.map((p) => p.title).filter(Boolean)}
         >
@@ -159,13 +158,13 @@ function Report({ ins, collapsible }) {
       {anomalies.length > 0 && (
         <Section
           icon="⚠️"
-          title="חריגים"
+          title={t('insights.anomalies')}
           collapsible={collapsible}
           previewTitles={anomalies.map((a) => a.title).filter(Boolean)}
         >
           <div className="si-grid">
             {anomalies.map((a, i) => (
-              <Card key={i} title={a.title} body={a.body} tone={SEVERITY_TONE[a.severity]} badge={a.date ? heDate(a.date) : SEVERITY_LABEL[a.severity]} />
+              <Card key={i} title={a.title} body={a.body} tone={SEVERITY_TONE[a.severity]} badge={a.date ? heDate(a.date) : (a.severity ? t(`insights.severity.${a.severity}`, { defaultValue: '' }) : '')} />
             ))}
           </div>
         </Section>
@@ -175,6 +174,7 @@ function Report({ ins, collapsible }) {
 }
 
 export default function SmartInsights() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const key = user?.email || '';
   const seed = getCache();
@@ -226,7 +226,7 @@ export default function SmartInsights() {
           }
         } catch (e) {
           if (p.alive && !getCache()) {
-            setError(e.message || 'שגיאה');
+            setError(e.message || t('insights.genericError'));
             setStatus('error');
           }
         }
@@ -274,7 +274,7 @@ export default function SmartInsights() {
   if (status === 'loading') {
     return (
       <div className="panel si-panel">
-        <div className="si-loading">טוען תובנות…</div>
+        <div className="si-loading">{t('insights.loading')}</div>
       </div>
     );
   }
@@ -282,7 +282,7 @@ export default function SmartInsights() {
   if (status === 'error') {
     return (
       <div className="panel si-panel">
-        <div className="si-note">התובנות אינן זמינות כרגע{error ? ` (${error})` : ''}.</div>
+        <div className="si-note">{error ? t('insights.unavailableWithError', { error }) : t('insights.unavailable')}</div>
       </div>
     );
   }
@@ -290,7 +290,7 @@ export default function SmartInsights() {
   if (status === 'enough-no') {
     return (
       <div className="panel si-panel">
-        <div className="si-note">צריך עוד כמה ימי רישום כדי להפיק תובנות אישיות — המשיכו לתעד וזה יופיע כאן.</div>
+        <div className="si-note">{t('insights.notEnoughData')}</div>
       </div>
     );
   }
@@ -300,13 +300,13 @@ export default function SmartInsights() {
   if (reports.length === 0) {
     return (
       <div className="panel si-panel">
-        <h2 className="si-title">תובנות חכמות</h2>
+        <h2 className="si-title">{t('insights.title')}</h2>
         {aiOff ? (
-          <div className="si-note">התובנות אינן זמינות כרגע (שירות ה-AI לא מוגדר).</div>
+          <div className="si-note">{t('insights.aiOff')}</div>
         ) : isGenerating ? (
-          <div className="si-loading">מכין/ה את הדוח הראשון שלך… זה עשוי לקחת עד דקה, והוא יופיע כאן אוטומטית.</div>
+          <div className="si-loading">{t('insights.generatingFirst')}</div>
         ) : (
-          <div className="si-note">הדוח הראשון ייווצר אוטומטית בתום השבוע/החודש הקרוב.</div>
+          <div className="si-note">{t('insights.firstReportSoon')}</div>
         )}
       </div>
     );
@@ -319,10 +319,10 @@ export default function SmartInsights() {
     <div className="panel si-panel">
       <div className="si-top">
         <h2 className="si-title">
-          תובנות חכמות
-          {anyUnseen && <span className="si-new-dot" title="יש דוח חדש">חדש</span>}
+          {t('insights.title')}
+          {anyUnseen && <span className="si-new-dot" title={t('insights.newReportTitle')}>{t('insights.new')}</span>}
         </h2>
-        {isGenerating && <span className="si-gen">מעדכן תובנות…</span>}
+        {isGenerating && <span className="si-gen">{t('insights.updating')}</span>}
       </div>
 
       {/* report history — newest first; "new" reports badged */}
@@ -335,7 +335,7 @@ export default function SmartInsights() {
             className={'si-chip' + (r.id === selected.id ? ' active' : '') + (!r.seen ? ' unseen' : '')}
             onClick={() => setSelectedId(r.id)}
           >
-            <span className="si-chip-period">{PERIOD_LABEL[r.period] || ''}</span>
+            <span className="si-chip-period">{r.period ? t(`insights.period.${r.period}`, { defaultValue: '' }) : ''}</span>
             <span className="si-chip-label">{r.label}</span>
             {!r.seen && <span className="si-chip-new">•</span>}
           </button>
@@ -346,7 +346,11 @@ export default function SmartInsights() {
 
       {selected.generatedAt && (
         <div className="si-foot">
-          דוח {PERIOD_LABEL[selected.period]} · {selected.label} · נוצר ב־{heDate(String(selected.generatedAt).slice(0, 10))}
+          {t('insights.footer', {
+            period: t(`insights.period.${selected.period}`, { defaultValue: '' }),
+            label: selected.label,
+            date: heDate(String(selected.generatedAt).slice(0, 10)),
+          })}
         </div>
       )}
     </div>

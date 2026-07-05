@@ -16,6 +16,7 @@ import {
 import { sendApprovalRequest, sendPasswordReset } from '../lib/mailer.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { asyncHandler, escapeHtml, isValidEmail } from '../lib/http.js';
+import { msg } from '../lib/i18n.js';
 
 const router = Router();
 
@@ -35,6 +36,7 @@ function signToken(user) {
 const userPayload = (u) => ({
   id: u._id,
   email: u.email,
+  language: u.language || 'he',
   gender: u.gender || '',
   dailyCarbTarget: u.dailyCarbTarget,
   ketoStartDate: u.ketoStartDate || '',
@@ -43,7 +45,7 @@ const userPayload = (u) => ({
   isAdmin: isAdmin(u),
 });
 
-const PROFILE_FIELDS = 'email gender dailyCarbTarget ketoStartDate ketoGoalMonths whatsappPhone';
+const PROFILE_FIELDS = 'email language gender dailyCarbTarget ketoStartDate ketoGoalMonths whatsappPhone';
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 // Base URL for the approval link in the email.
@@ -57,24 +59,40 @@ const baseUrl = () => {
   return `http://localhost:${process.env.PORT || 4000}`;
 };
 
-const PENDING_MSG = 'החשבון שלך נוצר וממתין לאישור מנהל. תקבל גישה לאחר האישור.';
+const pendingMsg = (req) =>
+  msg(
+    req,
+    'החשבון שלך נוצר וממתין לאישור מנהל. תקבל גישה לאחר האישור.',
+    'Your account was created and is awaiting admin approval. You’ll get access once approved.'
+  );
 const MIN_PASSWORD = 6;
 
 router.post('/register', registerLimiter, asyncHandler(async (req, res) => {
   const email = (typeof req.body.email === 'string' ? req.body.email : '').trim().toLowerCase();
   const password = typeof req.body.password === 'string' ? req.body.password : '';
-  if (!email || !password) return res.status(400).json({ error: 'אימייל וסיסמה נדרשים' });
-  if (!isValidEmail(email)) return res.status(400).json({ error: 'כתובת אימייל לא תקינה' });
+  // Language is chosen at sign-up. Default to Hebrew when absent/invalid.
+  const language = req.body.language === 'en' ? 'en' : 'he';
+  if (!email || !password)
+    return res.status(400).json({ error: msg(req, 'אימייל וסיסמה נדרשים', 'Email and password are required') });
+  if (!isValidEmail(email))
+    return res.status(400).json({ error: msg(req, 'כתובת אימייל לא תקינה', 'Invalid email address') });
   if (password.length < MIN_PASSWORD) {
-    return res.status(400).json({ error: `הסיסמה חייבת להכיל לפחות ${MIN_PASSWORD} תווים` });
+    return res.status(400).json({
+      error: msg(
+        req,
+        `הסיסמה חייבת להכיל לפחות ${MIN_PASSWORD} תווים`,
+        `Password must be at least ${MIN_PASSWORD} characters`
+      ),
+    });
   }
 
   const exists = await User.findOne({ email });
-  if (exists) return res.status(409).json({ error: 'משתמש עם אימייל זה כבר קיים' });
+  if (exists)
+    return res.status(409).json({ error: msg(req, 'משתמש עם אימייל זה כבר קיים', 'An account with this email already exists') });
 
   const passwordHash = await bcrypt.hash(password, 10);
   const autoApproved = AUTO_APPROVED_EMAILS.has(email);
-  const user = await User.create({ email, passwordHash, approved: autoApproved });
+  const user = await User.create({ email, passwordHash, language, approved: autoApproved });
 
   // Admins are let straight in; everyone else waits for the admin to click the
   // approval link we email out now.
@@ -88,19 +106,19 @@ router.post('/register', registerLimiter, asyncHandler(async (req, res) => {
   } catch (e) {
     console.error('[approval] failed to send approval email:', e.message);
   }
-  res.status(202).json({ pending: true, message: PENDING_MSG });
+  res.status(202).json({ pending: true, message: pendingMsg(req) });
 }));
 
 router.post('/login', loginLimiter, asyncHandler(async (req, res) => {
   const email = (typeof req.body.email === 'string' ? req.body.email : '').trim().toLowerCase();
   const password = typeof req.body.password === 'string' ? req.body.password : '';
   const user = await User.findOne({ email });
-  if (!user) return res.status(401).json({ error: 'אימייל או סיסמה שגויים' });
+  if (!user) return res.status(401).json({ error: msg(req, 'אימייל או סיסמה שגויים', 'Wrong email or password') });
   const ok = await bcrypt.compare(password, user.passwordHash);
-  if (!ok) return res.status(401).json({ error: 'אימייל או סיסמה שגויים' });
+  if (!ok) return res.status(401).json({ error: msg(req, 'אימייל או סיסמה שגויים', 'Wrong email or password') });
 
   // Auto-approve list takes effect even for accounts created before the gate existed.
-  if (!isApproved(user)) return res.status(403).json({ pending: true, error: PENDING_MSG });
+  if (!isApproved(user)) return res.status(403).json({ pending: true, error: pendingMsg(req) });
   if (AUTO_APPROVED_EMAILS.has(email) && !user.approved) {
     user.approved = true;
     await user.save();
@@ -156,14 +174,20 @@ router.post('/approve', asyncHandler(async (req, res) => {
 // to probe which email addresses are registered.
 router.post('/forgot-password', forgotLimiter, asyncHandler(async (req, res) => {
   const email = (typeof req.body.email === 'string' ? req.body.email : '').trim().toLowerCase();
-  const generic = { message: 'אם קיים חשבון עם האימייל הזה, ישלח אליו קישור לאיפוס הסיסמה.' };
+  const generic = {
+    message: msg(
+      req,
+      'אם קיים חשבון עם האימייל הזה, ישלח אליו קישור לאיפוס הסיסמה.',
+      'If an account exists for this email, a password-reset link has been sent to it.'
+    ),
+  };
   if (!isValidEmail(email)) return res.json(generic);
 
   const user = await User.findOne({ email });
   if (user) {
     const resetUrl = `${baseUrl()}/api/auth/reset-password?token=${makeResetToken(user)}`;
     try {
-      await sendPasswordReset({ email, resetUrl });
+      await sendPasswordReset({ email, resetUrl, lang: user.language || 'he' });
     } catch (e) {
       console.error('[reset] failed to send reset email:', e.message);
     }
@@ -234,7 +258,7 @@ router.post('/reset-password', resetLimiter, asyncHandler(async (req, res) => {
 
 router.get('/me', requireAuth, asyncHandler(async (req, res) => {
   const user = await User.findById(req.userId).select(PROFILE_FIELDS);
-  if (!user) return res.status(404).json({ error: 'משתמש לא נמצא' });
+  if (!user) return res.status(404).json({ error: msg(req, 'משתמש לא נמצא', 'User not found') });
   res.json({ user: userPayload(user) });
 }));
 
@@ -244,28 +268,32 @@ router.patch('/me', requireAuth, asyncHandler(async (req, res) => {
   if (req.body.gender != null) {
     const g = String(req.body.gender);
     if (!['male', 'female', ''].includes(g)) {
-      return res.status(400).json({ error: 'מגדר לא תקין' });
+      return res.status(400).json({ error: msg(req, 'מגדר לא תקין', 'Invalid gender') });
     }
     update.gender = g;
   }
   if (req.body.dailyCarbTarget != null) {
     const t = Number(req.body.dailyCarbTarget);
     if (!Number.isFinite(t) || t < 5 || t > 200) {
-      return res.status(400).json({ error: 'יעד יומי לא תקין (5–200 גרם)' });
+      return res
+        .status(400)
+        .json({ error: msg(req, 'יעד יומי לא תקין (5–200 גרם)', 'Invalid daily target (5–200 g)') });
     }
     update.dailyCarbTarget = t;
   }
   if (req.body.ketoGoalMonths != null) {
     const m = Number(req.body.ketoGoalMonths);
     if (!Number.isInteger(m) || m < 0 || m > 60) {
-      return res.status(400).json({ error: 'יעד תקופת קיטו לא תקין (0–60 חודשים)' });
+      return res.status(400).json({
+        error: msg(req, 'יעד תקופת קיטו לא תקין (0–60 חודשים)', 'Invalid keto-period goal (0–60 months)'),
+      });
     }
     update.ketoGoalMonths = m;
   }
   if (req.body.ketoStartDate != null) {
     const d = String(req.body.ketoStartDate);
     if (d !== '' && !ISO_DATE.test(d)) {
-      return res.status(400).json({ error: 'תאריך התחלה לא תקין' });
+      return res.status(400).json({ error: msg(req, 'תאריך התחלה לא תקין', 'Invalid start date') });
     }
     update.ketoStartDate = d;
   }
@@ -274,18 +302,27 @@ router.patch('/me', requireAuth, asyncHandler(async (req, res) => {
     // Empty string unlinks. Otherwise require a plausible international number.
     const phone = String(req.body.whatsappPhone).replace(/\D/g, '');
     if (phone && (phone.length < 8 || phone.length > 15)) {
-      return res.status(400).json({ error: 'מספר WhatsApp לא תקין (כולל קידומת מדינה, ללא +)' });
+      return res.status(400).json({
+        error: msg(
+          req,
+          'מספר WhatsApp לא תקין (כולל קידומת מדינה, ללא +)',
+          'Invalid WhatsApp number (include country code, no +)'
+        ),
+      });
     }
     if (phone) {
       const other = await User.findOne({ whatsappPhone: phone, _id: { $ne: req.userId } })
         .select('_id')
         .lean();
-      if (other) return res.status(409).json({ error: 'מספר WhatsApp זה כבר מקושר לחשבון אחר' });
+      if (other)
+        return res.status(409).json({
+          error: msg(req, 'מספר WhatsApp זה כבר מקושר לחשבון אחר', 'This WhatsApp number is already linked to another account'),
+        });
     }
     update.whatsappPhone = phone;
   }
   const user = await User.findByIdAndUpdate(req.userId, update, { new: true }).select(PROFILE_FIELDS);
-  if (!user) return res.status(404).json({ error: 'משתמש לא נמצא' });
+  if (!user) return res.status(404).json({ error: msg(req, 'משתמש לא נמצא', 'User not found') });
   res.json({ user: userPayload(user) });
 }));
 

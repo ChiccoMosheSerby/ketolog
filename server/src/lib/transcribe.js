@@ -7,11 +7,18 @@
 // drifts on tiny utterances.
 export const TRANSCRIBE_MODEL = () => process.env.TRANSCRIBE_MODEL || 'whisper-1';
 
-// Primes the decoder for Hebrew + the everyday food words this app hears, so a
-// one-word utterance like "שוקולד" stays Hebrew instead of becoming gibberish.
-const FOOD_PROMPT =
-  'תמלול תיאור ארוחה בעברית. מילים נפוצות: פיתה, חומוס, שוקולד, ביצים, גבינה, ' +
-  'אבוקדו, סלט, עוף, בשר, אורז, לחם, חלב, יוגורט, ירקות, אגוזים, חמאה, שמן זית, טחינה.';
+// Primes the decoder for the everyday food words this app hears, so a one-word
+// utterance stays in the target language instead of becoming gibberish. One
+// prompt per supported language ('שוקולד' vs "chocolate").
+const FOOD_PROMPTS = {
+  he:
+    'תמלול תיאור ארוחה בעברית. מילים נפוצות: פיתה, חומוס, שוקולד, ביצים, גבינה, ' +
+    'אבוקדו, סלט, עוף, בשר, אורז, לחם, חלב, יוגורט, ירקות, אגוזים, חמאה, שמן זית, טחינה.',
+  en:
+    'Transcription of a meal description in English. Common words: eggs, cheese, ' +
+    'avocado, salad, chicken, beef, rice, bread, milk, yogurt, vegetables, nuts, ' +
+    'butter, olive oil, chocolate, bacon, salmon, almonds, spinach, broccoli.',
+};
 
 export function transcribeConfigured() {
   return Boolean(process.env.OPENAI_API_KEY);
@@ -37,7 +44,7 @@ export async function transcribeAudio(buffer, mimeType = 'audio/webm', lang = 'h
   form.append('file', new Blob([buffer], { type: mimeType }), `audio.${extFor(mimeType)}`);
   form.append('model', TRANSCRIBE_MODEL());
   if (lang) form.append('language', lang);
-  form.append('prompt', FOOD_PROMPT);
+  form.append('prompt', FOOD_PROMPTS[lang] || FOOD_PROMPTS.he);
   form.append('temperature', '0'); // deterministic — least likely to hallucinate
   form.append('response_format', 'verbose_json'); // includes `duration` for cost tracking
 

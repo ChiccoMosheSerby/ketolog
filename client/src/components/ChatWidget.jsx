@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../lib/api.js';
 import { useToast } from '../lib/toast.jsx';
 import { useSpeech, speechErrorMessage } from '../lib/useSpeech.js';
@@ -6,9 +7,6 @@ import { fmt } from '../lib/helpers.js';
 import { renderText } from '../lib/markdown.jsx';
 import Logo from './Logo.jsx';
 import './ChatWidget.scss';
-
-const GREETING =
-  'היי! אני קֶטוֹ, העוזר/ת הקטוגני/ת שלך 🥑\nאפשר לשאול אותי אם מוצר מתאים לקיטו, לבקש חלופה טובה יותר, לשלוח תמונה של מוצר או תווית, או לבקש ממני להוסיף ארוחה / מוצר ליומן.';
 
 // Pull the displayable fields out of an action whether it came from POST
 // (payload) or from a reloaded thread view (raw tool input).
@@ -28,6 +26,7 @@ function actionView(a) {
 }
 
 export default function ChatWidget() {
+  const { t } = useTranslation();
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -139,7 +138,7 @@ export default function ChatWidget() {
         { role: 'assistant', text: r.reply, actions: r.actions || [] },
       ]);
     } catch (e) {
-      setMessages((m) => [...m, { role: 'assistant', text: '', error: e.message || 'שגיאה' }]);
+      setMessages((m) => [...m, { role: 'assistant', text: '', error: e.message || t('chat.errorGeneric') }]);
     } finally {
       setBusy(false);
     }
@@ -165,11 +164,11 @@ export default function ChatWidget() {
         )
       );
       if (status === 'added') {
-        toast(action.type === 'meal' ? 'הארוחה נוספה ליומן' : 'המוצר נשמר');
+        toast(action.type === 'meal' ? t('chat.mealAddedToast') : t('chat.productSavedToast'));
         window.dispatchEvent(new Event('ketolog:dataChanged'));
       }
     } catch (e) {
-      toast(e.message || 'הפעולה נכשלה');
+      toast(e.message || t('chat.actionFailedToast'));
     }
   }
 
@@ -186,27 +185,27 @@ export default function ChatWidget() {
         className={'chat-fab' + (open ? ' hidden' : '')}
         data-tour="chat"
         onClick={() => setOpen(true)}
-        aria-label="פתח/י את העוזר הקטוגני"
-        title="העוזר הקטוגני"
+        aria-label={t('chat.openAria')}
+        title={t('chat.assistantName')}
       >
         <Logo size={58} />
       </button>
 
       {open && (
-        <div className="chat-panel" role="dialog" aria-label="העוזר הקטוגני">
+        <div className="chat-panel" role="dialog" aria-label={t('chat.assistantName')}>
           <header className="chat-head">
             <div className="chat-title">
               <span className="chat-ava"><Logo size={36} /></span>
               <div>
-                <b>קֶטוֹ</b>
-                <span className="chat-sub">העוזר הקטוגני שלך</span>
+                <b>{t('chat.ketoName')}</b>
+                <span className="chat-sub">{t('chat.assistantSubtitle')}</span>
               </div>
             </div>
             <div className="chat-head-btns">
-              <button className="icon-btn" onClick={newChat} title="שיחה חדשה">
+              <button className="icon-btn" onClick={newChat} title={t('chat.newChat')}>
                 ✎
               </button>
-              <button className="icon-btn" onClick={() => setOpen(false)} title="סגור">
+              <button className="icon-btn" onClick={() => setOpen(false)} title={t('common.close')}>
                 ✕
               </button>
             </div>
@@ -215,14 +214,14 @@ export default function ChatWidget() {
           <div className="chat-body" ref={scrollRef}>
             {messages.length === 0 && (
               <div className="chat-msg assistant">
-                <div className="bubble">{renderText(GREETING)}</div>
+                <div className="bubble">{renderText(t('chat.greeting'))}</div>
               </div>
             )}
 
             {messages.map((m, i) => (
               <div key={i} className={'chat-msg ' + m.role}>
                 <div className={'bubble' + (m.error ? ' err' : '')}>
-                  {m.hasImage && <span className="img-chip">🖼️ תמונה</span>}
+                  {m.hasImage && <span className="img-chip">{t('chat.imageChip')}</span>}
                   {m.error ? m.error : renderText(m.text)}
                 </div>
                 {m.actions?.map((a) => (
@@ -245,7 +244,7 @@ export default function ChatWidget() {
           {image && (
             <div className="chat-attach">
               <img src={image.preview} alt="" />
-              <button className="icon-btn" onClick={() => setImage(null)} title="הסר תמונה">
+              <button className="icon-btn" onClick={() => setImage(null)} title={t('chat.removeImage')}>
                 ✕
               </button>
             </div>
@@ -255,7 +254,7 @@ export default function ChatWidget() {
             <button
               className="icon-btn"
               onClick={() => fileRef.current?.click()}
-              title="צרף/י תמונה"
+              title={t('chat.attachImage')}
             >
               📎
             </button>
@@ -264,7 +263,7 @@ export default function ChatWidget() {
               <button
                 className={'icon-btn' + (speech.listening ? ' rec' : '')}
                 onClick={toggleMic}
-                title={speech.listening ? 'עצור הקלטה' : 'דבר/י'}
+                title={speech.listening ? t('chat.stopRecording') : t('chat.speak')}
               >
                 🎤
               </button>
@@ -272,7 +271,7 @@ export default function ChatWidget() {
             <textarea
               ref={taRef}
               rows={1}
-              placeholder="שאל/י אותי על קיטו…"
+              placeholder={t('chat.inputPlaceholder')}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={onKeyDown}
@@ -289,13 +288,14 @@ export default function ChatWidget() {
 }
 
 function ActionCard({ action, onResolve }) {
+  const { t } = useTranslation();
   const v = actionView(action);
   const done = action.status === 'added';
   const cancelled = action.status === 'cancelled';
   const macros = [
-    v.carbs != null && `${fmt(Number(v.carbs))} פחמ' נטו`,
-    v.fat != null && `${fmt(Number(v.fat))} שומן`,
-    v.protein != null && `${fmt(Number(v.protein))} חלבון`,
+    v.carbs != null && t('chat.macroNetCarbs', { value: fmt(Number(v.carbs)) }),
+    v.fat != null && t('chat.macroFat', { value: fmt(Number(v.fat)) }),
+    v.protein != null && t('chat.macroProtein', { value: fmt(Number(v.protein)) }),
   ]
     .filter(Boolean)
     .join(' · ');
@@ -303,9 +303,9 @@ function ActionCard({ action, onResolve }) {
   return (
     <div className={'action-card' + (done ? ' done' : '') + (cancelled ? ' cancelled' : '')}>
       <div className="ac-head">
-        <span className="ac-kind">{action.type === 'meal' ? '🍽️ הוספת ארוחה' : '➕ מוצר חדש'}</span>
-        {done && <span className="ac-badge ok">נוסף ליומן ✓</span>}
-        {cancelled && <span className="ac-badge">בוטל</span>}
+        <span className="ac-kind">{action.type === 'meal' ? t('chat.actionMealKind') : t('chat.actionProductKind')}</span>
+        {done && <span className="ac-badge ok">{t('chat.addedBadge')}</span>}
+        {cancelled && <span className="ac-badge">{t('chat.cancelledBadge')}</span>}
       </div>
       <div className="ac-body">
         {action.type === 'meal' ? (
@@ -329,10 +329,10 @@ function ActionCard({ action, onResolve }) {
       {!done && !cancelled && (
         <div className="ac-btns">
           <button className="ac-add" onClick={() => onResolve('add')}>
-            {action.type === 'meal' ? 'הוסף ליומן' : 'שמור מוצר'}
+            {action.type === 'meal' ? t('chat.addToJournal') : t('chat.saveProduct')}
           </button>
           <button className="ac-cancel" onClick={() => onResolve('cancel')}>
-            בטל
+            {t('common.cancel')}
           </button>
         </div>
       )}

@@ -3,7 +3,7 @@ import { api } from './api.js';
 import { todayISO } from './helpers.js';
 
 // Single module-scoped cache for insight reports, shared by the SmartInsights
-// panel and the "new report" badge on the תובנות nav tab. It survives tab
+// panel and the "new report" badge on the insights nav tab. It survives tab
 // switches (the panel unmounts on desktop when another tab is active) so both
 // consumers read one fetch instead of each hitting the endpoint on their own.
 
@@ -12,7 +12,7 @@ export const FRESH_MS = 5 * 60 * 1000; // reuse cached data for 5 min before rev
 let cache = null; // { key, reports, generating, aiOff, enoughData, at }
 let inflight = null; // coalesce concurrent loads (panel + badge on cold start)
 
-// Report ids the user has acknowledged by opening the תובנות tab this session.
+// Report ids the user has acknowledged by opening the insights tab this session.
 // A newly-generated report gets a fresh id, so it re-shows the badge even after
 // an earlier visit.
 let dismissed = new Set();
@@ -94,7 +94,7 @@ export async function ensureLoaded(key) {
   }
 }
 
-// The user opened the תובנות tab: acknowledge every currently-unseen report so
+// The user opened the insights tab: acknowledge every currently-unseen report so
 // the badge clears until a genuinely new report arrives.
 export function markVisited(key) {
   if (!key) return;

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMediaQuery, MOBILE_QUERY } from '../lib/useMediaQuery.js';
 import { useAuth } from '../lib/auth.jsx';
 import './Onboarding.scss';
@@ -23,9 +24,10 @@ function selectTab(id) {
 }
 
 export default function Onboarding() {
+  const { t } = useTranslation();
   const { dismissOnboarding } = useAuth();
   const isMobile = useMediaQuery(MOBILE_QUERY);
-  const steps = buildSteps(isMobile);
+  const steps = buildSteps(isMobile, t);
 
   const [i, setI] = useState(0);
   const [rect, setRect] = useState(null); // target rect in viewport coords; null = no spotlight
@@ -102,8 +104,8 @@ export default function Onboarding() {
       {rect ? <div className="tour-spot" style={spotStyle} /> : <div className="tour-veil" />}
 
       <div className="tour-tip dock-bottom">
-        <button className="tour-skip" onClick={finish} aria-label="דלג">
-          דלג/י
+        <button className="tour-skip" onClick={finish} aria-label={t('onboarding.skipAria')}>
+          {t('onboarding.skip')}
         </button>
 
         <div className="tour-tip-head">
@@ -112,12 +114,12 @@ export default function Onboarding() {
         </div>
         <p>{step.text}</p>
 
-        <div className="tour-dots" role="tablist" aria-label="שלבים">
+        <div className="tour-dots" role="tablist" aria-label={t('onboarding.stepsAria')}>
           {steps.map((_, n) => (
             <button
               key={n}
               className={'tour-dot' + (n === i ? ' active' : '')}
-              aria-label={'שלב ' + (n + 1)}
+              aria-label={t('onboarding.stepNumberAria', { number: n + 1 })}
               aria-selected={n === i}
               onClick={() => setI(n)}
             />
@@ -131,13 +133,13 @@ export default function Onboarding() {
             disabled={i === 0}
             style={i === 0 ? { visibility: 'hidden' } : undefined}
           >
-            הקודם
+            {t('onboarding.back')}
           </button>
           <span className="tour-count">
             {i + 1} / {steps.length}
           </span>
           <button className="btn mini" onClick={next}>
-            {last ? 'יאללה, מתחילים' : 'הבא'}
+            {last ? t('onboarding.finish') : t('onboarding.next')}
           </button>
         </div>
       </div>
@@ -147,88 +149,83 @@ export default function Onboarding() {
 
 // Each step points at a real element (anchor) and, if needed, the tab it lives
 // in. The welcome step is anchorless (centered). Copy adapts to the device.
-function buildSteps(isMobile) {
-  const navHint = isMobile
-    ? 'החלקה שמאלה/ימינה מחליפה ביניהן.'
-    : 'לחיצה על לשונית מחליפה את התצוגה.';
+function buildSteps(isMobile, t) {
   // Products & the barcode scanner live in a dedicated tab on mobile, but sit at
-  // the top of the "היום" grid on desktop — so point at the right place per device.
+  // the top of the "Today" grid on desktop — so point at the right place per device.
   const productsTab = isMobile ? 'products' : 'today';
   return [
     {
       emoji: '🥑',
-      title: 'ברוכים הבאים ליומן קטו',
-      text: 'בואו נכיר את כל הפיצ׳רים — איפה כל דבר נמצא ואיך משתמשים בו. ייקח פחות מדקה, וכל שלב מדגיש לך את האזור באפליקציה.',
+      title: t('onboarding.welcomeTitle'),
+      text: t('onboarding.welcomeBody'),
     },
     {
       anchor: 'carb-ring',
       tab: 'today',
       emoji: '🎯',
-      title: 'תקציב הפחמימות היומי',
-      text: 'הטבעת מראה כמה פחמימות נטו צברת היום מול היעד שלך. כל עוד את/ה מתחת לקו — את/ה בירוק. את היעד האישי אפשר לשנות בהגדרות.',
+      title: t('onboarding.carbRingTitle'),
+      text: t('onboarding.carbRingBody'),
     },
     {
       anchor: 'add-meal',
       tab: 'today',
       emoji: '🍳',
-      title: 'הוספת ארוחה',
-      text: 'כותבים תיאור חופשי של מה שאכלת, וה-AI מעריך פחמימות, שומן וחלבון ומפרק לפריטים. יש גם הקלטה קולית (מיקרופון) וכפתור לחישוב-בלבד בלי לשמור.',
+      title: t('onboarding.addMealTitle'),
+      text: t('onboarding.addMealBody'),
     },
     {
       anchor: 'shortcuts',
       tab: 'today',
       emoji: '⚡',
-      title: 'הוספה מהירה',
-      text: 'מקום אחד מתקפל לכל הקיצורים: המוצרים השמורים שלך, תבניות ארוחה, ושכפול הארוחות של אתמול. קליק מוסיף ישר לפירוט הארוחה.',
+      title: t('onboarding.shortcutsTitle'),
+      text: t('onboarding.shortcutsBody'),
     },
     {
       anchor: 'chat',
       tab: 'today',
       emoji: '💬',
-      title: 'קֶטוֹ — העוזר/ת החכם/ה',
-      text: 'מהבועה הזו שואלים אם מוצר מתאים לקיטו, מבקשים חלופה, שולחים תמונה — ואפילו מבקשים להוסיף ארוחה ליומן. קֶטוֹ רואה את היומן שלך ועונה לפי הנתונים האמיתיים.',
+      title: t('onboarding.chatTitle'),
+      text: t('onboarding.chatBody'),
     },
     {
       anchor: 'journal',
       tab: 'today',
       emoji: '📖',
-      title: 'היומן — כל הימים הקודמים',
-      text: 'תחת היום הנוכחי מתקפל היומן המלא. פותחים אותו כדי לדפדף אחורה, לקפוץ לתאריך, ולראות מדדים לכל יום — משקל, צום, ריצה ועוד.',
+      title: t('onboarding.journalTitle'),
+      text: t('onboarding.journalBody'),
     },
     {
       anchor: 'tabs',
       emoji: '🧭',
-      title: 'הניווט הראשי',
-      text: `כאן עוברים בין "היום", "תובנות"${isMobile ? ' ו"המוצרים שלי"' : ''}. ${navHint}`,
+      title: t('onboarding.navTitle'),
+      text: isMobile ? t('onboarding.navBodyMobile') : t('onboarding.navBodyDesktop'),
     },
     {
       anchor: 'insights',
       tab: 'insights',
       emoji: '📈',
-      title: 'תובנות חכמות',
-      text: 'כאן חיים לוח המחוונים והדוחות: ממוצעים ורצפים, התקדמות תקופת הקיטו, ודוחות AI שבועיים/חודשיים שנכתבים אוטומטית ומזהים מגמות והמלצות — בלי שתצטרך/י לבקש.',
+      title: t('onboarding.insightsTitle'),
+      text: t('onboarding.insightsBody'),
     },
     {
       anchor: 'products',
       tab: productsTab,
       emoji: '📦',
-      title: 'המוצרים שלי',
-      text: 'שומרים כאן מוצרים קבועים שאת/ה אוכל/ת הרבה, עם הערכים התזונתיים שלהם. הם קופצים כתגיות מהירות בהוספת ארוחה — וה-AI משתמש בערכים המדויקים שלך.',
+      title: t('onboarding.productsTitle'),
+      text: t('onboarding.productsBody'),
     },
     {
       anchor: 'barcode',
       tab: productsTab,
       emoji: '📷',
-      title: 'סריקת ברקוד',
-      text: 'הכפתור פותח את סורק הברקוד במצלמה — מכוונים לברקוד המוצר וכל הערכים התזונתיים נמשכים אוטומטית. אפשר גם לזהות מוצר מתמונה או להקליד ברקוד ידנית.',
+      title: t('onboarding.barcodeTitle'),
+      text: t('onboarding.barcodeBody'),
     },
     {
       anchor: isMobile ? 'menu' : 'settings',
       emoji: '⚙️',
-      title: 'הגדרות',
-      text: isMobile
-        ? 'פותחים את התפריט (☰) כאן למעלה — ובהגדרות קובעים את היעד היומי, יעד תקופת הקיטו, לשון הפנייה, קישור WhatsApp, מצב כהה, ייצוא דוח, וגם הרצה מחדש של הסיור הזה.'
-        : 'כאן קובעים את היעד היומי, יעד תקופת הקיטו, לשון הפנייה, קישור WhatsApp, מצב כהה, ייצוא דוח — וגם אפשר להריץ מחדש את הסיור הזה בכל רגע.',
+      title: t('onboarding.settingsTitle'),
+      text: isMobile ? t('onboarding.settingsBodyMobile') : t('onboarding.settingsBodyDesktop'),
     },
   ];
 }

@@ -12,6 +12,7 @@ import { ensureDueReports, listReports, markSeen } from '../lib/insightsAgent.js
 import { transcribeAudio, transcribeConfigured, TRANSCRIBE_MODEL } from '../lib/transcribe.js';
 import { recordOpenAIUsage } from '../lib/usage.js';
 import { asyncHandler } from '../lib/http.js';
+import { msg, reqLang, defaultCat, defaultUnit } from '../lib/i18n.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -19,55 +20,63 @@ router.use(requireAuth);
 // POST /api/ai/transcribe { audio (base64), mimeType } -> { text }
 // Server-side speech-to-text for the voice-input mic (mobile-reliable).
 router.post('/transcribe', async (req, res) => {
-  if (!transcribeConfigured()) return res.status(503).json({ error: 'תמלול קולי לא הוגדר בשרת' });
+  if (!transcribeConfigured())
+    return res.status(503).json({ error: msg(req, 'תמלול קולי לא הוגדר בשרת', 'Voice transcription is not configured on the server') });
   const { audio, mimeType } = req.body || {};
-  if (!audio) return res.status(400).json({ error: 'חסר אודיו' });
+  if (!audio) return res.status(400).json({ error: msg(req, 'חסר אודיו', 'Missing audio') });
   try {
     const buffer = Buffer.from(audio, 'base64');
-    if (!buffer.length) return res.status(400).json({ error: 'אודיו ריק' });
-    const { text, duration } = await transcribeAudio(buffer, mimeType || 'audio/webm', 'he');
+    if (!buffer.length) return res.status(400).json({ error: msg(req, 'אודיו ריק', 'Empty audio') });
+    const { text, duration } = await transcribeAudio(buffer, mimeType || 'audio/webm', reqLang(req));
     recordOpenAIUsage({ userId: req.userId, kind: 'transcribe', model: TRANSCRIBE_MODEL(), seconds: duration });
     res.json({ text });
   } catch (err) {
     console.error('transcribe failed:', err.message);
     const m = err.message || '';
-    let error = 'התמלול נכשל כרגע';
-    if (m.includes('401') || m.includes('invalid_api_key')) error = 'מפתח ה-OpenAI שגוי בשרת';
+    let error = msg(req, 'התמלול נכשל כרגע', 'Transcription failed right now');
+    if (m.includes('401') || m.includes('invalid_api_key'))
+      error = msg(req, 'מפתח ה-OpenAI שגוי בשרת', 'The OpenAI API key on the server is invalid');
     else if (m.includes('429') || m.includes('quota') || m.includes('billing'))
-      error = 'אין מכסה/קרדיט בחשבון ה-OpenAI — הוסף/י אמצעי תשלום';
+      error = msg(
+        req,
+        'אין מכסה/קרדיט בחשבון ה-OpenAI — הוסף/י אמצעי תשלום',
+        'No quota/credit on the OpenAI account — add a payment method'
+      );
     res.status(502).json({ error });
   }
 });
 
 // POST /api/ai/estimate-meal { desc } -> { net_carbs, fat, protein, items[] }
 router.post('/estimate-meal', async (req, res) => {
-  if (!aiConfigured()) return res.status(503).json({ error: 'מפתח ה-AI לא הוגדר בשרת' });
+  if (!aiConfigured())
+    return res.status(503).json({ error: msg(req, 'מפתח ה-AI לא הוגדר בשרת', 'The AI key is not configured on the server') });
   const desc = (req.body.desc || '').trim();
-  if (!desc) return res.status(400).json({ error: 'חסר תיאור הארוחה' });
+  if (!desc) return res.status(400).json({ error: msg(req, 'חסר תיאור הארוחה', 'Missing meal description') });
   try {
     const products = await Product.find({ user: req.userId }).lean();
     // Reuse a previously computed estimate for the same description + product
     // context instead of re-calling the AI; only misses hit Claude.
-    const { result } = await estimateMealCached(req.userId, desc, products);
+    const { result } = await estimateMealCached(req.userId, desc, products, reqLang(req));
     res.json(result);
   } catch (err) {
     console.error('estimate-meal failed:', err.message);
-    res.status(502).json({ error: 'החישוב האוטומטי נכשל כרגע' });
+    res.status(502).json({ error: msg(req, 'החישוב האוטומטי נכשל כרגע', 'Automatic calculation failed right now') });
   }
 });
 
 // POST /api/ai/estimate-image { image (base64), mediaType, unit } -> product fields
 router.post('/estimate-image', async (req, res) => {
-  if (!aiConfigured()) return res.status(503).json({ error: 'מפתח ה-AI לא הוגדר בשרת' });
+  if (!aiConfigured())
+    return res.status(503).json({ error: msg(req, 'מפתח ה-AI לא הוגדר בשרת', 'The AI key is not configured on the server') });
   const { image, mediaType, unit } = req.body;
-  if (!image || !mediaType) return res.status(400).json({ error: 'חסרים נתוני תמונה' });
+  if (!image || !mediaType) return res.status(400).json({ error: msg(req, 'חסרים נתוני תמונה', 'Missing image data') });
   try {
     const products = await Product.find({ user: req.userId }).lean();
-    const result = await estimateImage(image, mediaType, unit, products, { userId: req.userId });
+    const result = await estimateImage(image, mediaType, unit, products, { userId: req.userId, lang: reqLang(req) });
     res.json(result);
   } catch (err) {
     console.error('estimate-image failed:', err.message);
-    res.status(502).json({ error: 'זיהוי התמונה נכשל כרגע' });
+    res.status(502).json({ error: msg(req, 'זיהוי התמונה נכשל כרגע', 'Image recognition failed right now') });
   }
 });
 
@@ -79,19 +88,20 @@ router.post('/estimate-image', async (req, res) => {
 router.post('/barcode', async (req, res) => {
   const barcode = String(req.body.barcode || '').replace(/\D/g, '');
   const unit = (req.body.unit || '').trim();
-  if (!barcode) return res.status(400).json({ error: 'ברקוד לא תקין' });
+  const lang = reqLang(req);
+  if (!barcode) return res.status(400).json({ error: msg(req, 'ברקוד לא תקין', 'Invalid barcode') });
 
   let off = null;
   try {
     off = await fetchProductByBarcode(barcode);
   } catch (err) {
     console.error('off lookup failed:', err.message);
-    return res.status(502).json({ error: 'חיפוש המוצר במסד הנתונים נכשל כרגע' });
+    return res.status(502).json({ error: msg(req, 'חיפוש המוצר במסד הנתונים נכשל כרגע', 'Product database lookup failed right now') });
   }
   if (!off) {
     return res
       .status(404)
-      .json({ found: false, barcode, error: 'המוצר לא נמצא במסד הנתונים' });
+      .json({ found: false, barcode, error: msg(req, 'המוצר לא נמצא במסד הנתונים', 'Product not found in the database') });
   }
 
   const hadFiber = off.per100.fiber != null;
@@ -104,21 +114,25 @@ router.post('/barcode', async (req, res) => {
       found: true,
       barcode,
       source: 'off',
-      name: off.name || 'מוצר',
+      name: off.name || msg(req, 'מוצר', 'product'),
       label: baseLabel || off.name || '',
-      unit: unit || '100 גרם',
+      unit: unit || (lang === 'en' ? '100 g' : '100 גרם'),
       net_carbs: raw.net_carbs,
       fat: raw.fat,
       protein: raw.protein,
       breakdown: hadFiber
-        ? 'חישוב גולמי ממסד הנתונים (פחמ\' פחות סיבים).'
-        : 'חישוב גולמי — ערך הסיבים חסר, ייתכן שהפחמימות גבוהות מהאמת.',
+        ? msg(req, 'חישוב גולמי ממסד הנתונים (פחמ\' פחות סיבים).', 'Raw calculation from the database (carbs minus fiber).')
+        : msg(
+            req,
+            'חישוב גולמי — ערך הסיבים חסר, ייתכן שהפחמימות גבוהות מהאמת.',
+            'Raw calculation — fiber value is missing, carbs may be higher than reality.'
+          ),
     });
   }
 
   try {
     const products = await Product.find({ user: req.userId }).lean();
-    const result = await interpretBarcode(off, unit, products, { userId: req.userId });
+    const result = await interpretBarcode(off, unit, products, { userId: req.userId, lang });
     res.json({
       ...result,
       found: true,
@@ -127,7 +141,7 @@ router.post('/barcode', async (req, res) => {
     });
   } catch (err) {
     console.error('barcode interpret failed:', err.message);
-    res.status(502).json({ error: 'עיבוד נתוני הברקוד נכשל כרגע' });
+    res.status(502).json({ error: msg(req, 'עיבוד נתוני הברקוד נכשל כרגע', 'Processing the barcode data failed right now') });
   }
 });
 
@@ -136,9 +150,11 @@ router.post('/barcode', async (req, res) => {
 // ----------------------------------------------------------------------------
 
 const HE_DAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
-const weekday = (iso) => {
+const EN_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const weekday = (iso, lang = 'he') => {
   const [y, m, d] = iso.split('-');
-  return HE_DAYS[new Date(y, m - 1, d).getDay()];
+  const idx = new Date(y, m - 1, d).getDay();
+  return (lang === 'en' ? EN_DAYS : HE_DAYS)[idx];
 };
 
 // Turn the stored raw Anthropic message array into a flat list the client can
@@ -188,10 +204,11 @@ router.get('/chat', asyncHandler(async (req, res) => {
 
 // POST /api/ai/chat { conversationId?, text, image?: { data, mediaType } }
 router.post('/chat', async (req, res) => {
-  if (!aiConfigured()) return res.status(503).json({ error: 'מפתח ה-AI לא הוגדר בשרת' });
+  if (!aiConfigured())
+    return res.status(503).json({ error: msg(req, 'מפתח ה-AI לא הוגדר בשרת', 'The AI key is not configured on the server') });
   const { conversationId, image } = req.body;
   const text = (req.body.text || '').trim();
-  if (!text && !image) return res.status(400).json({ error: 'אין הודעה לשליחה' });
+  if (!text && !image) return res.status(400).json({ error: msg(req, 'אין הודעה לשליחה', 'No message to send') });
 
   try {
     let convo = conversationId
@@ -200,7 +217,7 @@ router.post('/chat', async (req, res) => {
     if (!convo) {
       convo = new Conversation({
         user: req.userId,
-        title: text ? text.slice(0, 40) : 'תמונה',
+        title: text ? text.slice(0, 40) : msg(req, 'תמונה', 'Image'),
         messages: [],
         resolvedActions: {},
       });
@@ -225,26 +242,27 @@ router.post('/chat', async (req, res) => {
     res.json({ conversationId: convo._id, reply, actions });
   } catch (err) {
     console.error('chat failed:', err.status || '', err.message);
-    res.status(502).json(chatError(err));
+    res.status(502).json(chatError(err, reqLang(req)));
   }
 });
 
-// Map a thrown Anthropic API error to a user-facing Hebrew message plus a short
-// `code` so the real cause is visible client-side instead of a blanket
-// "unavailable". Overload/rate-limit (already retried by the SDK) get a
-// distinct "try again in a moment" so the user knows it's transient.
-function chatError(err) {
+// Map a thrown Anthropic API error to a user-facing message plus a short `code`
+// so the real cause is visible client-side instead of a blanket "unavailable".
+// Overload/rate-limit (already retried by the SDK) get a distinct "try again in
+// a moment" so the user knows it's transient. `lang` picks the message language.
+function chatError(err, lang = 'he') {
   const status = err.status; // set by the Anthropic SDK on APIError subclasses
   const m = (err.message || '').toLowerCase();
+  const t = (he, en) => (lang === 'en' ? en : he);
   if (status === 429 || m.includes('rate limit'))
-    return { error: 'השירות עמוס כרגע — נסו שוב בעוד רגע', code: 'rate_limit' };
+    return { error: t('השירות עמוס כרגע — נסו שוב בעוד רגע', 'The service is busy right now — try again in a moment'), code: 'rate_limit' };
   if (status === 529 || m.includes('overloaded'))
-    return { error: 'השירות עמוס כרגע — נסו שוב בעוד רגע', code: 'overloaded' };
+    return { error: t('השירות עמוס כרגע — נסו שוב בעוד רגע', 'The service is busy right now — try again in a moment'), code: 'overloaded' };
   if (status === 401 || m.includes('invalid x-api-key') || m.includes('authentication'))
-    return { error: 'מפתח ה-AI שגוי בשרת', code: 'auth' };
+    return { error: t('מפתח ה-AI שגוי בשרת', 'The AI key on the server is invalid'), code: 'auth' };
   if (status === 400)
-    return { error: 'הבקשה נדחתה על ידי שירות ה-AI', code: 'bad_request' };
-  return { error: 'העוזר אינו זמין כרגע', code: 'unknown' };
+    return { error: t('הבקשה נדחתה על ידי שירות ה-AI', 'The request was rejected by the AI service'), code: 'bad_request' };
+  return { error: t('העוזר אינו זמין כרגע', 'The assistant is unavailable right now'), code: 'unknown' };
 }
 
 // POST /api/ai/chat/:id/new -> not needed; omitting conversationId starts fresh.
@@ -254,9 +272,10 @@ function chatError(err) {
 // so it can't be double-committed and reloads show the right state.
 router.post('/chat/:id/actions/:actionId', asyncHandler(async (req, res) => {
   const { id, actionId } = req.params;
+  const lang = reqLang(req);
   const decision = req.body.decision === 'add' ? 'add' : 'cancel';
   const convo = await Conversation.findOne({ _id: id, user: req.userId });
-  if (!convo) return res.status(404).json({ error: 'שיחה לא נמצאה' });
+  if (!convo) return res.status(404).json({ error: msg(req, 'שיחה לא נמצאה', 'Conversation not found') });
 
   const resolved = convo.resolvedActions || {};
   if (resolved[actionId]) return res.json({ status: resolved[actionId], already: true });
@@ -272,7 +291,7 @@ router.post('/chat/:id/actions/:actionId', asyncHandler(async (req, res) => {
       }
     }
   }
-  if (!block) return res.status(404).json({ error: 'הצעה לא נמצאה' });
+  if (!block) return res.status(404).json({ error: msg(req, 'הצעה לא נמצאה', 'Proposal not found') });
 
   if (decision === 'cancel') {
     resolved[actionId] = 'cancelled';
@@ -290,11 +309,12 @@ router.post('/chat/:id/actions/:actionId', asyncHandler(async (req, res) => {
       const setOnInsert = { user: req.userId, date };
       if (!existing) {
         const count = await Day.countDocuments({ user: req.userId });
-        setOnInsert.label = 'יום ' + (count + 1) + ' · ' + weekday(date);
+        setOnInsert.label =
+          (lang === 'en' ? 'Day ' : 'יום ') + (count + 1) + ' · ' + weekday(date, lang);
       }
       const meal = {
         time: inp.time || '',
-        cat: inp.cat || 'נשנוש / ביניים',
+        cat: inp.cat || defaultCat(lang),
         desc: inp.desc || '',
         carbs: Number(inp.net_carbs) || 0,
         fat: inp.fat == null ? null : Number(inp.fat),
@@ -314,14 +334,14 @@ router.post('/chat/:id/actions/:actionId', asyncHandler(async (req, res) => {
 
     // propose_product
     if (!inp.key || !String(inp.key).trim()) {
-      return res.status(400).json({ error: 'חסר שם למוצר' });
+      return res.status(400).json({ error: msg(req, 'חסר שם למוצר', 'Missing product name') });
     }
     const product = await Product.create({
       user: req.userId,
       key: String(inp.key).trim(),
       label: inp.label || inp.key,
-      unit: inp.unit || 'מנה',
-      cat: inp.cat || 'נשנוש / ביניים',
+      unit: inp.unit || defaultUnit(lang),
+      cat: inp.cat || defaultCat(lang),
       carbs: Number(inp.carbs) || 0,
       fat: Number(inp.fat) || 0,
       protein: Number(inp.protein) || 0,
@@ -333,7 +353,7 @@ router.post('/chat/:id/actions/:actionId', asyncHandler(async (req, res) => {
     return res.json({ status: 'added', kind: 'product', product });
   } catch (err) {
     console.error('commit action failed:', err.message);
-    return res.status(502).json({ error: 'השמירה נכשלה' });
+    return res.status(502).json({ error: msg(req, 'השמירה נכשלה', 'Saving failed') });
   }
 }));
 
@@ -351,13 +371,14 @@ const serverToday = () => new Date().toISOString().slice(0, 10);
 router.get('/insights', asyncHandler(async (req, res) => {
   const today = ISO_RE.test(req.query.today || '') ? req.query.today : serverToday();
   const [user, days] = await Promise.all([
-    User.findById(req.userId).select('dailyCarbTarget ketoGoalMonths gender').lean(),
+    User.findById(req.userId).select('dailyCarbTarget ketoGoalMonths gender language').lean(),
     Day.find({ user: req.userId }).lean(),
   ]);
   const opts = {
     target: user?.dailyCarbTarget ?? 20,
     ketoGoalMonths: user?.ketoGoalMonths ?? 0,
     gender: user?.gender ?? '',
+    lang: user?.language === 'en' ? 'en' : 'he',
     today,
   };
 

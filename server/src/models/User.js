@@ -4,6 +4,10 @@ const userSchema = new mongoose.Schema(
   {
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash: { type: String, required: true },
+    // UI + AI language, chosen once at sign-up. 'he' | 'en'. Existing accounts
+    // predate this field, so read it everywhere as `user.language || 'he'` —
+    // undefined means a legacy Hebrew user (no migration needed).
+    language: { type: String, enum: ['en', 'he'], default: 'he' },
     // Grammatical gender for Hebrew address ('male' | 'female'). Empty = unset,
     // so AI text falls back to neutral dual forms (/ית). Drives correctly-
     // gendered wording in the insight reports.

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import useEmblaCarousel from 'embla-carousel-react';
 import { useMediaQuery, MOBILE_QUERY } from '../lib/useMediaQuery.js';
 import './TabShell.scss';
@@ -9,6 +10,7 @@ import './TabShell.scss';
 // Mobile mounts an Embla carousel with all panels + synced dots.
 // One `active` index is shared, so switching breakpoints keeps your place.
 export default function TabShell({ tabs, onTabChange }) {
+  const { t } = useTranslation();
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const [active, setActive] = useState(0);
   // The tab list can shrink across breakpoints (products is desktop-header-only),
@@ -32,17 +34,17 @@ export default function TabShell({ tabs, onTabChange }) {
   return (
     <div className="tabshell">
       <div className="tabbar" role="tablist" data-tour="tabs">
-        {tabs.map((t, i) => (
+        {tabs.map((tab, i) => (
           <button
-            key={t.id}
+            key={tab.id}
             role="tab"
             aria-selected={i === idx}
-            data-tour-tab={t.id}
+            data-tour-tab={tab.id}
             className={'tabbtn' + (i === idx ? ' active' : '')}
             onClick={() => change(i)}
           >
-            {t.label}
-            {t.badge && <span className="tab-badge" aria-label="חדש" />}
+            {tab.label}
+            {tab.badge && <span className="tab-badge" aria-label={t('tabShell.new')} />}
           </button>
         ))}
       </div>
@@ -54,7 +56,11 @@ export default function TabShell({ tabs, onTabChange }) {
 }
 
 function Carousel({ tabs, active, change }) {
-  const [emblaRef, emblaApi] = useEmblaCarousel({ direction: 'rtl', align: 'start' });
+  const { t, i18n } = useTranslation();
+  const [emblaRef, emblaApi] = useEmblaCarousel({
+    direction: i18n.dir() === 'rtl' ? 'rtl' : 'ltr',
+    align: 'start',
+  });
 
   // Bind once per api: jump to the shared `active` on mount, then mirror swipes back out.
   useEffect(() => {
@@ -71,25 +77,25 @@ function Carousel({ tabs, active, change }) {
   return (
     <div className="carousel">
       <div className="dots" role="tablist" data-tour="tabs">
-        {tabs.map((t, i) => (
+        {tabs.map((tab, i) => (
           <button
-            key={t.id}
+            key={tab.id}
             role="tab"
             aria-selected={i === active}
-            data-tour-tab={t.id}
+            data-tour-tab={tab.id}
             className={'dot' + (i === active ? ' active' : '')}
             onClick={() => goTo(i)}
           >
-            {t.label}
-            {t.badge && <span className="tab-badge" aria-label="חדש" />}
+            {tab.label}
+            {tab.badge && <span className="tab-badge" aria-label={t('tabShell.new')} />}
           </button>
         ))}
       </div>
       <div className="embla" ref={emblaRef}>
         <div className="embla-track">
-          {tabs.map((t) => (
-            <section className="embla-slide" key={t.id}>
-              {t.content}
+          {tabs.map((tab) => (
+            <section className="embla-slide" key={tab.id}>
+              {tab.content}
             </section>
           ))}
         </div>
