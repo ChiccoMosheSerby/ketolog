@@ -93,6 +93,124 @@
   color: var(--accent-ink);
 }
 
+/* ---- day-by-day strip (keto period) + shared strip legend ---- */
+.day-strip {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11px, 1fr));
+  gap: 3px;
+
+  .kcell {
+    aspect-ratio: 1;
+    border-radius: 3px;
+    background: var(--line);
+  }
+  .k-good {
+    background: var(--olive);
+  }
+  .k-over {
+    background: var(--amber);
+  }
+  .k-missed {
+    background: var(--line);
+  }
+  .k-future {
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--line);
+  }
+  .k-today {
+    background: var(--olive-soft);
+    box-shadow: 0 0 0 2px var(--accent-ink);
+  }
+}
+.strip-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+  font-size: 11.5px;
+  color: var(--ink-soft);
+
+  .it {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .sw {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    display: inline-block;
+    background: var(--line);
+
+    &.k-good {
+      background: var(--olive);
+    }
+    &.k-over {
+      background: var(--amber);
+    }
+    &.k-missed {
+      background: var(--line);
+    }
+    &.k-future {
+      background: transparent;
+      box-shadow: inset 0 0 0 1px var(--line);
+    }
+  }
+  /* line swatches for the trend legend */
+  .ln {
+    display: inline-block;
+    width: 16px;
+    height: 0;
+  }
+  .ln.solid {
+    border-top: 2px solid var(--olive);
+    opacity: 0.7;
+  }
+  .ln.bold {
+    border-top: 3px solid var(--olive-dark);
+  }
+  .ln.dash {
+    border-top: 2px dashed var(--amber);
+  }
+}
+
+/* ---- progress trend chart ---- */
+.trend {
+  .trend-svg {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  .trend-tick {
+    fill: var(--ink-soft);
+    font-size: 9px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .trend-mark {
+    font-size: 9px;
+    font-weight: 700;
+    font-family: 'IBM Plex Mono', monospace;
+
+    &.best {
+      fill: var(--accent-ink);
+    }
+    &.worst {
+      fill: var(--red);
+    }
+  }
+  .trend-axis {
+    /* chart draws oldest→newest left-to-right; keep labels aligned to that */
+    direction: ltr;
+    display: flex;
+    justify-content: space-between;
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--ink-soft);
+  }
+}
+
 /* ---- macro balance ---- */
 .macro {
   .macro-bar {

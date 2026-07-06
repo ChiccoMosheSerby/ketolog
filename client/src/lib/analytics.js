@@ -26,6 +26,12 @@ function addMonthsISO(iso, months) {
   const dt = new Date(y, m - 1 + months, d);
   return `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
 }
+// ISO date `n` days after `iso`.
+function addDaysISO(iso, n) {
+  const [y, m, d] = iso.split('-').map(Number);
+  const dt = new Date(y, m - 1, d + n);
+  return `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
+}
 // Whole days between two ISO dates (b - a). ISO strings parse as UTC midnight,
 // so the difference is exact regardless of timezone.
 const diffDays = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
@@ -48,6 +54,33 @@ export function buildKetoProgress(days, goal, today, target = TARGET) {
     (d) => mealsOf(d).length > 0 && d.date >= start && d.date < today && d.date <= end
   );
   const inTarget = inWindow.filter((d) => dayTotal(d) <= target).length;
+
+  // A cell per calendar day across the whole period (start … start+months),
+  // each tagged with its status so the dashboard can paint a day-by-day strip:
+  //   good   — logged, at/under target
+  //   over   — logged, over target
+  //   missed — a past day with no meals logged
+  //   today  — the current (in-progress) day
+  //   future — still ahead
+  const totalByDate = new Map();
+  days.forEach((d) => {
+    if (mealsOf(d).length > 0) totalByDate.set(d.date, dayTotal(d));
+  });
+  const strip = [];
+  for (let i = 0; i < totalDays; i++) {
+    const date = addDaysISO(start, i);
+    let status;
+    if (date > today) status = 'future';
+    else if (date === today) status = 'today';
+    else if (totalByDate.has(date)) status = totalByDate.get(date) <= target ? 'good' : 'over';
+    else status = 'missed';
+    strip.push({
+      date,
+      status,
+      total: totalByDate.has(date) ? round1(totalByDate.get(date)) : null,
+    });
+  }
+
   return {
     start,
     end,
@@ -60,6 +93,7 @@ export function buildKetoProgress(days, goal, today, target = TARGET) {
     loggedInPeriod: inWindow.length,
     inTargetInPeriod: inTarget,
     adherence: inWindow.length ? Math.round((inTarget / inWindow.length) * 100) : 0,
+    strip,
   };
 }
 
