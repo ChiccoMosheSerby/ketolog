@@ -135,17 +135,36 @@
 .macro {
   padding: 14px 20px 2px;
 }
-.macro-bar {
+/* extra specificity + explicit resets: Dashboard.scss defines a global
+   `.macro .macro-bar` (tint track, 16px tall) that would otherwise leak in here */
+.day .macro .macro-bar {
   display: flex;
-  height: 9px;
-  border-radius: 999px;
-  overflow: hidden;
-  background: var(--tint);
-  gap: 2px;
-  > i {
-    display: block;
-    height: 100%;
-    border-radius: 999px;
+  align-items: flex-end;
+  height: auto;
+  background: none;
+  overflow: visible;
+  border-radius: 0;
+  .seg {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    transition: width 0.3s ease;
+    b {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 1;
+      color: var(--ink);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    i {
+      display: block;
+      width: 100%;
+      height: 4px;
+    }
   }
 }
 .macro-legend {
@@ -163,9 +182,8 @@
   }
   .dot {
     display: inline-block;
-    width: 8px;
-    height: 8px;
-    border-radius: 999px;
+    width: 6px;
+    height: 6px;
     margin-inline-end: 5px;
     vertical-align: middle;
   }
@@ -253,6 +271,34 @@
       &:hover {
         opacity: 1;
         background: var(--green-tint);
+      }
+    }
+  }
+  /* per-meal macro split — a slimmer echo of the day bar, with its own numbers */
+  .meal-macro {
+    display: flex;
+    align-items: flex-end;
+    margin-top: 8px;
+    max-width: 220px;
+    .seg {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      b {
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 9px;
+        font-weight: 600;
+        line-height: 1;
+        color: var(--ink-soft);
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+      i {
+        display: block;
+        width: 100%;
+        height: 3px;
       }
     }
   }

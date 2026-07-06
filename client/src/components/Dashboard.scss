@@ -216,7 +216,6 @@
   .macro-bar {
     display: flex;
     height: 16px;
-    border-radius: 999px;
     overflow: hidden;
     background: var(--tint);
 
@@ -231,7 +230,7 @@
     flex-wrap: wrap;
     gap: 14px;
     margin-top: 12px;
-    font-size: 13px;
+    font-size: 11px;
     color: var(--ink-soft);
 
     .it {
@@ -245,8 +244,7 @@
     }
     .dot {
       width: 9px;
-      height: 9px;
-      border-radius: 999px;
+      height: 2px;
       display: inline-block;
     }
   }

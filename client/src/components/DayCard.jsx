@@ -60,9 +60,18 @@ export default function DayCard({
           {hasMacros(day) && mp ? (
             <div className="macro">
               <div className="macro-bar">
-                <i style={{ width: mp.fat + '%', background: 'var(--olive)' }}></i>
-                <i style={{ width: mp.protein + '%', background: 'var(--protein)' }}></i>
-                <i style={{ width: mp.carb + '%', background: 'var(--amber)' }}></i>
+                <span className="seg" style={{ width: mp.fat + '%' }}>
+                  <b>{mp.fat}%</b>
+                  <i style={{ background: 'var(--olive)' }}></i>
+                </span>
+                <span className="seg" style={{ width: mp.protein + '%' }}>
+                  <b>{mp.protein}%</b>
+                  <i style={{ background: 'var(--protein)' }}></i>
+                </span>
+                <span className="seg" style={{ width: mp.carb + '%' }}>
+                  <b>{mp.carb}%</b>
+                  <i style={{ background: 'var(--amber)' }}></i>
+                </span>
               </div>
               <div className="macro-legend">
                 <span>
@@ -92,6 +101,14 @@ export default function DayCard({
             ) : (
               meals.map((m) => {
                 const items = Array.isArray(m.items) ? m.items : [];
+                const mmp =
+                  m.fat != null || m.protein != null
+                    ? macroPct({
+                        carb: Number(m.carbs) || 0,
+                        fat: Number(m.fat) || 0,
+                        protein: Number(m.protein) || 0,
+                      })
+                    : null;
                 return (
                 <div className="meal" key={m._id}>
                   <div className="time">{m.time || '--:--'}</div>
@@ -119,6 +136,25 @@ export default function DayCard({
                           </li>
                         ))}
                       </ul>
+                    )}
+                    {mmp && (
+                      <div
+                        className="meal-macro"
+                        title={`שומן ${mmp.fat}% · חלבון ${mmp.protein}% · פחמ' ${mmp.carb}%`}
+                      >
+                        <span className="seg" style={{ width: mmp.fat + '%' }}>
+                          <b>{mmp.fat}%</b>
+                          <i style={{ background: 'var(--olive)' }}></i>
+                        </span>
+                        <span className="seg" style={{ width: mmp.protein + '%' }}>
+                          <b>{mmp.protein}%</b>
+                          <i style={{ background: 'var(--protein)' }}></i>
+                        </span>
+                        <span className="seg" style={{ width: mmp.carb + '%' }}>
+                          <b>{mmp.carb}%</b>
+                          <i style={{ background: 'var(--amber)' }}></i>
+                        </span>
+                      </div>
                     )}
                   </div>
                   <div className="carb">{fmt(Number(m.carbs) || 0)} ג'</div>
