@@ -29,8 +29,17 @@ const COLS = [
   ['fat', 'שומן', true],
   ['protein', 'חלבון', true],
   ['usedCount', 'שימושים', true],
-  ['updatedAt', 'עודכן', true],
+  ['lastUsed', 'שימוש אחרון', true],
 ];
+
+// Days since a date, for the "old vs still useful" read. Infinity if unknown.
+function ageDays(d) {
+  if (!d) return Infinity;
+  const t = new Date(d).getTime();
+  if (Number.isNaN(t)) return Infinity;
+  return (Date.now() - t) / 86400000;
+}
+const STALE_DAYS = 120; // not logged in ~4 months → visibly stale
 
 export default function AdminCatalog({ open, onClose }) {
   const [state, setState] = useState({ status: 'loading', items: [], error: null });
@@ -87,7 +96,7 @@ export default function AdminCatalog({ open, onClose }) {
       if (min && (Number(it.usedCount) || 0) < min) return false;
       if (onlyMissing && it.fat != null && it.protein != null) return false;
       if (matcher.test) {
-        const hay = `${it.name || ''} ${it.unit || ''}`;
+        const hay = `${it.name || ''} ${it.label || ''} ${it.unit || ''}`;
         if (!matcher.test(hay)) return false;
       }
       return true;
@@ -100,7 +109,7 @@ export default function AdminCatalog({ open, onClose }) {
       if (col === 'name' || col === 'unit') {
         return String(av || '').localeCompare(String(bv || ''), 'he') * mul;
       }
-      if (col === 'updatedAt') {
+      if (col === 'lastUsed') {
         av = new Date(av || 0).getTime();
         bv = new Date(bv || 0).getTime();
       } else {
@@ -202,17 +211,25 @@ export default function AdminCatalog({ open, onClose }) {
                       <td colSpan={COLS.length} className="ct-empty">אין מוצרים תואמים.</td>
                     </tr>
                   ) : (
-                    rows.map((it) => (
-                      <tr key={it._id} className={it.fat == null || it.protein == null ? 'missing' : ''}>
-                        <td className="ct-name">{it.name}</td>
-                        <td>{it.unit || '—'}</td>
-                        <td className="num">{fmt(it.carbs)}</td>
-                        <td className="num">{fmt(it.fat)}</td>
-                        <td className="num">{fmt(it.protein)}</td>
-                        <td className="num ct-uses">{(Number(it.usedCount) || 0).toLocaleString('he-IL')}</td>
-                        <td className="num ct-date">{fmtDate(it.updatedAt)}</td>
-                      </tr>
-                    ))
+                    rows.map((it) => {
+                      const stale = ageDays(it.lastUsed) > STALE_DAYS;
+                      return (
+                        <tr key={it._id} className={it.fat == null || it.protein == null ? 'missing' : ''}>
+                          <td className="ct-name">
+                            <span className="ct-nm">{it.name}</span>
+                            {it.label && <span className="ct-lbl">{it.label}</span>}
+                          </td>
+                          <td>{it.unit || '—'}</td>
+                          <td className="num">{fmt(it.carbs)}</td>
+                          <td className="num">{fmt(it.fat)}</td>
+                          <td className="num">{fmt(it.protein)}</td>
+                          <td className="num ct-uses">{(Number(it.usedCount) || 0).toLocaleString('he-IL')}</td>
+                          <td className={'num ct-date' + (stale ? ' stale' : '')} title={stale ? 'לא נרשם זמן רב' : ''}>
+                            {fmtDate(it.lastUsed)}
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>

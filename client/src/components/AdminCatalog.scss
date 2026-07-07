@@ -189,9 +189,25 @@
 
   tbody tr:hover td { background: var(--tint, rgba(20, 154, 94, 0.08)); }
 
-  .ct-name { font-weight: 600; white-space: normal; }
+  .ct-name {
+    white-space: normal;
+    max-width: 340px;
+    .ct-nm { display: block; font-weight: 600; }
+    .ct-lbl {
+      display: block;
+      margin-top: 2px;
+      font-size: 11.5px;
+      font-weight: 400;
+      color: var(--ink-soft);
+      line-height: 1.35;
+    }
+  }
   .ct-uses { font-weight: 700; color: var(--olive, #149a5e); }
-  .ct-date { font-size: 11.5px; color: var(--ink-soft); }
+  .ct-date {
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    &.stale { color: var(--amber, #c8912e); }
+  }
 
   /* items missing fat/protein — flag as cleanup candidates */
   tbody tr.missing td { background: rgba(217, 83, 79, 0.06); }

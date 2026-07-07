@@ -3,7 +3,9 @@
 // Idempotent: each run re-syncs usedCount to the app-wide truth rather than
 // adding to it, so it's safe to run repeatedly. Meals with no items[] are skipped.
 //
-// Usage (from the server/ directory):  node scripts/backfillCatalog.js
+// Usage (from the server/ directory):
+//   node scripts/backfillCatalog.js            re-sync counts into the catalog
+//   node scripts/backfillCatalog.js --fresh    wipe the catalog first, clean start
 import 'dotenv/config';
 import mongoose from 'mongoose';
 import { connectDB } from '../src/db.js';
@@ -11,7 +13,12 @@ import CatalogItem from '../src/models/CatalogItem.js';
 import { recomputeCatalog } from '../src/lib/catalog.js';
 
 async function main() {
+  const fresh = process.argv.includes('--fresh');
   await connectDB(process.env.MONGODB_URI);
+  if (fresh) {
+    const { deletedCount } = await CatalogItem.deleteMany({});
+    console.log(`⌫ Cleared catalog: ${deletedCount} items removed.`);
+  }
   const { daysScanned, itemsProcessed, distinctKeys } = await recomputeCatalog();
 
   const top = await CatalogItem.find({}).sort({ usedCount: -1 }).limit(15).lean();

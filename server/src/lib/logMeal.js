@@ -73,7 +73,7 @@ export async function logMealFromDesc({ userId, desc, date, time }) {
     { new: true, upsert: true }
   );
   // Feed the global learned-product catalog (best-effort; never blocks the log).
-  captureItemsToCatalog(meal.items);
+  captureItemsToCatalog(meal.items, meal.desc, day0);
 
   return { result, meal, day, date: day0 };
 }

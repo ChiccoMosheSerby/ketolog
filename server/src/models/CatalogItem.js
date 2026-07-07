@@ -15,6 +15,9 @@ const catalogItemSchema = new mongoose.Schema(
     // canonical dedup key (normalized name) — one entry per food, app-wide
     key: { type: String, required: true, unique: true },
     name: { type: String, default: '' }, // display name (trimmed original)
+    // description / details: a matching saved Product's label when one exists,
+    // otherwise the free text of a single-item meal it came from. May be empty.
+    label: { type: String, default: '' },
     unit: { type: String, default: '' },
     carbs: { type: Number, default: 0 }, // net carbs per single unit
     fat: { type: Number, default: null }, // per single unit
@@ -22,6 +25,10 @@ const catalogItemSchema = new mongoose.Schema(
     // Times this item has been logged app-wide (weighted by qty). Usage score
     // that both orders serving suggestions and drives the /optimize merge logic.
     usedCount: { type: Number, default: 0 },
+    // Date of the most recent meal (by the meal's own day, not the row's write
+    // time) that logged this item — so a stale product is visibly stale even
+    // right after a backfill. Drives the "still useful vs old" read.
+    lastUsed: { type: Date, default: null },
   },
   { timestamps: true } // createdAt = first seen, updatedAt = last used
 );

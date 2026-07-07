@@ -71,7 +71,7 @@ router.post('/:date/meals', asyncHandler(async (req, res) => {
     { new: true, upsert: true }
   );
   // Feed the global learned-product catalog (best-effort; never blocks the log).
-  captureItemsToCatalog(meal.items);
+  captureItemsToCatalog(meal.items, meal.desc, date);
   res.status(201).json(day);
 }));
 
