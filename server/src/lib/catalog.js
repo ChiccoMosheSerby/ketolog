@@ -1,4 +1,5 @@
 import CatalogItem from '../models/CatalogItem.js';
+import CatalogMerge from '../models/CatalogMerge.js';
 import Day from '../models/Day.js';
 import Product from '../models/Product.js';
 
@@ -37,17 +38,39 @@ async function productLabelMap() {
   return map;
 }
 
+// alias key -> canonical key, from the APPLIED rows of the durable merge table.
+// Chains are resolved to the ultimate canonical (with a cycle guard), so the map
+// is flat and a single get() lands on the surviving item. Every catalog write
+// path routes keys through this map — that is what makes merges permanent:
+// a logged rephrase bumps its main item instead of resurrecting the alias row.
+export async function aliasRemap() {
+  const merges = await CatalogMerge.find({ status: 'applied' }, { aliasKey: 1, canonicalKey: 1 }).lean();
+  const raw = new Map(merges.map((m) => [m.aliasKey, m.canonicalKey]));
+  const flat = new Map();
+  for (const [alias, canonical] of raw) {
+    let target = canonical;
+    const seen = new Set([alias]);
+    while (raw.has(target) && !seen.has(target)) {
+      seen.add(target);
+      target = raw.get(target);
+    }
+    flat.set(alias, target);
+  }
+  return flat;
+}
+
 // LIVE path — called after a single meal is logged (any user). Upserts each item
-// into the global catalog keyed on its normalized name: first capture seeds the
-// per-unit macros + a description (matching product label, else the meal's own
-// text when it's a single-item meal), every capture bumps usedCount by the item's
-// qty and advances lastUsed to the meal's date. Fire-and-forget — never let a
-// catalog write break logging.
+// into the global catalog keyed on its normalized name (remapped through the
+// merge table, so a rephrase of a merged item credits the main item): first
+// capture seeds the per-unit macros + a description (matching product label,
+// else the meal's own text when it's a single-item meal), every capture bumps
+// usedCount by the item's qty and advances lastUsed to the meal's date.
+// Fire-and-forget — never let a catalog write break logging.
 export async function captureItemsToCatalog(items, mealDesc, date) {
   try {
     const arr = Array.isArray(items) ? items : [];
     if (!arr.length) return;
-    const labelMap = await productLabelMap();
+    const [labelMap, remap] = await Promise.all([productLabelMap(), aliasRemap()]);
     // Only a single-item meal's text truly describes that one item; for a
     // multi-item meal the free text is the whole plate, so we don't stamp it.
     const fallback = arr.length === 1 ? String(mealDesc || '').trim() : '';
@@ -56,8 +79,9 @@ export async function captureItemsToCatalog(items, mealDesc, date) {
     const ops = [];
     for (const it of arr) {
       const name = String(it?.name || '').trim();
-      const key = catalogKey(name);
-      if (!key) continue;
+      const rawKey = catalogKey(name);
+      if (!rawKey) continue;
+      const key = remap.get(rawKey) || rawKey;
       const qty = Number(it?.qty) > 0 ? Number(it.qty) : 1;
       const label = labelMap.get(key) || fallback;
       ops.push({
@@ -92,12 +116,20 @@ export async function captureItemsToCatalog(items, mealDesc, date) {
 // Idempotent by design: re-running always converges to the app-wide truth
 // (unlike the live $inc path), so it's safe to run any time to reconcile.
 // Only meals that already carry an items[] breakdown contribute.
+//
+// Merge-aware: every item key is remapped through the durable merge table, so a
+// backfill can never resurrect a folded-away rephrase or reset its main item's
+// count — applied merges are re-applied, not undone. Alias rows are re-derived
+// and stale ones deleted; entries an admin curated (`verified`) keep their label.
 // Returns a summary for the CLI.
 export async function recomputeCatalog() {
+  const remap = await aliasRemap();
+
   // key -> { key, name, unit, carbs, fat, protein, usedCount, lastUsed(ms), descFallback }
   const acc = new Map();
   let daysScanned = 0;
   let itemsProcessed = 0;
+  let mergesApplied = 0;
 
   const cursor = Day.find({}, { date: 1, meals: 1 }).lean().cursor();
   for await (const day of cursor) {
@@ -108,8 +140,10 @@ export async function recomputeCatalog() {
       const fallback = mealItems.length === 1 ? String(meal.desc || '').trim() : '';
       for (const it of mealItems) {
         const name = String(it?.name || '').trim();
-        const key = catalogKey(name);
-        if (!key) continue;
+        const rawKey = catalogKey(name);
+        if (!rawKey) continue;
+        const key = remap.get(rawKey) || rawKey;
+        if (key !== rawKey) mergesApplied++;
         itemsProcessed++;
         const qty = Number(it?.qty) > 0 ? Number(it.qty) : 1;
         const cur = acc.get(key);
@@ -137,6 +171,10 @@ export async function recomputeCatalog() {
   }
 
   const labelMap = await productLabelMap();
+  // Admin-curated entries keep their hand-written label/description.
+  const verifiedKeys = new Set(
+    (await CatalogItem.find({ verified: true }, { key: 1 }).lean()).map((d) => d.key)
+  );
   const ops = [...acc.values()].map((v) => ({
     updateOne: {
       filter: { key: v.key },
@@ -146,7 +184,9 @@ export async function recomputeCatalog() {
         $set: {
           usedCount: v.usedCount,
           lastUsed: new Date(v.lastUsed),
-          label: labelMap.get(v.key) || v.descFallback || '',
+          ...(verifiedKeys.has(v.key)
+            ? {}
+            : { label: labelMap.get(v.key) || v.descFallback || '' }),
         },
         $setOnInsert: {
           key: v.key,
@@ -162,5 +202,20 @@ export async function recomputeCatalog() {
   }));
   if (ops.length) await CatalogItem.bulkWrite(ops, { ordered: false });
 
-  return { daysScanned, itemsProcessed, distinctKeys: acc.size };
+  // Re-derive the aliases cache from the merge table and drop any alias rows a
+  // pre-merge state may have left behind — the backfill converges to the merged
+  // truth no matter what it started from.
+  const aliasesByCanonical = new Map();
+  for (const [alias, canonical] of remap) {
+    if (!aliasesByCanonical.has(canonical)) aliasesByCanonical.set(canonical, []);
+    aliasesByCanonical.get(canonical).push(alias);
+  }
+  const aliasOps = [...aliasesByCanonical.entries()].map(([canonical, aliases]) => ({
+    updateOne: { filter: { key: canonical }, update: { $set: { aliases: aliases.sort() } } },
+  }));
+  if (aliasOps.length) await CatalogItem.bulkWrite(aliasOps, { ordered: false });
+  const aliasKeys = [...remap.keys()];
+  if (aliasKeys.length) await CatalogItem.deleteMany({ key: { $in: aliasKeys } });
+
+  return { daysScanned, itemsProcessed, distinctKeys: acc.size, mergesApplied };
 }

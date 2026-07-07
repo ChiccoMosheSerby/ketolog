@@ -181,7 +181,18 @@ export default function DayCard({
                     onSave={onSetMealTime ? (t) => onSetMealTime(iso, m._id, t) : null}
                   />
                   <div className="body">
-                    <div className="desc">{m.desc || m.cat}</div>
+                    <div className="desc">
+                      {m.desc || m.cat}
+                      {m.source === 'catalog' && (
+                        <span className="meal-src" title="חושב מקטלוג המוצרים הנלמד — ללא AI">📖</span>
+                      )}
+                      {m.source === 'local' && (
+                        <span className="meal-src" title="חושב מהמוצרים השמורים שלך — ללא AI">🧮</span>
+                      )}
+                      {m.source === 'ai' && (
+                        <span className="meal-src" title="חושב באמצעות AI">🤖</span>
+                      )}
+                    </div>
                     {items.length > 0 && (
                       <ul className="meal-items">
                         {items.map((it, i) => (

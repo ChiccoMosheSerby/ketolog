@@ -29,8 +29,26 @@ const catalogItemSchema = new mongoose.Schema(
     // time) that logged this item — so a stale product is visibly stale even
     // right after a backfill. Drives the "still useful vs old" read.
     lastUsed: { type: Date, default: null },
+    // Normalized rephrasings folded under this item (a match on any of them
+    // selects this entry). Denormalized cache of the applied CatalogMerge rows —
+    // the merge collection is the durable truth; this array is rebuilt from it
+    // by recomputeCatalog so a backfill can never lose a merge.
+    aliases: { type: [String], default: [] },
+    // True once an admin has vouched for the entry — either by creating it
+    // manually (with hand-calculated macros) or by approving a merge onto it.
+    // recomputeCatalog preserves the label/name of verified entries.
+    verified: { type: Boolean, default: false },
+    // Short note from an optimize scan (e.g. a flagged macro concern). Cleared
+    // by the admin once handled.
+    reviewNote: { type: String, default: '' },
+    // The optimize-prompt version that last examined this row. Rows below the
+    // current OPTIMIZE_PROMPT_VERSION are eligible for the next scan.
+    optimizeVersion: { type: Number, default: 0 },
   },
   { timestamps: true } // createdAt = first seen, updatedAt = last used
 );
+
+// The resolver looks items up by canonical key OR any alias in one query.
+catalogItemSchema.index({ aliases: 1 });
 
 export default mongoose.model('CatalogItem', catalogItemSchema);

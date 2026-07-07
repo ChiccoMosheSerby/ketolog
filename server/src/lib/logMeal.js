@@ -59,6 +59,7 @@ export async function logMealFromDesc({ userId, desc, date, time }) {
     fat: result.fat == null ? null : Number(result.fat),
     protein: result.protein == null ? null : Number(result.protein),
     items: Array.isArray(result.items) ? result.items : [],
+    source: result.source === 'catalog' ? 'catalog' : 'ai',
   };
 
   const existing = await Day.findOne({ user: userId, date: day0 }).lean();

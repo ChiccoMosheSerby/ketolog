@@ -60,9 +60,18 @@ const cleanMealItems = (arr) =>
 // POST /api/days/:date/meals  -> add a meal, creating the day if needed
 router.post('/:date/meals', asyncHandler(async (req, res) => {
   const { date } = req.params;
-  const { time = '', cat = '', desc = '', carbs = 0, fat = null, protein = null, items, label } =
+  const { time = '', cat = '', desc = '', carbs = 0, fat = null, protein = null, items, label, source } =
     req.body;
-  const meal = { time, cat, desc, carbs: Number(carbs) || 0, fat, protein, items: cleanMealItems(items) };
+  const meal = {
+    time,
+    cat,
+    desc,
+    carbs: Number(carbs) || 0,
+    fat,
+    protein,
+    items: cleanMealItems(items),
+    source: ['catalog', 'ai', 'local'].includes(source) ? source : '',
+  };
   const setOnInsert = { user: req.userId, date };
   if (label) setOnInsert.label = label;
   const day = await Day.findOneAndUpdate(

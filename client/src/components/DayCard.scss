@@ -251,6 +251,13 @@
     font-weight: 400;
     line-height: 1.45;
   }
+  /* how the meal was calculated: 📖 catalog / 🧮 saved products / 🤖 AI */
+  .meal-src {
+    margin-inline-start: 6px;
+    font-size: 11.5px;
+    opacity: 0.75;
+    cursor: help;
+  }
   /* per-item breakdown — one line per part of the meal */
   .meal-items {
     list-style: none;

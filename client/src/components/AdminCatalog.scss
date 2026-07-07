@@ -29,6 +29,29 @@
   gap: 12px;
 }
 
+/* the /admin route: same card, full page instead of a modal */
+.ct-page {
+  min-height: 100vh;
+  padding: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+
+  .ct-modal.ct-aspage {
+    max-width: 980px;
+    max-height: none;
+    overflow-y: visible;
+    box-shadow: none;
+  }
+}
+.ct-back {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--olive, #149a5e);
+  text-decoration: none;
+  &:hover { text-decoration: underline; }
+}
+
 .ct-head {
   display: flex;
   align-items: center;
@@ -57,6 +80,210 @@
   color: var(--ink-soft);
   text-align: center;
   padding: 16px 0;
+}
+
+/* ---- optimization action bar ---- */
+.ct-actionbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.ct-btn {
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--ink);
+  background: var(--bg, rgba(0, 0, 0, 0.02));
+  border: 1px solid var(--line);
+  border-radius: var(--r-md, 12px);
+  padding: 7px 12px;
+  cursor: pointer;
+  b { font-variant-numeric: tabular-nums; }
+  &:hover:not(:disabled) { border-color: var(--olive, #149a5e); color: var(--olive, #149a5e); }
+  &:disabled { opacity: 0.55; cursor: default; }
+  &.primary {
+    background: var(--olive, #149a5e);
+    border-color: var(--olive, #149a5e);
+    color: #fff;
+    font-weight: 600;
+    &:hover:not(:disabled) { color: #fff; filter: brightness(1.06); }
+  }
+  &.active { border-color: var(--olive, #149a5e); background: var(--tint, rgba(20, 154, 94, 0.08)); }
+  &.ok { border-color: var(--olive, #149a5e); color: var(--olive, #149a5e); font-weight: 600; }
+  &.danger { border-color: rgba(217, 83, 79, 0.5); color: #d9534f; }
+}
+
+/* the feature kill switch — OFF = the app behaves exactly like before */
+.ct-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  background: var(--bg, rgba(0, 0, 0, 0.02));
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 12px;
+  cursor: pointer;
+  &:disabled { opacity: 0.55; cursor: default; }
+
+  .ct-knob {
+    width: 30px;
+    height: 16px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ink) 20%, transparent);
+    position: relative;
+    transition: background 0.15s ease;
+    &::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      inset-inline-start: 2px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #fff;
+      transition: transform 0.15s ease;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+    }
+  }
+  &.on {
+    color: var(--olive, #149a5e);
+    border-color: var(--olive, #149a5e);
+    .ct-knob { background: var(--olive, #149a5e); }
+    .ct-knob::after { transform: translateX(-14px); } /* RTL: knob slides left */
+  }
+}
+
+.ct-scanstat {
+  font-size: 11.5px;
+  color: var(--ink-soft);
+}
+.ct-msg {
+  font-size: 12.5px;
+  color: var(--olive, #149a5e);
+  background: var(--tint, rgba(20, 154, 94, 0.08));
+  border: 1px solid color-mix(in srgb, var(--olive, #149a5e) 35%, transparent);
+  border-radius: var(--r-md, 12px);
+  padding: 7px 12px;
+  &.bad {
+    color: #d9534f;
+    background: rgba(217, 83, 79, 0.07);
+    border-color: rgba(217, 83, 79, 0.35);
+  }
+}
+.ct-pending { color: var(--amber, #c8912e); }
+
+/* ---- merge requests panel ---- */
+.ct-merges {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 2px;
+}
+.ct-mergecard {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md, 12px);
+  padding: 10px 12px;
+  background: var(--bg, rgba(0, 0, 0, 0.02));
+}
+.ct-mergemain { flex: 1 1 300px; min-width: 240px; }
+.ct-mergepair {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 13px;
+  .ct-fold { color: var(--ink-soft); text-decoration: line-through solid color-mix(in srgb, var(--ink-soft) 55%, transparent) 1px; }
+  .ct-arrow { font-size: 11px; color: var(--ink-soft); }
+  .ct-canon { font-weight: 700; color: var(--olive, #149a5e); }
+}
+.ct-mergemeta {
+  margin-top: 3px;
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  line-height: 1.4;
+}
+.ct-mergeacts {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* ---- manual merge / manual product forms ---- */
+.ct-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px dashed color-mix(in srgb, var(--olive, #149a5e) 45%, transparent);
+  border-radius: var(--r-md, 12px);
+  padding: 12px;
+
+  .ct-formtitle { font-size: 13px; font-weight: 700; color: var(--ink); }
+
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 11.5px;
+    color: var(--ink-soft);
+  }
+  input {
+    padding: 7px 10px;
+    font: inherit;
+    font-size: 13px;
+    color: var(--ink);
+    background: var(--bg, rgba(0, 0, 0, 0.02));
+    border: 1px solid var(--line);
+    border-radius: var(--r-md, 12px);
+    outline: none;
+    &:focus { border-color: var(--olive, #149a5e); }
+    &[type='number'] { direction: ltr; text-align: center; }
+  }
+}
+.ct-formgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px;
+}
+.ct-formacts { display: flex; gap: 6px; }
+.ct-formaliases {
+  font-size: 11.5px;
+  color: var(--ink-soft);
+
+  .ct-alias {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin: 2px 3px;
+    padding: 2px 8px;
+    border: 1px solid color-mix(in srgb, var(--olive, #149a5e) 40%, transparent);
+    border-radius: 999px;
+    color: var(--ink);
+    background: var(--card);
+
+    .ct-aliasx {
+      font: inherit;
+      font-size: 10px;
+      line-height: 1;
+      background: transparent;
+      border: none;
+      color: var(--ink-soft);
+      cursor: pointer;
+      padding: 0 1px;
+      &:hover { color: #d9534f; }
+      &:disabled { opacity: 0.5; cursor: default; }
+    }
+  }
 }
 
 /* ---- controls ---- */
@@ -200,6 +427,96 @@
       font-weight: 400;
       color: var(--ink-soft);
       line-height: 1.35;
+    }
+    .ct-verified {
+      margin-inline-start: 5px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--olive, #149a5e);
+    }
+    .ct-flagnote {
+      display: block;
+      margin-top: 2px;
+      font-size: 11px;
+      color: var(--amber, #c8912e);
+      line-height: 1.35;
+    }
+    .ct-aliasbtn {
+      display: inline-block;
+      margin-top: 3px;
+      font: inherit;
+      font-size: 11px;
+      color: var(--olive, #149a5e);
+      background: transparent;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      &:hover { text-decoration: underline; }
+    }
+  }
+  .ct-actth { width: 1%; }
+  .ct-selth { width: 1%; }
+  .ct-selcell {
+    width: 1%;
+    text-align: center;
+    input { accent-color: var(--olive, #149a5e); cursor: pointer; }
+  }
+  tbody tr.sel td { background: var(--tint, rgba(20, 154, 94, 0.1)) !important; }
+  .ct-rowacts {
+    white-space: nowrap;
+    button {
+      font: inherit;
+      font-size: 12.5px;
+      background: transparent;
+      border: none;
+      color: var(--ink-soft);
+      cursor: pointer;
+      padding: 2px 4px;
+      &:hover { color: var(--olive, #149a5e); }
+    }
+  }
+  tr.ct-aliasrow td {
+    white-space: normal;
+    background: var(--tint, rgba(20, 154, 94, 0.06)) !important;
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    .ct-aliaslead { margin-inline-end: 6px; }
+    .ct-alias {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin: 2px 3px;
+      padding: 2px 8px;
+      border: 1px solid color-mix(in srgb, var(--olive, #149a5e) 40%, transparent);
+      border-radius: 999px;
+      color: var(--ink);
+      background: var(--card);
+      font-size: 11.5px;
+
+      .ct-aliasx {
+        font: inherit;
+        font-size: 10px;
+        line-height: 1;
+        background: transparent;
+        border: none;
+        color: var(--ink-soft);
+        cursor: pointer;
+        padding: 0 1px;
+        &:hover { color: #d9534f; }
+        &:disabled { opacity: 0.5; cursor: default; }
+      }
+    }
+    .ct-aliasadd {
+      font: inherit;
+      font-size: 11px;
+      margin-inline-start: 4px;
+      padding: 2px 8px;
+      border: 1px dashed color-mix(in srgb, var(--olive, #149a5e) 50%, transparent);
+      border-radius: 999px;
+      background: transparent;
+      color: var(--olive, #149a5e);
+      cursor: pointer;
+      &:hover { background: var(--tint, rgba(20, 154, 94, 0.08)); }
     }
   }
   .ct-uses { font-weight: 700; color: var(--olive, #149a5e); }

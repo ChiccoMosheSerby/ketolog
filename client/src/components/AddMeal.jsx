@@ -32,6 +32,7 @@ export default function AddMeal({
   });
   const [items, setItems] = useState([]); // per-item breakdown from the last calc
   const [note, setNote] = useState(null); // { html } via structured fields
+  const [calcSource, setCalcSource] = useState(""); // 'catalog' | 'ai' | '' — where the last calc came from
   const [busy, setBusy] = useState(false);
   // Structured list of saved products the user tapped in, kept alongside the free
   // text. `descIsPure` stays true only while the description was built *solely*
@@ -65,6 +66,7 @@ export default function AddMeal({
     setNote(null);
     setPendingMacro({ fat: null, protein: null });
     setItems([]);
+    setCalcSource("");
   }
 
   // Any hand-typed / dictated / template text means the description is no longer
@@ -156,11 +158,14 @@ export default function AddMeal({
     toast("התבנית נוספה לפירוט");
   }
 
-  async function doAdd(carbsValue, macro, mealItems) {
+  // `source` must be passed explicitly when doAdd runs right after a calc —
+  // the calcSource state set moments earlier isn't visible yet in this closure.
+  async function doAdd(carbsValue, macro, mealItems, source) {
     if (!date) {
       toast("בחר/י תאריך");
       return;
     }
+    const src = source ?? calcSource;
     const meal = {
       time: nowHM(),
       desc: desc.trim(),
@@ -168,6 +173,7 @@ export default function AddMeal({
       fat: macro?.fat ?? null,
       protein: macro?.protein ?? null,
       items: mealItems ?? items,
+      source: src,
     };
     await onLogged(date, meal);
     setDesc("");
@@ -175,7 +181,15 @@ export default function AddMeal({
     setPicked([]);
     setDescIsPure(true);
     clearNote();
-    toast("הארוחה נרשמה");
+    toast(
+      src === "catalog"
+        ? "הארוחה נרשמה · 📖 ללא AI (מהקטלוג)"
+        : src === "local"
+          ? "הארוחה נרשמה · 🧮 ללא AI (מהמוצרים שלך)"
+          : src === "ai"
+            ? "הארוחה נרשמה · 🤖 חושב ב-AI"
+            : "הארוחה נרשמה"
+    );
   }
 
   async function runCalc(thenLog) {
@@ -190,6 +204,7 @@ export default function AddMeal({
       setCarb(fmt(t.carbs));
       setPendingMacro({ fat: t.fat, protein: t.protein });
       setItems(t.items);
+      setCalcSource("local");
       setNote({
         carbs: fmt(t.carbs),
         fat: t.fat == null ? "?" : fmt(t.fat),
@@ -201,7 +216,7 @@ export default function AddMeal({
         items: t.items,
         local: true,
       });
-      if (thenLog) await doAdd(t.carbs, { fat: t.fat, protein: t.protein }, t.items);
+      if (thenLog) await doAdd(t.carbs, { fat: t.fat, protein: t.protein }, t.items, "local");
       return;
     }
     setBusy(true);
@@ -212,6 +227,8 @@ export default function AddMeal({
       const fat = Number(r.fat);
       const prot = Number(r.protein);
       const mealItems = Array.isArray(r.items) ? r.items : [];
+      const fromCatalog = r.source === "catalog";
+      setCalcSource(fromCatalog ? "catalog" : "ai");
       const carbsValue = isNaN(n) ? "" : fmt(n);
       const macro = {
         fat: isNaN(fat) ? null : fat,
@@ -230,8 +247,10 @@ export default function AddMeal({
         protein: isNaN(prot) ? "?" : fmt(prot),
         mp,
         items: mealItems,
+        catalog: fromCatalog,
+        ai: !fromCatalog,
       });
-      if (thenLog && !isNaN(n)) await doAdd(carbsValue, macro, mealItems);
+      if (thenLog && !isNaN(n)) await doAdd(carbsValue, macro, mealItems, fromCatalog ? "catalog" : "ai");
     } catch {
       setNote({
         error:
@@ -368,7 +387,19 @@ export default function AddMeal({
               {note.local && (
                 <span className="bd">
                   <br />
-                  חושב מהמוצרים השמורים שלך — ללא AI.
+                  🧮 ללא AI — חושב מהמוצרים השמורים שלך.
+                </span>
+              )}
+              {note.catalog && (
+                <span className="bd">
+                  <br />
+                  📖 ללא AI — חושב מקטלוג המוצרים הנלמד.
+                </span>
+              )}
+              {note.ai && (
+                <span className="bd">
+                  <br />
+                  🤖 חושב באמצעות AI.
                 </span>
               )}
               {note.items && note.items.length > 0 && (
