@@ -72,6 +72,23 @@ router.post('/:date/meals', asyncHandler(async (req, res) => {
   res.status(201).json(day);
 }));
 
+// PATCH /api/days/:date/meals/:mealId  -> update a single meal's time (HH:MM).
+// Meals are sorted by this string in the UI, so changing it reorders the day.
+router.patch('/:date/meals/:mealId', asyncHandler(async (req, res) => {
+  const { date, mealId } = req.params;
+  const { time } = req.body;
+  if (typeof time !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) {
+    return res.status(400).json({ error: 'שעה לא חוקית (HH:MM)' });
+  }
+  const day = await Day.findOneAndUpdate(
+    { user: req.userId, date, 'meals._id': mealId },
+    { $set: { 'meals.$.time': time } },
+    { new: true }
+  );
+  if (!day) return res.status(404).json({ error: 'ארוחה לא נמצאה' });
+  res.json(day);
+}));
+
 // DELETE /api/days/:date/meals/:mealId
 router.delete('/:date/meals/:mealId', asyncHandler(async (req, res) => {
   const { date, mealId } = req.params;

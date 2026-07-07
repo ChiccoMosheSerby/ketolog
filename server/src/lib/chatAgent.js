@@ -81,7 +81,6 @@ const TOOLS = [
       type: 'object',
       properties: {
         date: { type: 'string', description: 'YYYY-MM-DD. ברירת מחדל: היום' },
-        time: { type: 'string', description: 'שעה HH:MM (אופציונלי)' },
         cat: { type: 'string', description: 'סוג הארוחה, למשל "ארוחת בוקר", "נשנוש / ביניים"' },
         desc: { type: 'string', description: 'תיאור מה נאכל' },
         net_carbs: { type: 'number', description: 'פחמימות נטו בגרמים' },
@@ -185,7 +184,6 @@ function buildAction(toolUseId, name, input) {
       status: 'pending',
       payload: {
         date: input.date || todayISO(),
-        time: input.time || '',
         cat: input.cat || 'נשנוש / ביניים',
         desc: input.desc || '',
         carbs: Number(input.net_carbs) || 0,

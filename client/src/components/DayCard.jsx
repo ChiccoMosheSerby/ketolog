@@ -4,6 +4,70 @@ import {
 } from '../lib/helpers.js';
 import './DayCard.scss';
 
+const HM_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+// Keep only digits and lay them out as HH:MM (a colon after the 2nd digit).
+// Typing "0930" yields "09:30"; anything non-numeric is dropped.
+function formatHM(raw) {
+  const d = String(raw).replace(/\D/g, '').slice(0, 4);
+  return d.length <= 2 ? d : d.slice(0, 2) + ':' + d.slice(2);
+}
+
+// The meal time, shown as a tap-to-edit chip. Editing accepts digits only,
+// formatted as HH:MM; a valid, changed value is saved on blur / Enter, and the
+// parent re-sorts the meal into its new slot.
+function MealTime({ value, onSave }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(value || '');
+
+  if (!onSave) return <div className="time">{value || '--:--'}</div>;
+
+  function commit() {
+    setEditing(false);
+    const v = val.trim();
+    if (HM_RE.test(v) && v !== value) onSave(v);
+    else setVal(value || '');
+  }
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        className="time time-btn"
+        data-tour="meal-time"
+        title="הקש/י לעריכת השעה"
+        onClick={() => {
+          setVal(value || '');
+          setEditing(true);
+        }}
+      >
+        {value || '--:--'}
+      </button>
+    );
+  }
+
+  return (
+    <input
+      className="time time-edit"
+      type="text"
+      inputMode="numeric"
+      autoFocus
+      maxLength={5}
+      placeholder="--:--"
+      value={val}
+      onChange={(e) => setVal(formatHM(e.target.value))}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.currentTarget.blur();
+        else if (e.key === 'Escape') {
+          setVal(value || '');
+          setEditing(false);
+        }
+      }}
+    />
+  );
+}
+
 export default function DayCard({
   iso,
   day,
@@ -11,6 +75,7 @@ export default function DayCard({
   open,
   onToggle,
   onDeleteMeal,
+  onSetMealTime,
   onSetMetric,
   onCopyMeal,
   onSaveTemplate,
@@ -111,7 +176,10 @@ export default function DayCard({
                     : null;
                 return (
                 <div className="meal" key={m._id}>
-                  <div className="time">{m.time || '--:--'}</div>
+                  <MealTime
+                    value={m.time}
+                    onSave={onSetMealTime ? (t) => onSetMealTime(iso, m._id, t) : null}
+                  />
                   <div className="body">
                     <div className="desc">{m.desc || m.cat}</div>
                     {items.length > 0 && (

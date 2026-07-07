@@ -215,6 +215,32 @@
     padding-top: 2px;
     font-variant-numeric: tabular-nums;
   }
+  /* tap-to-edit chip: looks like the plain time, hints it's interactive */
+  .time-btn {
+    appearance: none;
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-align: start;
+    border-radius: 5px;
+    transition: background 0.15s, color 0.15s;
+    &:hover {
+      background: var(--chip, rgba(0, 0, 0, 0.05));
+      color: var(--accent);
+    }
+  }
+  .time-edit {
+    width: 52px;
+    min-width: 52px;
+    padding: 1px 4px;
+    border: 1px solid var(--accent);
+    border-radius: 5px;
+    background: var(--card, #fff);
+    color: var(--accent-ink);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
   .body {
     flex: 1;
     min-width: 0;

@@ -72,17 +72,17 @@ export default function SettingsModal({ open, onClose, onExport }) {
           </span>
         </div>
 
-        <label className="settings-field">
+        <label className="settings-field" data-tour="set-target">
           <span className="settings-lab">יעד יומי (גרם נטו)</span>
           <input type="number" min="5" max="200" value={target} onChange={(e) => setTarget(e.target.value)} />
         </label>
 
-        <label className="settings-field">
+        <label className="settings-field" data-tour="set-keto">
           <span className="settings-lab">יעד קיטו (חודשים · 0 = ללא)</span>
           <input type="number" min="0" max="60" value={keto} onChange={(e) => setKeto(e.target.value)} />
         </label>
 
-        <label className="settings-field">
+        <label className="settings-field" data-tour="set-wa">
           <span className="settings-lab">WhatsApp</span>
           <input type="tel" dir="ltr" placeholder="972501234567" value={wa} onChange={(e) => setWa(e.target.value)} />
         </label>

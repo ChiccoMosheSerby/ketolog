@@ -22,6 +22,20 @@ function selectTab(id) {
   document.querySelector(`[data-tour-tab="${id}"]`)?.click();
 }
 
+// Open the settings modal by clicking the real gear button (its onClick also
+// closes the mobile drawer, so this works on both layouts). No-op if it is
+// already open.
+function openSettings() {
+  if (document.querySelector('.settings-modal')) return;
+  document.querySelector('[data-tour="settings"]')?.click();
+}
+
+// Close the settings modal via its own close button, so React state stays in
+// sync. No-op if it is not open.
+function closeSettings() {
+  document.querySelector('.settings-modal .settings-close')?.click();
+}
+
 export default function Onboarding() {
   const { dismissOnboarding } = useAuth();
   const isMobile = useMediaQuery(MOBILE_QUERY);
@@ -35,6 +49,7 @@ export default function Onboarding() {
   const last = i === steps.length - 1;
 
   const finish = useCallback(() => {
+    closeSettings(); // don't leave the settings modal open behind the tour
     selectTab('today'); // leave the user on the main tab
     setLeaving(true);
     setTimeout(() => dismissOnboarding(), 200);
@@ -62,11 +77,15 @@ export default function Onboarding() {
     };
 
     if (step.tab) selectTab(step.tab);
-    setRect(null); // hide the old spotlight while the tab/carousel transitions
+    // Open the settings modal for steps that live inside it; close it otherwise
+    // (e.g. when the user steps back out to an earlier, non-modal step).
+    if (step.modal === 'settings') openSettings();
+    else closeSettings();
+    setRect(null); // hide the old spotlight while the tab/carousel/modal transitions
 
-    // Wait out the tab switch / carousel scroll before measuring, then
-    // re-measure once more in case the (animated) carousel was still settling.
-    const delay = step.tab ? (isMobile ? 520 : 340) : 70;
+    // Wait out the tab switch / carousel scroll / modal render before measuring,
+    // then re-measure once more in case things were still settling.
+    const delay = step.modal ? (isMobile ? 460 : 320) : step.tab ? (isMobile ? 520 : 340) : 70;
     const t1 = setTimeout(start, delay);
     const t2 = setTimeout(locate, delay + 280);
     window.addEventListener('resize', locate);
@@ -77,7 +96,7 @@ export default function Onboarding() {
       window.removeEventListener('resize', locate);
       window.removeEventListener('scroll', locate, true);
     };
-  }, [i, step.anchor, step.tab, isMobile]);
+  }, [i, step.anchor, step.tab, step.modal, isMobile]);
 
   // Keyboard: arrows move (RTL-aware), Enter advances, Esc skips.
   useEffect(() => {
@@ -168,11 +187,24 @@ function buildSteps(isMobile) {
       text: 'הטבעת מראה כמה פחמימות נטו צברת היום מול היעד שלך. כל עוד את/ה מתחת לקו — את/ה בירוק. את היעד האישי אפשר לשנות בהגדרות.',
     },
     {
+      anchor: 'tabs',
+      emoji: '🧭',
+      title: 'הניווט הראשי',
+      text: `כאן עוברים בין "היום", "תובנות"${isMobile ? ' ו"המוצרים שלי"' : ''}. ${navHint}`,
+    },
+    {
       anchor: 'add-meal',
       tab: 'today',
       emoji: '🍳',
       title: 'הוספת ארוחה',
-      text: 'כותבים תיאור חופשי של מה שאכלת, וה-AI מעריך פחמימות, שומן וחלבון ומפרק לפריטים. יש גם הקלטה קולית (מיקרופון) וכפתור לחישוב-בלבד בלי לשמור.',
+      text: 'כאן מוסיפים ארוחה ליומן. בשלבים הבאים נראה בדיוק איך — מה כותבים ואיזה כפתור לוחצים.',
+    },
+    {
+      anchor: 'meal-desc',
+      tab: 'today',
+      emoji: '⌨️',
+      title: 'כותבים מה אכלת',
+      text: 'בשדה הזה כותבים תיאור חופשי, למשל: "חביתה מ-3 ביצים, פרוסת גאודה ומלפפון". לא צריך להזין ערכים — ה-AI מפרק לפריטים ומעריך פחמימות, שומן וחלבון. יש גם 🎤 הקלטה קולית במקום להקליד.',
     },
     {
       anchor: 'shortcuts',
@@ -180,6 +212,20 @@ function buildSteps(isMobile) {
       emoji: '⚡',
       title: 'הוספה מהירה',
       text: 'מקום אחד מתקפל לכל הקיצורים: המוצרים השמורים שלך, תבניות ארוחה, ושכפול הארוחות של אתמול. קליק מוסיף ישר לפירוט הארוחה.',
+    },
+    {
+      anchor: 'meal-submit',
+      tab: 'today',
+      emoji: '✅',
+      title: 'חשב ורשום ארוחה',
+      text: 'לוחצים על "חשב ורשום ארוחה" — המערכת מחשבת את המאקרו ושומרת את הארוחה ליומן. רוצים רק לבדוק בלי לשמור? "חשב פחמימות בלבד" מציג את ההערכה מבלי לרשום.',
+    },
+    {
+      anchor: 'meal-time',
+      tab: 'today',
+      emoji: '🕐',
+      title: 'עריכת שעת הארוחה',
+      text: 'לכל ארוחה שנשמרה יש שעה. הקש/י על השעה כדי לתקן אותה — מקלידים ספרות בלבד (למשל 0930) והיא נשמרת כ-09:30, והארוחה מסתדרת מחדש לפי הסדר הכרונולוגי.',
     },
     {
       anchor: 'chat',
@@ -194,12 +240,6 @@ function buildSteps(isMobile) {
       emoji: '📖',
       title: 'היומן — כל הימים הקודמים',
       text: 'תחת היום הנוכחי מתקפל היומן המלא. פותחים אותו כדי לדפדף אחורה, לקפוץ לתאריך, ולראות מדדים לכל יום — משקל, צום, ריצה ועוד.',
-    },
-    {
-      anchor: 'tabs',
-      emoji: '🧭',
-      title: 'הניווט הראשי',
-      text: `כאן עוברים בין "היום", "תובנות"${isMobile ? ' ו"המוצרים שלי"' : ''}. ${navHint}`,
     },
     {
       anchor: 'insights',
@@ -227,8 +267,29 @@ function buildSteps(isMobile) {
       emoji: '⚙️',
       title: 'הגדרות',
       text: isMobile
-        ? 'פותחים את התפריט (☰) כאן למעלה — ובהגדרות קובעים את היעד היומי, יעד תקופת הקיטו, לשון הפנייה, קישור WhatsApp, מצב כהה, ייצוא דוח, וגם הרצה מחדש של הסיור הזה.'
-        : 'כאן קובעים את היעד היומי, יעד תקופת הקיטו, לשון הפנייה, קישור WhatsApp, מצב כהה, ייצוא דוח — וגם אפשר להריץ מחדש את הסיור הזה בכל רגע.',
+        ? 'כל ההגדרות האישיות נמצאות בתפריט (☰) כאן למעלה. בואו נפתח אותן ונעבור על מה שכדאי להגדיר בהתחלה.'
+        : 'כל ההגדרות האישיות נמצאות מאחורי הכפתור הזה. בואו נפתח אותן ונעבור על מה שכדאי להגדיר בהתחלה.',
+    },
+    {
+      anchor: 'set-target',
+      modal: 'settings',
+      emoji: '🎯',
+      title: 'יעד יומי',
+      text: 'זה תקציב הפחמימות נטו (בגרמים) שאת/ה מכוון/ת אליו בכל יום — בדרך כלל 20–30 גרם בקיטו. הטבעת בראש המסך נמדדת מול היעד הזה. אפשר לשנות בכל עת.',
+    },
+    {
+      anchor: 'set-keto',
+      modal: 'settings',
+      emoji: '📅',
+      title: 'יעד קיטו',
+      text: 'כמה חודשים את/ה מתכנן/ת להיות בקיטו. זה מזין את מד ההתקדמות של תקופת הקיטו בתובנות. אפס = בלי יעד תקופה.',
+    },
+    {
+      anchor: 'set-wa',
+      modal: 'settings',
+      emoji: '💬',
+      title: 'WhatsApp',
+      text: 'מזינים כאן מספר WhatsApp (כולל קידומת מדינה, למשל 972501234567) כדי לרשום ארוחות ולקבל עדכונים דרך וואטסאפ. אחרי מילוי השדות לוחצים "שמור".',
     },
   ];
 }

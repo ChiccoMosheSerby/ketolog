@@ -24,7 +24,6 @@ export default function AddMeal({
   canRepeat,
 }) {
   const toast = useToast();
-  const [time, setTime] = useState(nowHM());
   const [carb, setCarb] = useState("");
   const [desc, setDesc] = useState("");
   const [pendingMacro, setPendingMacro] = useState({
@@ -163,7 +162,7 @@ export default function AddMeal({
       return;
     }
     const meal = {
-      time,
+      time: nowHM(),
       desc: desc.trim(),
       carbs: Number(carbsValue) || 0,
       fat: macro?.fat ?? null,
@@ -248,10 +247,10 @@ export default function AddMeal({
     else doAdd(carb, pendingMacro, items);
   }
 
-  // Reset the form back to a clean "log something now" state: time → now,
-  // date → today, and clear the description / carbs / calc result.
+  // Reset the form back to a clean "log something now" state: date → today,
+  // and clear the description / carbs / calc result. The meal's time is stamped
+  // automatically at log time, so there is no time field to reset.
   function resetForm() {
-    setTime(nowHM());
     onDateChange(todayISO());
     setCarb("");
     setDesc("");
@@ -293,14 +292,6 @@ export default function AddMeal({
           </div>
         </div>
         <div className="fld">
-          <label>שעה</label>
-          <input
-            type="time"
-            value={time}
-            onChange={(e) => setTime(e.target.value)}
-          />
-        </div>
-        <div className="fld">
           <label>פחמימות נטו (גרם)</label>
           <input
             type="number"
@@ -334,6 +325,7 @@ export default function AddMeal({
             )}
           </label>
           <textarea
+            data-tour="meal-desc"
             placeholder="לדוגמה: חביתה מ-3 ביצים, פרוסת גאודה, מלפפון לא קלוף, חופן שרי"
             value={desc}
             onChange={(e) => {
@@ -400,7 +392,7 @@ export default function AddMeal({
       )}
 
       <div className="row" style={{ marginTop: 12, alignItems: "center" }}>
-        <button className="btn" disabled={busy} onClick={onAddClick}>
+        <button className="btn" data-tour="meal-submit" disabled={busy} onClick={onAddClick}>
           {busy ? "מחשב…" : "חשב ורשום ארוחה"}
         </button>
         <button
@@ -414,7 +406,7 @@ export default function AddMeal({
           className="btn ghost"
           disabled={busy}
           onClick={resetForm}
-          title="איפוס: היום, שעה נוכחית, ניקוי שדות"
+          title="איפוס: היום, ניקוי שדות"
         >
           איפוס
         </button>

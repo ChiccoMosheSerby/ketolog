@@ -39,6 +39,7 @@ export const api = {
   upsertDay: (date, fields) => request('PUT', `/days/${date}`, fields),
   setMetric: (date, field, value) => request('PATCH', `/days/${date}/metrics`, { field, value }),
   addMeal: (date, meal) => request('POST', `/days/${date}/meals`, meal),
+  updateMeal: (date, mealId, patch) => request('PATCH', `/days/${date}/meals/${mealId}`, patch),
   deleteMeal: (date, mealId) => request('DELETE', `/days/${date}/meals/${mealId}`),
 
   // products

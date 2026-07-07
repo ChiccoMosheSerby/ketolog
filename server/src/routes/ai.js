@@ -8,6 +8,7 @@ import { estimateImage, interpretBarcode, aiConfigured } from '../lib/anthropic.
 import { estimateMealCached } from '../lib/estimateCache.js';
 import { fetchProductByBarcode, rawKeto } from '../lib/openfoodfacts.js';
 import { runChatTurn } from '../lib/chatAgent.js';
+import { israelTimeHM } from '../lib/logMeal.js';
 import { ensureDueReports, listReports, markSeen } from '../lib/insightsAgent.js';
 import { transcribeAudio, transcribeConfigured, TRANSCRIBE_MODEL } from '../lib/transcribe.js';
 import { recordOpenAIUsage } from '../lib/usage.js';
@@ -293,7 +294,9 @@ router.post('/chat/:id/actions/:actionId', asyncHandler(async (req, res) => {
         setOnInsert.label = 'יום ' + (count + 1) + ' · ' + weekday(date);
       }
       const meal = {
-        time: inp.time || '',
+        // Stamp the current time when the meal is committed — meals from chat
+        // are logged "now", same as the in-app form.
+        time: israelTimeHM(),
         cat: inp.cat || 'נשנוש / ביניים',
         desc: inp.desc || '',
         carbs: Number(inp.net_carbs) || 0,

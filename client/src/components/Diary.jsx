@@ -119,6 +119,18 @@ export default function Diary() {
     toast('הארוחה נמחקה');
   }
 
+  // Edit a logged meal's time (HH:MM). DayCard sorts meals by time, so the row
+  // moves into its new chronological slot as soon as the update lands.
+  async function updateMealTime(date, mealId, time) {
+    try {
+      const day = await api.updateMeal(date, mealId, { time });
+      mergeDay(day);
+      toast('השעה עודכנה');
+    } catch (e) {
+      toast(e.message);
+    }
+  }
+
   async function setMetric(date, field, value) {
     const day = await api.setMetric(date, field, value);
     mergeDay(day);
@@ -309,6 +321,7 @@ export default function Diary() {
               open={expanded.has(d.date)}
               onToggle={() => toggle(d.date)}
               onDeleteMeal={deleteMeal}
+              onSetMealTime={updateMealTime}
               onSetMetric={setMetric}
               onCopyMeal={copyMealToActive}
               onSaveTemplate={saveMealAsTemplate}
@@ -346,6 +359,7 @@ export default function Diary() {
         open={expanded.has(activeDate)}
         onToggle={() => toggle(activeDate)}
         onDeleteMeal={deleteMeal}
+        onSetMealTime={updateMealTime}
         onSetMetric={setMetric}
         onCopyMeal={copyMealToActive}
         onSaveTemplate={saveMealAsTemplate}
