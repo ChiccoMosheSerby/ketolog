@@ -3,6 +3,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { isAdmin } from '../lib/approval.js';
 import { usageSummary } from '../lib/usage.js';
 import { asyncHandler } from '../lib/http.js';
+import CatalogItem from '../models/CatalogItem.js';
 
 const router = Router();
 
@@ -17,6 +18,14 @@ router.use((req, res, next) => {
 // GET /api/admin/usage -> per-user AI cost breakdown (what each user costs me).
 router.get('/usage', asyncHandler(async (req, res) => {
   res.json(await usageSummary());
+}));
+
+// GET /api/admin/catalog -> the whole global learned-product catalog. The admin
+// UI does its own filtering/sorting client-side (regex, column sort, thresholds),
+// so we just hand over every item; the catalog is small (distinct foods).
+router.get('/catalog', asyncHandler(async (req, res) => {
+  const items = await CatalogItem.find({}).sort({ usedCount: -1 }).lean();
+  res.json({ items, count: items.length });
 }));
 
 export default router;

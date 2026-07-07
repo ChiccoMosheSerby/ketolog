@@ -4,6 +4,7 @@ import { useMediaQuery, MOBILE_QUERY } from '../lib/useMediaQuery.js';
 import CarbRing from './CarbRing.jsx';
 import SettingsModal from './SettingsModal.jsx';
 import AdminUsage from './AdminUsage.jsx';
+import AdminCatalog from './AdminCatalog.jsx';
 import './Header.scss';
 
 // The 3 live day summaries. `mini` shrinks them for the mobile top bar.
@@ -64,7 +65,7 @@ export function TargetLegend() {
 // Compact identity bar: email, a gear that opens the settings modal, and logout.
 // Everything else (target, keto goal, WhatsApp, gender, theme, tour, export)
 // lives inside the settings modal now.
-function UserBar({ onOpenSettings, onOpenAdmin }) {
+function UserBar({ onOpenSettings, onOpenAdmin, onOpenCatalog }) {
   const { user, logout } = useAuth();
   return (
     <div className="userbar">
@@ -72,6 +73,11 @@ function UserBar({ onOpenSettings, onOpenAdmin }) {
       {user?.isAdmin && (
         <button className="btn ghost mini" onClick={onOpenAdmin} title="שימוש ועלויות">
           💰 שימוש
+        </button>
+      )}
+      {user?.isAdmin && (
+        <button className="btn ghost mini" onClick={onOpenCatalog} title="מפת מוצרים">
+          🗺️ מוצרים
         </button>
       )}
       <button className="btn ghost mini" onClick={onOpenSettings} title="הגדרות" data-tour="settings">
@@ -89,6 +95,7 @@ export default function Header({ stats, onExport }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
+  const [catalogOpen, setCatalogOpen] = useState(false);
 
   // Close the drawer if we grow back to desktop.
   useEffect(() => {
@@ -109,6 +116,7 @@ export default function Header({ stats, onExport }) {
     <>
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} onExport={onExport} />
       <AdminUsage open={adminOpen} onClose={() => setAdminOpen(false)} />
+      <AdminCatalog open={catalogOpen} onClose={() => setCatalogOpen(false)} />
     </>
   );
 
@@ -120,6 +128,7 @@ export default function Header({ stats, onExport }) {
           <UserBar
             onOpenSettings={() => setSettingsOpen(true)}
             onOpenAdmin={() => setAdminOpen(true)}
+            onOpenCatalog={() => setCatalogOpen(true)}
           />
         </div>
         {modals}
@@ -152,6 +161,7 @@ export default function Header({ stats, onExport }) {
         <UserBar
           onOpenSettings={() => { setDrawerOpen(false); setSettingsOpen(true); }}
           onOpenAdmin={() => { setDrawerOpen(false); setAdminOpen(true); }}
+          onOpenCatalog={() => { setDrawerOpen(false); setCatalogOpen(true); }}
         />
         <TargetLegend />
       </aside>

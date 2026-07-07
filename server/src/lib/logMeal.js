@@ -1,6 +1,7 @@
 import Product from '../models/Product.js';
 import Day from '../models/Day.js';
 import { estimateMealCached } from './estimateCache.js';
+import { captureItemsToCatalog } from './catalog.js';
 
 // Sunday-indexed, matching JS getDay() / the Intl 'short' weekday order below.
 const HE_DAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
@@ -71,6 +72,8 @@ export async function logMealFromDesc({ userId, desc, date, time }) {
     { $push: { meals: meal }, $setOnInsert: setOnInsert },
     { new: true, upsert: true }
   );
+  // Feed the global learned-product catalog (best-effort; never blocks the log).
+  captureItemsToCatalog(meal.items);
 
   return { result, meal, day, date: day0 };
 }

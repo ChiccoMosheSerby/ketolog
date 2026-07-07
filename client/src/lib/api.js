@@ -73,4 +73,6 @@ export const api = {
 
   // admin — per-user AI cost breakdown (admin accounts only)
   getAdminUsage: () => request('GET', '/admin/usage'),
+  // admin — the global learned-product catalog (map of every food logged)
+  getAdminCatalog: () => request('GET', '/admin/catalog'),
 };

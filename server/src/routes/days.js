@@ -2,6 +2,7 @@ import { Router } from 'express';
 import Day from '../models/Day.js';
 import { requireAuth } from '../middleware/auth.js';
 import { asyncHandler } from '../lib/http.js';
+import { captureItemsToCatalog } from '../lib/catalog.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -69,6 +70,8 @@ router.post('/:date/meals', asyncHandler(async (req, res) => {
     { $push: { meals: meal }, $setOnInsert: setOnInsert },
     { new: true, upsert: true }
   );
+  // Feed the global learned-product catalog (best-effort; never blocks the log).
+  captureItemsToCatalog(meal.items);
   res.status(201).json(day);
 }));
 

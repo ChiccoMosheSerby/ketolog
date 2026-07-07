@@ -1,0 +1,217 @@
+/* ============================================================
+   AdminCatalog — admin-only "products map": the global learned
+   catalog in a filterable/sortable table. Mirrors AdminUsage's
+   modal shell, widened for the table.
+   ============================================================ */
+.ct-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.ct-modal {
+  width: 100%;
+  max-width: 760px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg, 18px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ct-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+}
+.ct-close {
+  background: transparent;
+  border: none;
+  color: var(--ink-soft);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px 8px;
+  line-height: 1;
+  &:hover { color: var(--ink); }
+}
+
+.ct-note {
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  text-align: center;
+  padding: 16px 0;
+}
+
+/* ---- controls ---- */
+.ct-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.ct-search {
+  position: relative;
+  flex: 1 1 220px;
+  min-width: 180px;
+
+  input {
+    width: 100%;
+    padding: 8px 12px;
+    font: inherit;
+    font-size: 13.5px;
+    color: var(--ink);
+    background: var(--bg, rgba(0, 0, 0, 0.02));
+    border: 1px solid var(--line);
+    border-radius: var(--r-md, 12px);
+    outline: none;
+    &:focus { border-color: var(--olive, #149a5e); }
+    &.bad { border-color: #d9534f; }
+  }
+}
+.ct-re-err {
+  position: absolute;
+  inset-inline-end: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10.5px;
+  color: #d9534f;
+  direction: ltr;
+  pointer-events: none;
+}
+.ct-chk {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  cursor: pointer;
+  user-select: none;
+  input { accent-color: var(--olive, #149a5e); }
+}
+.ct-min {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+
+  input {
+    width: 58px;
+    padding: 5px 8px;
+    font: inherit;
+    font-size: 12.5px;
+    color: var(--ink);
+    background: var(--bg, rgba(0, 0, 0, 0.02));
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    outline: none;
+    direction: ltr;
+    text-align: center;
+    &:focus { border-color: var(--olive, #149a5e); }
+  }
+}
+
+.ct-summary {
+  font-size: 12px;
+  color: var(--ink-soft);
+  b { color: var(--ink); font-variant-numeric: tabular-nums; }
+}
+
+/* ---- table ---- */
+.ct-tablewrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md, 12px);
+}
+.ct-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+
+  /* light vertical separators between columns — a touch lighter than row lines */
+  th:not(:last-child),
+  td:not(:last-child) {
+    border-inline-end: 1px solid color-mix(in srgb, var(--line) 45%, transparent);
+  }
+
+  thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--tint, rgba(20, 154, 94, 0.08));
+    color: var(--ink);
+    font-weight: 700;
+    font-size: 12px;
+    text-align: start;
+    padding: 9px 12px;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    border-bottom: 1px solid var(--line);
+    &:hover { color: var(--olive, #149a5e); }
+    &.num { text-align: end; }
+  }
+
+  tbody td {
+    padding: 8px 12px;
+    color: var(--ink);
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+    &.num {
+      text-align: end;
+      font-family: 'IBM Plex Mono', monospace;
+      font-variant-numeric: tabular-nums;
+      direction: ltr;
+    }
+  }
+  tbody tr:last-child td { border-bottom: none; }
+
+  /* zebra striping — two alternating row colors */
+  tbody tr:nth-child(odd) td { background: transparent; }
+  tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--ink) 4%, transparent); }
+
+  tbody tr:hover td { background: var(--tint, rgba(20, 154, 94, 0.08)); }
+
+  .ct-name { font-weight: 600; white-space: normal; }
+  .ct-uses { font-weight: 700; color: var(--olive, #149a5e); }
+  .ct-date { font-size: 11.5px; color: var(--ink-soft); }
+
+  /* items missing fat/protein — flag as cleanup candidates */
+  tbody tr.missing td { background: rgba(217, 83, 79, 0.06); }
+  tbody tr.missing:hover td { background: rgba(217, 83, 79, 0.1); }
+}
+.ct-empty {
+  text-align: center;
+  color: var(--ink-soft);
+  padding: 20px 0 !important;
+}
+
+.ct-foot {
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+  text-align: center;
+  code {
+    font-family: 'IBM Plex Mono', monospace;
+    background: var(--tint, rgba(20, 154, 94, 0.1));
+    padding: 1px 5px;
+    border-radius: 5px;
+  }
+}
