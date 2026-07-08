@@ -195,6 +195,24 @@ export async function removeAlias(aliasKeyRaw) {
   return { aliasKey, canonicalKey: merge?.canonicalKey || null };
 }
 
+// Delete an item outright. Its applied/pending merges are removed too — the
+// folded rephrasings become independent again (keeping them would make a later
+// log of a rephrase resurrect the deleted key via aliasRemap). Rejected merges
+// stay: they are negative few-shot examples, not live mappings. The food can
+// still reappear if a user logs it again or a backfill runs — deletion removes
+// the catalog entry, not the meal history behind it.
+export async function deleteManualItem(keyRaw) {
+  const key = catalogKey(keyRaw);
+  if (!key) throw new Error('חסר פריט');
+  const { deletedCount } = await CatalogItem.deleteOne({ key });
+  if (!deletedCount) throw new Error('פריט לא נמצא');
+  const { deletedCount: removedMerges } = await CatalogMerge.deleteMany({
+    $or: [{ canonicalKey: key }, { aliasKey: key }],
+    status: { $ne: 'rejected' },
+  });
+  return { key, removedMerges };
+}
+
 // Admin edit of an existing item's curated fields (macros/label/unit/name —
 // the normalized key itself is immutable). Marks the entry verified.
 export async function updateManualItem(key, { name, label, unit, carbs, fat, protein, reviewNote }) {

@@ -12,6 +12,7 @@ import {
   createManualMerge,
   createManualItem,
   updateManualItem,
+  deleteManualItem,
   removeAlias,
 } from '../lib/optimizeCatalog.js';
 import { getSetting, setSetting, RESOLVER_ENABLED } from '../lib/settings.js';
@@ -159,6 +160,17 @@ router.patch('/catalog/items/:key', asyncHandler(async (req, res) => {
   try {
     const item = await updateManualItem(req.params.key, req.body || {});
     res.json(item);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+}));
+
+// DELETE /api/admin/catalog/items/:key -> remove an item from the catalog
+// entirely, along with the merges that fold phrases under it (those phrases
+// become independent again). Re-logging the food recreates a fresh row.
+router.delete('/catalog/items/:key', asyncHandler(async (req, res) => {
+  try {
+    res.json(await deleteManualItem(req.params.key));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

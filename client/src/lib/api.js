@@ -91,6 +91,9 @@ export const api = {
   createCatalogItem: (item) => request('POST', '/admin/catalog/items', item),
   updateCatalogItem: (key, patch) =>
     request('PATCH', `/admin/catalog/items/${encodeURIComponent(key)}`, patch),
+  // remove an item entirely (its folded rephrases become independent again)
+  deleteCatalogItem: (key) =>
+    request('DELETE', `/admin/catalog/items/${encodeURIComponent(key)}`),
   // detach a rephrase from its main item (rename = detach + re-add)
   removeCatalogAlias: (aliasKey) =>
     request('DELETE', `/admin/catalog/aliases/${encodeURIComponent(aliasKey)}`),

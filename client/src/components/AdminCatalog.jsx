@@ -12,8 +12,9 @@ import './AdminCatalog.scss';
 //   main), or rejects (which teaches future scans a negative example).
 // - manual curation — create a merge/rephrase directly, or create a whole
 //   catalog product with hand-calculated values; both survive backfills.
-// - each item can expand to show the rephrasings folded under it; a match on
-//   any of them makes the meal resolver pick that item with no AI call.
+// - each item's folded rephrasings show as read-only chips right in its row;
+//   a match on any of them makes the meal resolver pick that item with no AI
+//   call. Editing them = editing the phrases field in the item's product card.
 
 const fmt = (n) => {
   if (n == null) return '—';
@@ -71,7 +72,6 @@ export default function AdminCatalog({ open = true, onClose, page = false }) {
   const [msg, setMsg] = useState(null); // { t, bad? } — inline status line
   const [showMerges, setShowMerges] = useState(false);
   const [flipped, setFlipped] = useState(() => new Set()); // merge ids where the admin flipped the main item
-  const [expanded, setExpanded] = useState(() => new Set()); // item keys with the rephrases row open
   const [selected, setSelected] = useState(() => new Set()); // item keys checked for a multi-select merge
   // form: null | { type: 'merge', canonical } | { type: 'item', editKey? , ...fields }
   const [form, setForm] = useState(null);
@@ -253,11 +253,17 @@ export default function AdminCatalog({ open = true, onClose, page = false }) {
       };
       if (f.editKey) {
         await api.updateCatalogItem(f.editKey, { name: f.name, label: f.label, unit: f.unit, ...macros, reviewNote: '' });
-        const addPhrases = String(f.phrases || '')
-          .split(/[,\n]/)
-          .map((s) => s.trim())
-          .filter(Boolean);
-        if (addPhrases.length) await api.createCatalogMerge(f.editKey, addPhrases);
+        // the phrases input IS the rephrase manager: diff it against the item's
+        // current aliases — removed ones detach, new ones fold under the item
+        const norm = (s) => String(s).trim().replace(/\s+/g, ' ').toLowerCase();
+        const prev = itemByKey.get(f.editKey)?.aliases || [];
+        const next = String(f.phrases || '').split(/[,\n]/).map(norm).filter(Boolean);
+        const nextSet = new Set(next);
+        const prevSet = new Set(prev);
+        const toRemove = prev.filter((a) => !nextSet.has(a));
+        const toAdd = next.filter((a) => !prevSet.has(a));
+        for (const a of toRemove) await api.removeCatalogAlias(a);
+        if (toAdd.length) await api.createCatalogMerge(f.editKey, toAdd);
         setMsg({ t: `"${f.name}" עודכן וסומן כמאומת` });
       } else {
         await api.createCatalogItem({
@@ -280,14 +286,6 @@ export default function AdminCatalog({ open = true, onClose, page = false }) {
       setBusy(false);
     }
   }
-
-  const toggleExpanded = (key) =>
-    setExpanded((s) => {
-      const next = new Set(s);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
 
   const toggleSelected = (key) =>
     setSelected((s) => {
@@ -323,17 +321,54 @@ export default function AdminCatalog({ open = true, onClose, page = false }) {
       return next;
     });
 
-  // Detach a rephrase from its item. Rename = detach + add the corrected
-  // phrase back (via the item's edit form or the manual-merge form).
-  async function detachAlias(aliasKey) {
-    if (!window.confirm(`לנתק את הניסוח "${aliasKey}" מהפריט? הוא יחזור להיות עצמאי.`)) return;
+  // Bulk delete of the checked rows: one confirm for the whole batch, then the
+  // per-item endpoint for each; a failure doesn't stop the rest of the batch.
+  async function deleteSelected() {
+    const keys = [...selected];
+    const aliasCount = keys.reduce((s, k) => s + (itemByKey.get(k)?.aliases || []).length, 0);
+    const warn = aliasCount ? `\n${aliasCount} ניסוחים מקופלים ישוחררו ויחזרו להיות עצמאיים.` : '';
+    if (!window.confirm(`למחוק ${keys.length} מוצרים מהקטלוג?${warn}`)) return;
     setBusy(true);
     try {
-      await api.removeCatalogAlias(aliasKey);
-      setMsg({ t: `הניסוח "${aliasKey}" נותק` });
+      const failed = [];
+      for (const k of keys) {
+        try {
+          await api.deleteCatalogItem(k);
+        } catch {
+          failed.push(k);
+        }
+      }
+      setMsg(
+        failed.length
+          ? { t: `נמחקו ${keys.length - failed.length} מתוך ${keys.length} · נכשלו: ${failed.join(', ')}`, bad: true }
+          : { t: `נמחקו ${keys.length} מוצרים מהקטלוג` }
+      );
+      setSelected(new Set());
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Delete an item outright. Its folded rephrasings become independent again;
+  // the food reappears only if someone logs it again (or a backfill runs).
+  async function deleteItem(it) {
+    const n = (it.aliases || []).length;
+    const warn = n ? `\n${n} ניסוחים מקופלים ישוחררו ויחזרו להיות עצמאיים.` : '';
+    if (!window.confirm(`למחוק את "${it.name}" מהקטלוג?${warn}`)) return;
+    setBusy(true);
+    try {
+      await api.deleteCatalogItem(it.key);
+      setMsg({ t: `"${it.name}" נמחק מהקטלוג` });
+      setSelected((s) => {
+        if (!s.has(it.key)) return s;
+        const next = new Set(s);
+        next.delete(it.key);
+        return next;
+      });
       await load();
     } catch (e) {
-      setMsg({ t: 'הניתוק נכשל: ' + e.message, bad: true });
+      setMsg({ t: 'המחיקה נכשלה: ' + e.message, bad: true });
     } finally {
       setBusy(false);
     }
@@ -351,10 +386,65 @@ export default function AdminCatalog({ open = true, onClose, page = false }) {
             carbs: it.carbs ?? '',
             fat: it.fat ?? '',
             protein: it.protein ?? '',
-            phrases: '',
+            phrases: (it.aliases || []).join(', '),
           }
         : { type: 'item', ...EMPTY_ITEM_FORM }
     );
+
+  // The product form, defined once: rendered above the table when creating a
+  // manual product, and inline under the product's own row (a product card)
+  // when editing. The phrases input manages the rephrasings: it opens with the
+  // current ones, and on save the diff is applied (added → merge, removed →
+  // detach) — see submitItem.
+  const itemForm = form?.type === 'item' && (
+    <form className={'ct-form' + (form.editKey ? ' ct-editcard' : '')} onSubmit={submitItem}>
+      <div className="ct-formtitle">
+        {form.editKey ? `עריכת "${form.editKey}"` : 'מוצר ידני — ערכים ליחידה אחת'}
+      </div>
+      <div className="ct-formgrid">
+        <label>
+          שם
+          <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+        </label>
+        <label>
+          יחידה
+          <input value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} placeholder="פרוסה / כף / מנה" />
+        </label>
+        <label>
+          פחמ' נטו
+          <input type="number" step="any" min="0" value={form.carbs} onChange={(e) => setForm({ ...form, carbs: e.target.value })} />
+        </label>
+        <label>
+          שומן
+          <input type="number" step="any" min="0" value={form.fat} onChange={(e) => setForm({ ...form, fat: e.target.value })} />
+        </label>
+        <label>
+          חלבון
+          <input type="number" step="any" min="0" value={form.protein} onChange={(e) => setForm({ ...form, protein: e.target.value })} />
+        </label>
+      </div>
+      <label>
+        תיאור (אופציונלי)
+        <input value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} />
+      </label>
+      <label>
+        {form.editKey
+          ? 'ניסוחים (מופרדים בפסיק) — מחיקה מהרשימה מנתקת, הוספה מקפלת תחת המוצר'
+          : 'ניסוחים נוספים (מופרדים בפסיק, אופציונלי)'}
+        <input
+          value={form.phrases || ''}
+          onChange={(e) => setForm({ ...form, phrases: e.target.value })}
+          placeholder="כינויים שיתקפלו תחת המוצר"
+        />
+      </label>
+      <div className="ct-formacts">
+        <button className="ct-btn primary" type="submit" disabled={busy}>
+          {form.editKey ? 'עדכן' : 'הוסף לקטלוג'}
+        </button>
+        <button className="ct-btn" type="button" onClick={() => setForm(null)}>ביטול</button>
+      </div>
+    </form>
+  );
 
   const body = (
     <div
@@ -413,6 +503,11 @@ export default function AdminCatalog({ open = true, onClose, page = false }) {
               {selected.size >= 2 && (
                 <button className="ct-btn primary" onClick={mergeSelected} disabled={busy}>
                   🔗 מזג נבחרים ({selected.size})
+                </button>
+              )}
+              {selected.size > 0 && (
+                <button className="ct-btn danger" onClick={deleteSelected} disabled={busy}>
+                  🗑 מחק נבחרים ({selected.size})
                 </button>
               )}
               {selected.size > 0 && (
@@ -522,72 +617,7 @@ export default function AdminCatalog({ open = true, onClose, page = false }) {
               </form>
             )}
 
-            {form?.type === 'item' && (
-              <form className="ct-form" onSubmit={submitItem}>
-                <div className="ct-formtitle">
-                  {form.editKey ? `עריכת "${form.editKey}"` : 'מוצר ידני — ערכים ליחידה אחת'}
-                </div>
-                <div className="ct-formgrid">
-                  <label>
-                    שם
-                    <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-                  </label>
-                  <label>
-                    יחידה
-                    <input value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} placeholder="פרוסה / כף / מנה" />
-                  </label>
-                  <label>
-                    פחמ' נטו
-                    <input type="number" step="any" min="0" value={form.carbs} onChange={(e) => setForm({ ...form, carbs: e.target.value })} />
-                  </label>
-                  <label>
-                    שומן
-                    <input type="number" step="any" min="0" value={form.fat} onChange={(e) => setForm({ ...form, fat: e.target.value })} />
-                  </label>
-                  <label>
-                    חלבון
-                    <input type="number" step="any" min="0" value={form.protein} onChange={(e) => setForm({ ...form, protein: e.target.value })} />
-                  </label>
-                </div>
-                <label>
-                  תיאור (אופציונלי)
-                  <input value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} />
-                </label>
-                <label>
-                  {form.editKey ? 'הוספת ניסוחים (מופרדים בפסיק, אופציונלי)' : 'ניסוחים נוספים (מופרדים בפסיק, אופציונלי)'}
-                  <input
-                    value={form.phrases || ''}
-                    onChange={(e) => setForm({ ...form, phrases: e.target.value })}
-                    placeholder="כינויים שיתקפלו תחת המוצר"
-                  />
-                </label>
-                {form.editKey && (itemByKey.get(form.editKey)?.aliases || []).length > 0 && (
-                  <div className="ct-formaliases">
-                    ניסוחים קיימים:
-                    {(itemByKey.get(form.editKey)?.aliases || []).map((a) => (
-                      <span className="ct-alias" key={a}>
-                        {a}
-                        <button
-                          type="button"
-                          className="ct-aliasx"
-                          title="נתק את הניסוח מהפריט"
-                          disabled={busy}
-                          onClick={() => detachAlias(a)}
-                        >
-                          ✕
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <div className="ct-formacts">
-                  <button className="ct-btn primary" type="submit" disabled={busy}>
-                    {form.editKey ? 'עדכן' : 'הוסף לקטלוג'}
-                  </button>
-                  <button className="ct-btn" type="button" onClick={() => setForm(null)}>ביטול</button>
-                </div>
-              </form>
-            )}
+            {form?.type === 'item' && !form.editKey && itemForm}
 
             <div className="ct-controls">
               <div className="ct-search">
@@ -657,16 +687,17 @@ export default function AdminCatalog({ open = true, onClose, page = false }) {
                     rows.map((it) => {
                       const stale = ageDays(it.lastUsed) > STALE_DAYS;
                       const hasAliases = (it.aliases || []).length > 0;
-                      const isOpen = expanded.has(it.key);
                       const isSel = selected.has(it.key);
+                      const isEditing = form?.type === 'item' && form.editKey === it.key;
                       return [
                         <tr
                           key={it._id}
                           className={
                             (it.fat == null || it.protein == null ? 'missing' : '') + (isSel ? ' sel' : '')
                           }
+                          onClick={() => (isEditing ? setForm(null) : openItemForm(it))}
                         >
-                          <td className="ct-selcell">
+                          <td className="ct-selcell" onClick={(e) => e.stopPropagation()}>
                             <input
                               type="checkbox"
                               checked={isSel}
@@ -682,9 +713,11 @@ export default function AdminCatalog({ open = true, onClose, page = false }) {
                             {it.label && <span className="ct-lbl">{it.label}</span>}
                             {it.reviewNote && <span className="ct-flagnote">⚠ {it.reviewNote}</span>}
                             {hasAliases && (
-                              <button className="ct-aliasbtn" onClick={() => toggleExpanded(it.key)}>
-                                🔗 {it.aliases.length} ניסוחים {isOpen ? '▴' : '▾'}
-                              </button>
+                              <span className="ct-rowaliases">
+                                {it.aliases.map((a) => (
+                                  <span className="ct-alias" key={a}>{a}</span>
+                                ))}
+                              </span>
                             )}
                           </td>
                           <td>{it.unit || '—'}</td>
@@ -695,41 +728,27 @@ export default function AdminCatalog({ open = true, onClose, page = false }) {
                           <td className={'num ct-date' + (stale ? ' stale' : '')} title={stale ? 'לא נרשם זמן רב' : ''}>
                             {fmtDate(it.lastUsed)}
                           </td>
-                          <td className="ct-rowacts">
-                            <button title="ערוך ערכים" onClick={() => openItemForm(it)}>✎</button>
+                          <td className="ct-rowacts" onClick={(e) => e.stopPropagation()}>
+                            <button title="ערוך ערכים" onClick={() => (isEditing ? setForm(null) : openItemForm(it))}>✎</button>
                             <button
                               title="קפל ניסוחים תחת הפריט הזה"
                               onClick={() => setForm({ type: 'merge', canonical: it.key, phrases: '' })}
                             >
                               🔗
                             </button>
+                            <button
+                              className="ct-del"
+                              title="מחק מהקטלוג"
+                              disabled={busy}
+                              onClick={() => deleteItem(it)}
+                            >
+                              🗑
+                            </button>
                           </td>
                         </tr>,
-                        hasAliases && isOpen && (
-                          <tr key={it._id + ':aliases'} className="ct-aliasrow">
-                            <td colSpan={COLS.length + 2}>
-                              <span className="ct-aliaslead">ניסוחים שמובילים לפריט הזה:</span>
-                              {it.aliases.map((a) => (
-                                <span className="ct-alias" key={a}>
-                                  {a}
-                                  <button
-                                    className="ct-aliasx"
-                                    title="נתק את הניסוח מהפריט"
-                                    disabled={busy}
-                                    onClick={() => detachAlias(a)}
-                                  >
-                                    ✕
-                                  </button>
-                                </span>
-                              ))}
-                              <button
-                                className="ct-aliasadd"
-                                title="הוסף ניסוח לפריט הזה"
-                                onClick={() => setForm({ type: 'merge', canonical: it.key, phrases: '' })}
-                              >
-                                ＋ ניסוח
-                              </button>
-                            </td>
+                        isEditing && (
+                          <tr key={it._id + ':edit'} className="ct-editrow">
+                            <td colSpan={COLS.length + 2}>{itemForm}</td>
                           </tr>
                         ),
                       ];
