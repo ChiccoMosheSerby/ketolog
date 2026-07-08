@@ -1,0 +1,110 @@
+// Deep-link contract for "confirm this in the app" links.
+//
+// The keto-calc tab asks Claude to reply with a link in one of these shapes;
+// when the user opens it, the app parses it on load and pops a confirmation
+// dialog so nothing is saved without the user's approval. Both ends live here so
+// the param names stay in sync.
+//
+//   product → {origin}/?add=product&name=…&desc=…&unit=…&carbs=…&fat=…&protein=…&kcal=…
+//   meal    → {origin}/?add=meal&desc=…&carbs=…&fat=…&protein=…&kcal=…&items=<JSON>&date=…
+//
+// `date` is optional on a meal link (defaults to today). `items` is an optional
+// URL-encoded JSON array of the per-ingredient breakdown ([{name, carbs, …}]),
+// which renders as the meal's itemized rows. `kcal` is informational on both and
+// is never persisted (neither model stores calories).
+
+const ALL_PARAMS = ['add', 'name', 'desc', 'unit', 'cat', 'date', 'carbs', 'fat', 'protein', 'kcal', 'items'];
+
+// The product-link template we hand Claude — origin filled in, values as <placeholders>.
+export function productLinkTemplate(origin) {
+  return (
+    `${origin}/?add=product` +
+    `&name=<שם קצר>` +
+    `&desc=<פירוט מלא>` +
+    `&unit=<יחידה, למשל מנה>` +
+    `&carbs=<פחמימות נטו>` +
+    `&fat=<שומן>` +
+    `&protein=<חלבון>` +
+    `&kcal=<קלוריות>`
+  );
+}
+
+// The meal-link template we hand Claude — leads to the main screen with the meal
+// ready to write to the log on approval. `items` is a URL-encoded JSON array of
+// the per-ingredient breakdown so the logged meal shows its itemized rows.
+export function mealLinkTemplate(origin) {
+  return (
+    `${origin}/?add=meal` +
+    `&desc=<פירוט הארוחה>` +
+    `&carbs=<פחמימות נטו>` +
+    `&fat=<שומן>` +
+    `&protein=<חלבון>` +
+    `&kcal=<קלוריות>` +
+    `&items=<מערך JSON של הפריטים, לדוגמה [{"name":"חביתה מ-3 ביצים","carbs":1.2},{"name":"קפה שחור","carbs":0}]>`
+  );
+}
+
+// Parse an app deep link out of a location.search string. Returns a draft tagged
+// with its `type` ('product' | 'meal'), or null when the link isn't one of ours.
+export function parseAppLink(search) {
+  const q = new URLSearchParams(search || '');
+  const type = q.get('add');
+  if (type !== 'product' && type !== 'meal') return null;
+
+  const numOrNull = (v) => {
+    if (v == null || v === '') return null;
+    const n = Number(v);
+    return isNaN(n) ? null : n;
+  };
+  const str = (k) => (q.get(k) || '').trim();
+
+  const common = {
+    type,
+    desc: str('desc'),
+    carbs: numOrNull(q.get('carbs')),
+    fat: numOrNull(q.get('fat')),
+    protein: numOrNull(q.get('protein')),
+    kcal: numOrNull(q.get('kcal')),
+  };
+
+  if (type === 'product') {
+    return { ...common, key: str('name'), unit: str('unit') };
+  }
+  // meal — parse the optional per-ingredient breakdown (URL-decoded JSON array).
+  return { ...common, cat: str('cat'), date: str('date'), items: parseItems(q.get('items')) };
+}
+
+// Parse the `items` param (a JSON array) into clean meal-item objects. Returns []
+// on missing/invalid JSON, so a malformed link still logs a valid single meal.
+function parseItems(raw) {
+  if (!raw) return [];
+  let arr;
+  try {
+    arr = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(arr)) return [];
+  const numOr = (v, d) => {
+    const n = Number(v);
+    return v != null && v !== '' && !isNaN(n) ? n : d;
+  };
+  return arr
+    .filter((it) => it && (it.name != null || it.carbs != null))
+    .map((it) => ({
+      name: String(it.name || '').trim(),
+      qty: numOr(it.qty, 1) > 0 ? numOr(it.qty, 1) : 1,
+      unit: String(it.unit || '').trim(),
+      carbs: numOr(it.carbs, 0),
+      fat: numOr(it.fat, null),
+      protein: numOr(it.protein, null),
+    }));
+}
+
+// Strip the deep-link params from the current URL without a reload, so a refresh
+// (or the back button) doesn't re-open the confirmation dialog.
+export function clearAppLink() {
+  const url = new URL(window.location.href);
+  ALL_PARAMS.forEach((k) => url.searchParams.delete(k));
+  window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+}

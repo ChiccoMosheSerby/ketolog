@@ -4,6 +4,7 @@ import Diary from './components/Diary.jsx';
 import ChatWidget from './components/ChatWidget.jsx';
 import Onboarding from './components/Onboarding.jsx';
 import AdminCatalog from './components/AdminCatalog.jsx';
+import AppLinkConfirm from './components/AppLinkConfirm.jsx';
 
 export default function App() {
   const { user, loading, needsOnboarding } = useAuth();
@@ -24,6 +25,7 @@ export default function App() {
     <>
       <Diary />
       <ChatWidget />
+      <AppLinkConfirm />
       {needsOnboarding && <Onboarding />}
     </>
   );

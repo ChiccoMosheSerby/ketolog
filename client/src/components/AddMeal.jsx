@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api.js";
 import { useToast } from "../lib/toast.jsx";
 import { useSpeech, speechErrorMessage } from "../lib/useSpeech.js";
@@ -10,6 +10,7 @@ import {
   nextISO,
   todayISO,
 } from "../lib/helpers.js";
+import { parseAppLink, clearAppLink } from "../lib/appLink.js";
 import MealShortcuts from "./MealShortcuts.jsx";
 import "./AddMeal.scss";
 
@@ -61,6 +62,34 @@ export default function AddMeal({
       speech.start();
     }
   }
+
+  // Opened via a Claude meal deep link (?add=meal&…): prefill this form with the
+  // computed values so the meal lands on the existing entry form, ready to log on
+  // the user's approval. Because carbs is filled, logging won't trigger an AI
+  // call. Product links (?add=product) are handled by AppLinkConfirm instead.
+  useEffect(() => {
+    const d = parseAppLink(window.location.search);
+    if (!d || d.type !== "meal") return;
+    clearAppLink();
+    if (d.date) onDateChange(d.date);
+    markManual(); // not a pure saved-products sum
+    setDesc(d.desc || "");
+    setCarb(d.carbs != null ? fmt(d.carbs) : "");
+    setPendingMacro({ fat: d.fat ?? null, protein: d.protein ?? null });
+    setItems(d.items || []);
+    setNote({
+      carbs: d.carbs != null ? fmt(d.carbs) : "?",
+      fat: d.fat != null ? fmt(d.fat) : "?",
+      protein: d.protein != null ? fmt(d.protein) : "?",
+      mp:
+        d.carbs != null && d.fat != null && d.protein != null
+          ? macroPct({ carb: d.carbs, fat: d.fat, protein: d.protein })
+          : null,
+      items: d.items || [],
+      claude: true,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function clearNote() {
     setNote(null);
@@ -166,12 +195,15 @@ export default function AddMeal({
       return;
     }
     const src = source ?? calcSource;
+    // Macros may arrive as numbers (from a calc) or as strings (hand-typed into
+    // the fat/protein fields) — normalize to a number or null either way.
+    const toNum = (v) => (v == null || v === "" ? null : Number(v));
     const meal = {
       time: nowHM(),
       desc: desc.trim(),
       carbs: Number(carbsValue) || 0,
-      fat: macro?.fat ?? null,
-      protein: macro?.protein ?? null,
+      fat: toNum(macro?.fat),
+      protein: toNum(macro?.protein),
       items: mealItems ?? items,
       source: src,
     };
@@ -310,8 +342,11 @@ export default function AddMeal({
             </button>
           </div>
         </div>
+      </div>
+
+      <div className="row macros" style={{ marginTop: 10 }}>
         <div className="fld">
-          <label>פחמימות נטו (גרם)</label>
+          <label>פחמימות נטו <span className="unit">(גרם)</span></label>
           <input
             type="number"
             step="0.1"
@@ -319,6 +354,35 @@ export default function AddMeal({
             placeholder="חישוב אוטומטי"
             value={carb}
             onChange={(e) => setCarb(e.target.value)}
+          />
+        </div>
+        <div className="fld">
+          <label>חלבון <span className="unit">(גרם)</span></label>
+          <input
+            type="number"
+            step="0.1"
+            min="0"
+            placeholder="—"
+            value={pendingMacro.protein ?? ""}
+            onChange={(e) =>
+              setPendingMacro((m) => ({
+                ...m,
+                protein: e.target.value === "" ? null : e.target.value,
+              }))
+            }
+          />
+        </div>
+        <div className="fld">
+          <label>שומן <span className="unit">(גרם)</span></label>
+          <input
+            type="number"
+            step="0.1"
+            min="0"
+            placeholder="—"
+            value={pendingMacro.fat ?? ""}
+            onChange={(e) =>
+              setPendingMacro((m) => ({ ...m, fat: e.target.value === "" ? null : e.target.value }))
+            }
           />
         </div>
       </div>
@@ -382,6 +446,12 @@ export default function AddMeal({
                   חלוקה קלורית: שומן {note.mp.fat}% · חלבון {note.mp.protein}% ·
                   פחמ' {note.mp.carb}% (~
                   {note.mp.kcal} קק"ל)
+                </span>
+              )}
+              {note.claude && (
+                <span className="bd">
+                  <br />
+                  🔗 מולא מקלוד — בדקו את הערכים ולחצו "חשב ורשום ארוחה".
                 </span>
               )}
               {note.local && (

@@ -1,4 +1,28 @@
 /* ---------- AddMeal: voice mic, quick-add product tags ---------- */
+
+/* The three macro inputs share one row, equal width, and stay side-by-side even
+   on narrow panels (they only wrap when truly cramped). */
+.row.macros {
+  gap: 8px;
+  .fld {
+    flex: 1 1 0;
+    min-width: 84px;
+  }
+  label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .unit {
+    color: var(--ink-soft);
+    font-weight: 400;
+  }
+  input {
+    font-family: 'IBM Plex Mono', monospace;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
 .desc-label {
   display: flex;
   align-items: center;

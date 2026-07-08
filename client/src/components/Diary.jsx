@@ -9,6 +9,7 @@ import Products from './Products.jsx';
 import DayCard from './DayCard.jsx';
 import Dashboard from './Dashboard.jsx';
 import SmartInsights from './SmartInsights.jsx';
+import KetoCalc from './KetoCalc.jsx';
 import Header, { TargetLegend } from './Header.jsx';
 import TabShell from './TabShell.jsx';
 import { useMediaQuery, MOBILE_QUERY } from '../lib/useMediaQuery.js';
@@ -408,6 +409,13 @@ export default function Diary() {
       ),
     },
     ...(isMobile ? [{ id: 'products', label: 'המוצרים שלי', content: productsPanel }] : []),
+    {
+      id: 'calc',
+      label: 'חישוב מדדים',
+      content: (
+        <KetoCalc days={days} target={target} ketoMonths={user?.ketoGoalMonths || 0} />
+      ),
+    },
   ];
 
   return (
