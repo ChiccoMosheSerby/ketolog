@@ -2,6 +2,7 @@
   "name": "ketolog",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "KetoLog — MERN keto diary (Express + MongoDB + React/Vite). Single-service deploy: the API also serves the built client.",
   "engines": {
     "node": ">=18"

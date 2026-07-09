@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { recordAnthropicUsage } from './usage.js';
+import { KETO_CORE_RULES } from '../../../shared/ketoCore.js';
 
 let client = null;
 export function getClient() {
@@ -29,24 +30,14 @@ export const CHAT_MODEL = () => process.env.CHAT_MODEL || 'claude-opus-4-8';
 // ketoRules is the one nutrition prompt every estimator shares. Each estimator
 // appends its own output-format instruction (below), so there is no need to
 // strip a baked-in format back off — the meal/image/barcode shapes stay distinct
-// and explicit. Ported from keto-log.html; products injected as context.
+// and explicit. The nutrition core lives in shared/ketoCore.js so the client's
+// claude.ai redirect prompt (KetoCalc) computes with the exact same rules;
+// only the persona/task framing and the products context are added here.
 export function ketoRules(products = []) {
   let base =
     'אתה מומחה/ית התזונה הקטוגנית הטוב/ה בעולם — דיאטן/ית קליני/ת עם דיוק של מעבדה. ' +
     'העריך/י בדיוק הגבוה ביותר האפשרי עבור הכמויות המתוארות: (1) פחמימות נטו בגרמים, (2) שומן בגרמים, (3) חלבון בגרמים. ' +
-    'בסס/י על ידע תזונתי מעמיק (כמו USDA ותוויות יצרן ישראליות), חשב/י לפי המרכיבים והכמויות בפועל, ושקלל/י את שיטת ההכנה. ' +
-    'אם הכמות לא ברורה — הנח/י מנה בינונית סבירה, ועדיף לדייק בהיגיון מאשר להמציא דיוק מזויף. ' +
-    'פחמימות נטו = סך הפחמימות, פחות סיבים תזונתיים (אינם הופכים לגלוקוז), פחות אריתריטול ואלולוז (אינם מעלים סוכר בדם). ' +
-    'ממתיקים סטיביה/טרוביה = 0 פחמימות. מלטיטול או כוהל סוכר אחר שמעלה סוכר חלקית — ספור כמחצית מערכו. ' +
-    'בשר/דג/ביצים = 0 פחמימות; שמן וחמאה = 0 פחמימות וגם 0 חלבון; גבינות קשות מיושנות ≈ 0 פחמימות; ' +
-    'אם כמות לא צוינה, הנח מנה בינונית סבירה. ' +
-    // Consistency + portion scaling: the same base food must always map to the same
-    // per-unit reference, and size/fraction words scale it linearly — so "half" can
-    // never come out larger than the "whole" of the same food.
-    'עקביות מחייבת: לאותו מאכל בסיסי השתמש/י תמיד באותו ערך ייחוס קבוע ליחידה שלמה (למשל מלפפון בינוני, ביצה L), ' +
-    'ללא תלות בארוחה או בניסוח. מילות כמות וגודל משנות את הערך באופן ליניארי מתוך אותו ערך בסיס: ' +
-    '"חצי" = מחצית הערך, "רבע" = רבע, "שלם"/"שלמה" = יחידה מלאה, "גדול" / "קטן" ביחס למנה בינונית. ' +
-    'לכן מנה חלקית של מאכל לעולם אינה יכולה להיות גדולה ממנה שלמה של אותו מאכל — בדוק/י זאת לפני התשובה.';
+    KETO_CORE_RULES;
 
   if (products.length) {
     base +=

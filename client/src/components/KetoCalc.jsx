@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { dayTotal, fmt, todayISO } from '../lib/helpers.js';
 import { productLinkTemplate, mealLinkTemplate } from '../lib/appLink.js';
+import { KETO_PROMPT_RULES } from '../lib/ketoPromptRules.js';
 import { useToast } from '../lib/toast.jsx';
 import './KetoCalc.scss';
 
@@ -21,11 +22,19 @@ function ketoDayNumber(days) {
 }
 
 // Assemble the full prompt that gets URL-encoded into the Claude link.
-// Only the summary metrics travel — no per-day journal detail. Claude is asked
-// to reply with a single ketolog deep link (see lib/appLink.js). `mode` chooses
-// which link Claude returns: a new saved product, or a meal to write to the log.
+// Only the summary metrics travel — no per-day journal detail. The keto
+// calculation rules (trimmed from the server estimators' system prompt) ride
+// along so the web chat computes net carbs the same way the app does. Claude
+// is asked to reply with a ketolog deep link (see lib/appLink.js) followed by
+// a readable breakdown of the values. `mode` chooses which link Claude
+// returns: a new saved product, or a meal to write to the log.
 function buildPrompt({ text, days, target, ketoMonths, avg, origin, mode }) {
   const context = [
+    // claude.ai titles a chat from its first message; there's no URL param or
+    // in-chat way to set it. Leading with "ketolog" as the headline biases the
+    // auto-title toward it (best effort, not guaranteed).
+    'ketolog',
+    '',
     `תזונת קיטו. אלו פרטיה לגבי: יום מספר ${ketoDayNumber(days)} בקיטו`,
     '',
     ketoMonths ? `יעד קיטו: ${ketoMonths} חודשים` : null,
@@ -55,15 +64,18 @@ function buildPrompt({ text, days, target, ketoMonths, avg, origin, mode }) {
     'ל:',
     text.trim(),
     '',
-    'החזר לי את התשובה כקישור אחד בלבד — שורה אחת, ללא שום טקסט לפני או אחרי,',
-    'ללא הקדמות, הסברים או סיכומים. הקישור בפורמט הבא בדיוק, כשאתה ממלא את',
+    'החזר את התשובה בפורמט הבא, ללא הקדמות:',
+    'שורה ראשונה — קישור אחד בלבד, בפורמט המדויק שלהלן, כשאתה ממלא את',
     `הערכים המחושבים ${encodeNote}`,
     '',
     template,
     ...mealExtra,
+    '',
+    'אחרי הקישור הוסף פירוט קצר וקריא: תיאור המוצר/הארוחה, הערכים שחישבת',
+    '(פחמימות נטו, שומן, חלבון, קק"ל) והסבר קצר של החישוב.',
   ].join('\n');
 
-  return `${context}\n\n${request}`;
+  return `${context}\n\n${KETO_PROMPT_RULES}\n\n${request}`;
 }
 
 export default function KetoCalc({ days = [], target, ketoMonths = 0 }) {
@@ -124,8 +136,8 @@ export default function KetoCalc({ days = [], target, ketoMonths = 0 }) {
         <h2 className="kc-title">חישוב מדדים עם קלוד</h2>
         <p className="kc-sub">
           כתבו פירוט ארוחה או מוצר, ובחרו כפתור. ייפתח צ׳אט קלוד עם המדדים שלכם, שיחשב פחמימות
-          נטו, חלבון, שומן וקלוריות ויחזיר קישור. לחיצה על הקישור תפתח את האפליקציה עם המוצר או
-          הארוחה מוכנים — ותצטרכו רק לאשר.
+          נטו, חלבון, שומן וקלוריות ויחזיר קישור יחד עם פירוט הערכים. לחיצה על הקישור תפתח את
+          האפליקציה עם המוצר או הארוחה מוכנים — ותצטרכו רק לאשר.
         </p>
 
         <textarea

@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
@@ -8,6 +9,11 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
+    // The prompt rules are imported from ../shared (also used by the server),
+    // which sits outside the Vite root — allow serving from the repo root.
+    fs: {
+      allow: [fileURLToPath(new URL('..', import.meta.url))],
+    },
     proxy: {
       '/api': 'http://localhost:4000',
     },
