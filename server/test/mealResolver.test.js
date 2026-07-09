@@ -8,6 +8,7 @@ import {
   parseMeal,
   buildLookup,
   resolveFromLookup,
+  resolveFromLookups,
 } from '../src/lib/mealResolver.js';
 
 test('splitSegments: commas, newlines, plus, standalone vav', () => {
@@ -20,7 +21,7 @@ test('splitSegments: commas, newlines, plus, standalone vav', () => {
 });
 
 test('parseSegment: quantities', () => {
-  assert.deepEqual(parseSegment('3 ביצים'), { qty: 3, name: 'ביצים', nameKey: 'ביצים', ambiguous: false });
+  assert.deepEqual(parseSegment('3 ביצים'), { qty: 3, name: 'ביצים', nameKey: 'ביצים', rawKey: '3 ביצים', ambiguous: false });
   assert.equal(parseSegment('חצי מלפפון').qty, 0.5);
   assert.equal(parseSegment('רבע אבוקדו').qty, 0.25);
   assert.equal(parseSegment('שתי ביצים').qty, 2);
@@ -45,6 +46,7 @@ test('parseSegment: hyphenated digit stays inside the name ("מ-2")', () => {
     qty: 1,
     name: 'חביתה מ-2 ביצים',
     nameKey: 'חביתה מ-2 ביצים',
+    rawKey: '1 חביתה מ-2 ביצים',
     ambiguous: false,
   });
 });
@@ -118,6 +120,67 @@ test('resolveFromLookup: ANY unmatched or ambiguous segment → null (no partial
   assert.equal(resolveFromLookup('ביצה, סלט ירקות ביתי', lookup), null);
   assert.equal(resolveFromLookup('ביצה גדולה', lookup), null);
   assert.equal(resolveFromLookup('קצת ביצה', lookup), null);
+});
+
+test('resolveFromLookups: saved product with grams in its NAME resolves (ambiguity-exempt)', () => {
+  // the exact text the shortcut chip composes: "<unit> <key>" where the key
+  // itself contains a weight — must resolve from the user's product, no AI
+  const products = buildLookup([
+    { key: '300 גרם סינטה', name: '300 גרם סינטה', unit: 'מנה', carbs: 0, fat: 20, protein: 60 },
+  ]);
+  const r = resolveFromLookups('מנה 300 גרם סינטה', products, new Map());
+  assert.ok(r);
+  assert.equal(r.source, 'local');
+  assert.equal(r.result.net_carbs, 0);
+  assert.equal(r.result.items[0].qty, 1);
+  // a leading count still scales it ("2 מנה ...")
+  const r2 = resolveFromLookups('2 מנה 300 גרם סינטה', products, new Map());
+  assert.equal(r2.result.fat, 40);
+  assert.equal(r2.result.items[0].qty, 2);
+});
+
+test('resolveFromLookups: raw segment matches a product whose name starts with a number (qty stays 1)', () => {
+  const products = buildLookup([
+    { key: '300 גרם סינטה', name: '300 גרם סינטה', unit: 'מנה', carbs: 0, fat: 20, protein: 60 },
+  ]);
+  const r = resolveFromLookups('300 גרם סינטה', products, new Map());
+  assert.ok(r);
+  assert.equal(r.result.items[0].qty, 1); // NOT 300 portions
+  assert.equal(r.result.fat, 20);
+});
+
+test('resolveFromLookups: the exemption is exact-match only — other weights still go to AI', () => {
+  const products = buildLookup([
+    { key: '300 גרם סינטה', name: '300 גרם סינטה', unit: 'מנה', carbs: 0 },
+    { key: 'סינטה', name: 'סינטה', unit: 'מנה', carbs: 0 },
+  ]);
+  assert.equal(resolveFromLookups('150 גרם סינטה', products, new Map()), null);
+  assert.equal(resolveFromLookups('קצת סינטה', products, new Map()), null);
+});
+
+test('resolveFromLookups: products win over the catalog; mixed meals are source catalog', () => {
+  const products = buildLookup([
+    { key: 'ביצה', name: 'ביצה', unit: 'ביצה', carbs: 0.3, fat: 5, protein: 6 },
+  ]);
+  const catalog = buildLookup([
+    { key: 'ביצה', name: 'ביצה', unit: 'ביצה', carbs: 0.9, fat: 5, protein: 6 },
+    { key: 'קפה שחור', name: 'קפה שחור', unit: 'כוס', carbs: 0, fat: 0, protein: 0 },
+  ]);
+  const pure = resolveFromLookups('2 ביצה', products, catalog);
+  assert.equal(pure.source, 'local');
+  assert.equal(pure.result.net_carbs, 0.6); // the user's value, not the catalog's
+  const mixed = resolveFromLookups('ביצה, קפה שחור', products, catalog);
+  assert.equal(mixed.source, 'catalog');
+  assert.equal(mixed.result.net_carbs, 0.3);
+});
+
+test('resolveFromLookups: catalog tier keeps full precision rules (ambiguous → null)', () => {
+  const catalog = buildLookup([
+    { key: '300 גרם סינטה', name: '300 גרם סינטה', unit: 'מנה', carbs: 0 },
+  ]);
+  // same text that a PRODUCT would resolve — a catalog-only match must not,
+  // because the ambiguity exemption belongs to the user's own data alone
+  assert.equal(resolveFromLookups('מנה 300 גרם סינטה', new Map(), catalog), null);
 });
 
 test('resolveFromLookup: null fat/protein on an entry keeps totals null (renders "?")', () => {

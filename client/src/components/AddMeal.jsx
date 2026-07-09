@@ -33,7 +33,7 @@ export default function AddMeal({
   });
   const [items, setItems] = useState([]); // per-item breakdown from the last calc
   const [note, setNote] = useState(null); // { html } via structured fields
-  const [calcSource, setCalcSource] = useState(""); // 'catalog' | 'ai' | '' — where the last calc came from
+  const [calcSource, setCalcSource] = useState(""); // 'local' | 'catalog' | 'ai' | '' — where the last calc came from
   const [busy, setBusy] = useState(false);
   // Structured list of saved products the user tapped in, kept alongside the free
   // text. `descIsPure` stays true only while the description was built *solely*
@@ -259,8 +259,9 @@ export default function AddMeal({
       const fat = Number(r.fat);
       const prot = Number(r.protein);
       const mealItems = Array.isArray(r.items) ? r.items : [];
-      const fromCatalog = r.source === "catalog";
-      setCalcSource(fromCatalog ? "catalog" : "ai");
+      // 'local' = the server matched the user's own saved products (above all)
+      const src = r.source === "catalog" || r.source === "local" ? r.source : "ai";
+      setCalcSource(src);
       const carbsValue = isNaN(n) ? "" : fmt(n);
       const macro = {
         fat: isNaN(fat) ? null : fat,
@@ -279,10 +280,11 @@ export default function AddMeal({
         protein: isNaN(prot) ? "?" : fmt(prot),
         mp,
         items: mealItems,
-        catalog: fromCatalog,
-        ai: !fromCatalog,
+        local: src === "local",
+        catalog: src === "catalog",
+        ai: src === "ai",
       });
-      if (thenLog && !isNaN(n)) await doAdd(carbsValue, macro, mealItems, fromCatalog ? "catalog" : "ai");
+      if (thenLog && !isNaN(n)) await doAdd(carbsValue, macro, mealItems, src);
     } catch {
       setNote({
         error:

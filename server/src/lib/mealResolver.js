@@ -75,19 +75,23 @@ export function splitSegments(desc) {
     .filter(Boolean);
 }
 
-// Parse one segment into { qty, name, nameKey, ambiguous }. qty defaults to 1.
-// Recognized as a quantity: ONE leading number / count word / fraction word,
-// plus an optional trailing "וחצי" ("ביצה וחצי" = 1.5). Any ambiguous word, a
-// second independent quantity, or an empty name marks the segment ambiguous.
+// Parse one segment into { qty, name, nameKey, rawKey, ambiguous }. qty
+// defaults to 1. Recognized as a quantity: ONE leading number / count word /
+// fraction word, plus an optional trailing "וחצי" ("ביצה וחצי" = 1.5). Any
+// ambiguous word, a second independent quantity, or an empty name marks the
+// segment ambiguous. rawKey is the untouched segment text as a lookup key —
+// the products tier also matches it verbatim, so a saved product whose name
+// starts with a number ("300 גרם סינטה") isn't mis-read as qty=300.
 export function parseSegment(raw) {
   // Detach digit runs stuck to letters ("2ביצים" -> "2 ביצים") before tokenizing.
   // A hyphen keeps its digit attached: "חביתה מ-2 ביצים" must stay one name whose
   // key equals the catalog key, not become "מ- 2".
   const spaced = String(raw || '').replace(/(\d)(?=[^\d\s.,%])/g, '$1 ').replace(/([^\d\s.,-])(?=\d)/g, '$1 ');
   let tokens = spaced.trim().split(/\s+/).filter(Boolean);
+  const rawKey = catalogKey(raw);
 
   while (tokens.length && LEADING_CONNECTIVES.has(tokens[0])) tokens = tokens.slice(1);
-  if (!tokens.length) return { qty: 1, name: '', nameKey: '', ambiguous: true };
+  if (!tokens.length) return { qty: 1, name: '', nameKey: '', rawKey, ambiguous: true };
 
   let qty = null;
   let ambiguous = false;
@@ -128,7 +132,7 @@ export function parseSegment(raw) {
   const name = tokens.join(' ');
   if (!name) ambiguous = true;
 
-  return { qty: qty == null ? 1 : qty, name, nameKey: catalogKey(name), ambiguous };
+  return { qty: qty == null ? 1 : qty, name, nameKey: catalogKey(name), rawKey, ambiguous };
 }
 
 // Parse a whole description. `ok` is false when there is nothing to match or
@@ -173,21 +177,44 @@ export function buildLookup(entries) {
   return map;
 }
 
-// Resolve a parsed meal against a lookup. Returns the estimator-shaped result
-// ({ net_carbs, fat, protein, items }) or null when ANY segment fails — no
-// partial serving, ever. Totals are derived from the per-item breakdown with
-// the same rounding as normalizeMeal, so the meal card always reconciles.
-export function resolveFromLookup(desc, lookup) {
-  const { segments, ok } = parseMeal(desc);
-  if (!ok) return null;
+const EMPTY_LOOKUP = new Map();
+
+// Resolve a meal against two tiers: the user's own saved products first, then
+// the learned catalog. A saved product is the user's hand-confirmed data, so it
+// outranks everything AND is exempt from the ambiguity rules — its name may
+// itself contain grams/numbers ("300 גרם סינטה") and still match, because the
+// match is exact on the full normalized text. Two product matches are tried per
+// segment: the name left after quantity extraction ("2 מנה X" → qty 2 of "מנה
+// X"), then the raw segment verbatim with qty 1 ("300 גרם סינטה" — the digits
+// belong to the name, not the amount). Catalog matches keep the full
+// precision rules (no ambiguous segment, exact key/alias match).
+//
+// Returns { result, source: 'local' | 'catalog' } — 'local' when every segment
+// came from the user's products — or null when ANY segment fails; no partial
+// serving, ever. Totals are derived from the per-item breakdown with the same
+// rounding as normalizeMeal, so the meal card always reconciles.
+export function resolveFromLookups(desc, productsLookup, catalogLookup) {
+  const { segments } = parseMeal(desc);
+  if (!segments.length) return null;
 
   const items = [];
+  let fromCatalog = false;
   for (const seg of segments) {
-    const entry = lookup.get(seg.nameKey);
-    if (!entry) return null;
+    let qty = seg.qty;
+    let entry = seg.nameKey ? productsLookup.get(seg.nameKey) : null;
+    if (!entry && productsLookup.has(seg.rawKey)) {
+      entry = productsLookup.get(seg.rawKey);
+      qty = 1;
+    }
+    if (!entry) {
+      if (seg.ambiguous || !seg.nameKey) return null;
+      entry = catalogLookup.get(seg.nameKey);
+      if (!entry) return null;
+      fromCatalog = true;
+    }
     items.push({
       name: entry.name || seg.name,
-      qty: seg.qty,
+      qty,
       unit: String(entry.unit || ''),
       carbs: Number(entry.carbs) || 0,
       fat: entry.fat == null ? null : Number(entry.fat),
@@ -197,9 +224,18 @@ export function resolveFromLookup(desc, lookup) {
 
   const sum = (key) => items.reduce((a, it) => a + (Number(it[key]) || 0) * (it.qty || 1), 0);
   return {
-    net_carbs: round2(sum('carbs')),
-    fat: items.every((it) => it.fat != null) ? round2(sum('fat')) : null,
-    protein: items.every((it) => it.protein != null) ? round2(sum('protein')) : null,
-    items,
+    result: {
+      net_carbs: round2(sum('carbs')),
+      fat: items.every((it) => it.fat != null) ? round2(sum('fat')) : null,
+      protein: items.every((it) => it.protein != null) ? round2(sum('protein')) : null,
+      items,
+    },
+    source: fromCatalog ? 'catalog' : 'local',
   };
+}
+
+// Single-tier resolution (catalog rules in full) — kept for tests/simulation.
+export function resolveFromLookup(desc, lookup) {
+  const r = resolveFromLookups(desc, EMPTY_LOOKUP, lookup);
+  return r ? r.result : null;
 }
