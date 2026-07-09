@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { kcalZone } from '../lib/helpers.js';
 import { useAuth } from '../lib/auth.jsx';
 import { useMediaQuery, MOBILE_QUERY } from '../lib/useMediaQuery.js';
 import CarbRing from './CarbRing.jsx';
@@ -19,6 +20,19 @@ function Stats({ stats, mini }) {
         <span className="num">{stats.days}</span>
         <span className="lab">ימים מתועדים</span>
       </div>
+      {stats.todayKcal != null && (() => {
+        const kz = kcalZone(stats.todayKcal, stats.kcalTarget);
+        return (
+          <div className="stat" title={kz?.cap}>
+            <span className="num" style={kz ? { color: kz.color } : undefined}>
+              ~{stats.todayKcal}
+            </span>
+            <span className="lab">
+              {stats.kcalTarget ? `קק"ל מתוך ${stats.kcalTarget}` : 'קק"ל היום'}
+            </span>
+          </div>
+        );
+      })()}
       <div className="stat stat-today" data-tour="carb-ring">
         <CarbRing
           consumed={stats.todayNum}

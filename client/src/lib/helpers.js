@@ -33,6 +33,29 @@ export function macroPct(g) {
   };
 }
 
+// Total calories for a day (fat 9 kcal/g, protein & carb 4). Meals logged
+// without fat/protein contribute their carbs only, so with partial macros the
+// number is a lower bound. Returns null when there is nothing to count.
+export function dayKcal(d) {
+  const g = dayMacroGrams(d);
+  const kcal = g.fat * 9 + g.protein * 4 + g.carb * 4;
+  return kcal > 0 ? Math.round(kcal) : null;
+}
+
+// Traffic-light zone for a daily calorie total against the user's kcal target:
+// green at/under target, amber up to 10% over, red beyond. Returns null when
+// there's no target (0/unset) or nothing to grade — callers keep neutral ink.
+export function kcalZone(kcal, target) {
+  if (!target || kcal == null) return null;
+  if (kcal <= target) {
+    return { color: 'var(--olive)', cap: 'ביעד — נשארו ' + Math.round(target - kcal) + ' קק"ל' };
+  }
+  if (kcal <= target * 1.1) {
+    return { color: 'var(--amber)', cap: 'מעט מעל יעד הקלוריות (' + target + ')' };
+  }
+  return { color: 'var(--red)', cap: 'חריגה מיעד הקלוריות (' + target + ')' };
+}
+
 export function hasMacros(d) {
   return (d.meals || []).some((m) => m.fat != null || m.protein != null);
 }

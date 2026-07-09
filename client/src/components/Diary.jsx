@@ -2,9 +2,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import { useToast } from '../lib/toast.jsx';
 import { useAuth } from '../lib/auth.jsx';
-import { dayTotal, fmt, todayISO, dayHebrewName, prevISO, TARGET } from '../lib/helpers.js';
+import { dayTotal, dayKcal, fmt, todayISO, dayHebrewName, prevISO, TARGET } from '../lib/helpers.js';
 import { downloadReport } from '../lib/exportLog.js';
 import AddMeal from './AddMeal.jsx';
+import QuickAdd from './QuickAdd.jsx';
 import Products from './Products.jsx';
 import DayCard from './DayCard.jsx';
 import Dashboard from './Dashboard.jsx';
@@ -48,6 +49,7 @@ export default function Diary() {
     [user?.email],
   );
   const target = user?.dailyCarbTarget ?? TARGET;
+  const kcalTarget = user?.dailyKcalTarget || 0;
   const [days, setDays] = useState([]); // array of day docs, newest first
   const [products, setProducts] = useState([]);
   const [templates, setTemplates] = useState([]);
@@ -273,7 +275,9 @@ export default function Diary() {
     days: days.length || '–',
     today: today ? fmt(dayTotal(today)) : '0',
     todayNum: today ? dayTotal(today) : 0,
+    todayKcal: today ? dayKcal(today) : null,
     target,
+    kcalTarget,
   };
 
   const activeDay = days.find((d) => d.date === activeDate) || {
@@ -329,6 +333,7 @@ export default function Diary() {
               onSaveProduct={saveMealAsProduct}
               onSaveItemProduct={saveItemAsProduct}
               target={target}
+              kcalTarget={kcalTarget}
             />
           ))
         )}
@@ -367,6 +372,7 @@ export default function Diary() {
         onSaveProduct={saveMealAsProduct}
         onSaveItemProduct={saveItemAsProduct}
         target={target}
+        kcalTarget={kcalTarget}
       />
 
       <div className={'journal-fold' + (historyOpen ? ' open' : '')}>
@@ -394,6 +400,11 @@ export default function Diary() {
   const tabs = [
     { id: 'today', label: 'היום', content: todayTab },
     {
+      id: 'quick',
+      label: 'הוספה מהירה',
+      content: <QuickAdd date={activeDate} onDateChange={setActiveDate} onLogged={addMeal} />,
+    },
+    {
       id: 'insights',
       label: 'תובנות',
       badge: insightsBadge,
@@ -401,6 +412,7 @@ export default function Diary() {
         <Dashboard
           days={days}
           target={target}
+          kcalTarget={kcalTarget}
           today={todayISO()}
           ketoMonths={user?.ketoGoalMonths || 0}
         >

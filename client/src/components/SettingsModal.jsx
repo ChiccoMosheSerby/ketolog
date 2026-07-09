@@ -15,6 +15,7 @@ export default function SettingsModal({ open, onClose, onExport }) {
 
   const [gender, setGender] = useState('');
   const [target, setTarget] = useState('20');
+  const [kcalTarget, setKcalTarget] = useState('0');
   const [keto, setKeto] = useState('0');
   const [wa, setWa] = useState('');
   const [saving, setSaving] = useState(false);
@@ -24,6 +25,7 @@ export default function SettingsModal({ open, onClose, onExport }) {
     if (!open) return;
     setGender(user?.gender || '');
     setTarget(String(user?.dailyCarbTarget ?? 20));
+    setKcalTarget(String(user?.dailyKcalTarget || 0));
     setKeto(String(user?.ketoGoalMonths || 0));
     setWa(user?.whatsappPhone || '');
   }, [open, user]);
@@ -40,13 +42,23 @@ export default function SettingsModal({ open, onClose, onExport }) {
   async function save() {
     const t = Number(target);
     if (!Number.isFinite(t) || t < 5 || t > 200) return toast('יעד יומי לא תקין (5–200 גרם)');
+    const k = Number(kcalTarget);
+    if (!Number.isFinite(k) || (k !== 0 && (k < 500 || k > 10000))) {
+      return toast('יעד קלוריות לא תקין (500–10,000 קק"ל, או 0 לביטול)');
+    }
     const m = Number(keto);
     if (!Number.isInteger(m) || m < 0 || m > 60) return toast('יעד קיטו לא תקין (0–60 חודשים)');
     const digits = wa.replace(/\D/g, '');
     if (digits && (digits.length < 8 || digits.length > 15)) return toast('מספר WhatsApp לא תקין');
     setSaving(true);
     try {
-      await updateProfile({ gender, dailyCarbTarget: t, ketoGoalMonths: m, whatsappPhone: digits });
+      await updateProfile({
+        gender,
+        dailyCarbTarget: t,
+        dailyKcalTarget: Math.round(k),
+        ketoGoalMonths: m,
+        whatsappPhone: digits,
+      });
       toast('ההגדרות נשמרו');
       onClose();
     } catch (e) {
@@ -75,6 +87,11 @@ export default function SettingsModal({ open, onClose, onExport }) {
         <label className="settings-field" data-tour="set-target">
           <span className="settings-lab">יעד יומי (גרם נטו)</span>
           <input type="number" min="5" max="200" value={target} onChange={(e) => setTarget(e.target.value)} />
+        </label>
+
+        <label className="settings-field" data-tour="set-kcal">
+          <span className="settings-lab">יעד קלוריות יומי (קק"ל · 0 = ללא)</span>
+          <input type="number" min="0" max="10000" step="50" value={kcalTarget} onChange={(e) => setKcalTarget(e.target.value)} />
         </label>
 
         <label className="settings-field" data-tour="set-keto">

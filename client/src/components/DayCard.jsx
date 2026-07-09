@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  dayTotal, dayMacroGrams, macroPct, hasMacros, fmt, heDate, zoneInfo, maxRange, TARGET,
+  dayTotal, dayMacroGrams, dayKcal, kcalZone, macroPct, hasMacros, fmt, heDate, zoneInfo, maxRange, TARGET,
 } from '../lib/helpers.js';
 import './DayCard.scss';
 
@@ -82,6 +82,7 @@ export default function DayCard({
   onSaveProduct,
   onSaveItemProduct,
   target = TARGET,
+  kcalTarget = 0,
 }) {
   const mt = day.metrics || {};
   const [weight, setWeight] = useState(mt.weight || '');
@@ -93,6 +94,8 @@ export default function DayCard({
   const meals = [...(day.meals || [])].sort((a, b) => (a.time || '').localeCompare(b.time || ''));
   const g = dayMacroGrams(day);
   const mp = macroPct(g);
+  const kcal = dayKcal(day);
+  const kz = kcalZone(kcal, kcalTarget);
 
   return (
     <div className={'day' + (open ? ' open' : '')}>
@@ -102,8 +105,19 @@ export default function DayCard({
           <span className="day-date">{heDate(iso)}</span>
         </span>
         <span className="day-hright">
-          <span className="day-total" style={{ color: zi.color }}>
-            {fmt(total)} <small>ג' נטו</small>
+          <span className="day-hnums">
+            <span className="day-total" style={{ color: zi.color }}>
+              {fmt(total)} <small>ג' נטו</small>
+            </span>
+            {kcal != null && (
+              <span
+                className="day-kcal"
+                style={kz ? { color: kz.color } : undefined}
+                title={kz ? kz.cap : 'סה"כ קלוריות ליום (לפי המאקרו שתועד)'}
+              >
+                ~{kcal} <small>קק"ל</small>
+              </span>
+            )}
           </span>
           <span className="chev"></span>
         </span>
@@ -219,7 +233,7 @@ export default function DayCard({
                     {mmp && (
                       <div
                         className="meal-macro"
-                        title={`שומן ${mmp.fat}% · חלבון ${mmp.protein}% · פחמ' ${mmp.carb}%`}
+                        title={`שומן ${mmp.fat}% · חלבון ${mmp.protein}% · פחמ' ${mmp.carb}% · ~${mmp.kcal} קק"ל`}
                       >
                         <span className="seg" style={{ width: mmp.fat + '%' }}>
                           <b>{mmp.fat}%</b>

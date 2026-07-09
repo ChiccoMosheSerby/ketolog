@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { buildAnalytics } from '../lib/analytics.js';
-import { fmt, heDate, zoneInfo, TARGET } from '../lib/helpers.js';
+import { dayKcal, fmt, heDate, kcalZone, zoneInfo, TARGET } from '../lib/helpers.js';
 import CarbRing from './CarbRing.jsx';
 import './Dashboard.scss';
 
@@ -70,13 +70,24 @@ function DayStrip({ cells }) {
   );
 }
 
-// Net-carb progress over the whole log. A layered area chart across *every*
+// Daily-value progress over the whole log (net carbs by default; any per-day
+// series via unit/seriesLabel/zone). A layered area chart across *every*
 // calendar day between the first and last logged day: the raw daily line +
 // gradient fill (broken over un-logged gaps), a smoothed 7-day trend line, a
-// dashed target reference with a shaded over-target band, y-axis ticks, faint
-// markers for un-logged days, and best/worst callouts. The svg scales to 100%
-// width (non-scaling strokes stay crisp).
-function TrendChart({ series, target, best, worst }) {
+// dashed target reference with a shaded over-target band (when a target is
+// set), y-axis ticks, faint markers for un-logged days, and best/worst
+// callouts. The svg scales to 100% width (non-scaling strokes stay crisp).
+function TrendChart({
+  series,
+  target = 0,
+  best,
+  worst,
+  unit = "ג'",
+  seriesLabel = 'נטו יומי',
+  zone = zoneInfo,
+  gid = 'trendFill',
+  ariaLabel = 'גרף התקדמות פחמימות נטו ליום',
+}) {
   const W = 340;
   const H = 184;
   const padL = 30;
@@ -91,7 +102,7 @@ function TrendChart({ series, target, best, worst }) {
   const spanDays = Math.max(1, daysBetween(first, last));
 
   const totals = series.map((p) => p.total);
-  const peak = Math.max(...totals, target);
+  const peak = Math.max(...totals, target || 0);
   const yMax = Math.max(5, Math.ceil((peak * 1.12) / 5) * 5); // nice round headroom
   const x = (date) => padL + (daysBetween(first, date) / spanDays) * plotW;
   const y = (v) => padTop + plotH * (1 - Math.min(v / yMax, 1));
@@ -130,8 +141,8 @@ function TrendChart({ series, target, best, worst }) {
     .filter(Boolean);
   const maPath = smoothPath(maPts);
 
-  const yTarget = y(target);
-  const ticks = [0, target, yMax];
+  const yTarget = target ? y(target) : null;
+  const ticks = target ? [0, target, yMax] : [0, yMax];
   const showDots = loggedDots.length <= 60;
   const showGaps = dayCount <= 70; // faint marks for un-logged days, when not too dense
   const markable = loggedDots.length >= 3; // only flag records once there's a spread
@@ -139,30 +150,32 @@ function TrendChart({ series, target, best, worst }) {
   return (
     <div className="trend">
       <svg className="trend-svg" viewBox={`0 0 ${W} ${H}`} role="img"
-           aria-label="גרף התקדמות פחמימות נטו ליום">
+           aria-label={ariaLabel}>
         <defs>
-          <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--olive)" stopOpacity="0.30" />
             <stop offset="100%" stopColor="var(--olive)" stopOpacity="0.02" />
           </linearGradient>
         </defs>
 
         {/* over-target zone + gridlines */}
-        <rect x={padL} y={padTop} width={plotW} height={Math.max(0, yTarget - padTop)}
-              fill="var(--red)" opacity="0.06" />
+        {yTarget != null && (
+          <rect x={padL} y={padTop} width={plotW} height={Math.max(0, yTarget - padTop)}
+                fill="var(--red)" opacity="0.06" />
+        )}
         {ticks.map((t) => (
           <g key={t}>
             <line x1={padL} y1={y(t)} x2={W - padR} y2={y(t)}
-                  stroke={t === target ? 'var(--amber)' : 'var(--line)'}
-                  strokeWidth="1" strokeDasharray={t === target ? '4 4' : null}
-                  vectorEffect="non-scaling-stroke" opacity={t === target ? 0.8 : 0.5} />
+                  stroke={target > 0 && t === target ? 'var(--amber)' : 'var(--line)'}
+                  strokeWidth="1" strokeDasharray={target > 0 && t === target ? '4 4' : null}
+                  vectorEffect="non-scaling-stroke" opacity={target > 0 && t === target ? 0.8 : 0.5} />
             <text x={padL - 5} y={y(t) + 3} textAnchor="end" className="trend-tick">{fmt(t)}</text>
           </g>
         ))}
 
         {/* raw daily series: gradient area + thin line, per logged run */}
         {segments.map((seg, i) =>
-          seg.length > 1 ? <path key={'a' + i} d={segArea(seg)} fill="url(#trendFill)" /> : null
+          seg.length > 1 ? <path key={'a' + i} d={segArea(seg)} fill={`url(#${gid})`} /> : null
         )}
         {segments.map((seg, i) => (
           <path key={'l' + i} d={segLine(seg)} fill="none" stroke="var(--olive)" strokeWidth="1.25"
@@ -184,12 +197,13 @@ function TrendChart({ series, target, best, worst }) {
           </circle>
         ))}
 
-        {/* per-day dots, colored by zone */}
+        {/* per-day dots, colored by zone (neutral when no target is set) */}
         {showDots && loggedDots.map((d) => (
           <circle key={d.date} cx={d.cx} cy={d.cy} r={loggedDots.length <= 20 ? 3 : 2.2}
-                  fill={zoneInfo(d.total, target).color} stroke="var(--paper)" strokeWidth="1"
+                  fill={(target && zone(d.total, target)?.color) || 'var(--olive)'}
+                  stroke="var(--paper)" strokeWidth="1"
                   vectorEffect="non-scaling-stroke">
-            <title>{`${heDate(d.date)} · ${fmt(d.total)} ג'`}</title>
+            <title>{`${heDate(d.date)} · ${fmt(d.total)} ${unit}`}</title>
           </circle>
         ))}
 
@@ -219,9 +233,11 @@ function TrendChart({ series, target, best, worst }) {
         <span>{shortDate(last)}</span>
       </div>
       <div className="strip-legend">
-        <span className="it"><span className="ln solid" /> נטו יומי</span>
+        <span className="it"><span className="ln solid" /> {seriesLabel}</span>
         <span className="it"><span className="ln bold" /> ממוצע נע 7 ימים</span>
-        <span className="it"><span className="ln dash" /> יעד {fmt(target)} ג'</span>
+        {target > 0 && (
+          <span className="it"><span className="ln dash" /> יעד {fmt(target)} {unit}</span>
+        )}
       </div>
     </div>
   );
@@ -339,11 +355,25 @@ function Coffee({ coffee }) {
   );
 }
 
-export default function Dashboard({ days, target = TARGET, today, ketoMonths, children }) {
+export default function Dashboard({ days, target = TARGET, kcalTarget = 0, today, ketoMonths, children }) {
   const a = useMemo(
     () => buildAnalytics(days, target, { today, ketoGoal: { months: ketoMonths } }),
     [days, target, today, ketoMonths]
   );
+
+  // Daily calories series for the trend chart — only days whose meals carry
+  // macros can be counted (dayKcal is null otherwise), sorted oldest→newest.
+  const kcal = useMemo(() => {
+    const series = (days || [])
+      .filter((d) => (d.meals || []).length > 0)
+      .map((d) => ({ date: d.date, total: dayKcal(d) }))
+      .filter((p) => p.total != null)
+      .sort((x, y) => x.date.localeCompare(y.date));
+    if (!series.length) return { series };
+    const best = series.reduce((m, p) => (p.total < m.total ? p : m));
+    const worst = series.reduce((m, p) => (p.total > m.total ? p : m));
+    return { series, best, worst };
+  }, [days]);
 
   if (!a.hasData) {
     return (
@@ -399,6 +429,35 @@ export default function Dashboard({ days, target = TARGET, today, ketoMonths, ch
           <TrendChart series={a.series} target={target} best={a.best} worst={a.worst} />
         ) : (
           <div className="d-note">צריך לפחות יומיים מתועדים כדי להציג את מגמת ההתקדמות.</div>
+        )}
+      </div>
+
+      {/* daily calories trend — colored by the kcal target when one is set */}
+      <div className="panel d-panel">
+        <h2>קלוריות יומיות</h2>
+        {kcal.series.length >= 2 ? (
+          <>
+            <TrendChart
+              series={kcal.series}
+              target={kcalTarget}
+              best={kcal.best}
+              worst={kcal.worst}
+              unit='קק"ל'
+              seriesLabel='קק"ל ליום'
+              zone={kcalZone}
+              gid="kcalFill"
+              ariaLabel="גרף קלוריות יומיות"
+            />
+            {!kcalTarget && (
+              <div className="d-note">
+                להצגת קו יעד ולצביעת הימים (ירוק/כתום/אדום) — הגדירו "יעד קלוריות יומי" בהגדרות.
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="d-note">
+            צריך לפחות יומיים עם פירוט מאקרו (שומן/חלבון) כדי להציג את גרף הקלוריות.
+          </div>
         )}
       </div>
 
