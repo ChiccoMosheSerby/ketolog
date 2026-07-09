@@ -36,7 +36,18 @@ function productsFingerprint(products = []) {
 async function resolveFromCatalog(desc, products = []) {
   const { segments, ok } = parseMeal(desc);
   if (!ok) return null;
-  const keys = [...new Set(segments.map((s) => s.nameKey))];
+  // Fetch each segment's key AND the key minus its first word — the segment may
+  // carry a unit prefix ("מנה דאבל אספרסו") while the catalog doc is keyed on
+  // the bare name. This only widens the FETCH; serving still requires an exact
+  // "<unit> <key>" match, which buildLookup derives from the doc's own unit.
+  const keys = [
+    ...new Set(
+      segments.flatMap((s) => {
+        const i = s.nameKey.indexOf(' ');
+        return i > 0 ? [s.nameKey, s.nameKey.slice(i + 1)] : [s.nameKey];
+      })
+    ),
+  ];
   const catalogEntries = await CatalogItem.find({
     $or: [{ key: { $in: keys } }, { aliases: { $in: keys } }],
   }).lean();

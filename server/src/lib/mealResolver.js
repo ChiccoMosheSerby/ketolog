@@ -81,7 +81,9 @@ export function splitSegments(desc) {
 // second independent quantity, or an empty name marks the segment ambiguous.
 export function parseSegment(raw) {
   // Detach digit runs stuck to letters ("2ביצים" -> "2 ביצים") before tokenizing.
-  const spaced = String(raw || '').replace(/(\d)(?=[^\d\s.,%])/g, '$1 ').replace(/([^\d\s.,])(?=\d)/g, '$1 ');
+  // A hyphen keeps its digit attached: "חביתה מ-2 ביצים" must stay one name whose
+  // key equals the catalog key, not become "מ- 2".
+  const spaced = String(raw || '').replace(/(\d)(?=[^\d\s.,%])/g, '$1 ').replace(/([^\d\s.,-])(?=\d)/g, '$1 ');
   let tokens = spaced.trim().split(/\s+/).filter(Boolean);
 
   while (tokens.length && LEADING_CONNECTIVES.has(tokens[0])) tokens = tokens.slice(1);
@@ -140,9 +142,22 @@ export function parseMeal(desc) {
 
 // ---- matching / assembly ------------------------------------------------------
 
+// Naive plural forms of a Hebrew unit noun: "פרוסה" → "פרוסות", "כוס" →
+// "כוסות"/"כוסים". Over-generation is harmless — each variant only adds an
+// alias key for the same entry — while a missed irregular plural ("כפיות")
+// just falls back to the AI, per the precision rule.
+function unitVariants(unit) {
+  const u = String(unit || '').trim();
+  if (!u) return [];
+  return u.endsWith('ה') ? [u, u.slice(0, -1) + 'ות'] : [u, u + 'ות', u + 'ים'];
+}
+
 // Build a lookup Map from entries ({key, name, unit, carbs, fat, protein,
 // aliases?}) indexed by the canonical key AND every alias, so a match on any
-// rephrase selects the main item. First writer wins on collisions.
+// rephrase selects the main item. Each entry is also indexed under
+// "<unit> <key>" (singular and plural) — the exact text the product-shortcut
+// chips compose ("מנה" + "דאבל אספרסו עם טרוביה") — so a shortcut-built or
+// dictated description resolves without AI. First writer wins on collisions.
 export function buildLookup(entries) {
   const map = new Map();
   for (const e of entries || []) {
@@ -152,6 +167,7 @@ export function buildLookup(entries) {
       if (key && !map.has(key)) map.set(key, e);
     };
     put(e.key);
+    for (const u of unitVariants(e.unit)) put(`${u} ${e.key}`);
     for (const a of e.aliases || []) put(a);
   }
   return map;
