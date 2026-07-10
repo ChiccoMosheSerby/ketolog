@@ -42,6 +42,16 @@ export function dayKcal(d) {
   return kcal > 0 ? Math.round(kcal) : null;
 }
 
+// Calories for a single meal or item from its macro grams (fat 9 kcal/g,
+// protein & carb 4), scaled by qty. Returns null when fat/protein were never
+// logged — carbs alone would be a misleading lower bound.
+export function macroKcal(m, qty = 1) {
+  if (m.fat == null && m.protein == null) return null;
+  const kcal =
+    ((Number(m.fat) || 0) * 9 + (Number(m.protein) || 0) * 4 + (Number(m.carbs) || 0) * 4) * qty;
+  return kcal > 0 ? Math.round(kcal) : null;
+}
+
 // Traffic-light zone for a daily calorie total against the user's kcal target:
 // green at/under target, amber up to 10% over, red beyond. Returns null when
 // there's no target (0/unset) or nothing to grade — callers keep neutral ink.

@@ -306,6 +306,13 @@
       white-space: nowrap;
       color: var(--ink);
     }
+    .mi-kcal {
+      font-family: 'IBM Plex Mono', monospace;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      font-size: 11px;
+      color: var(--ink-soft);
+    }
     .mi-save {
       background: none;
       border: none;
@@ -358,6 +365,17 @@
     white-space: nowrap;
     padding-top: 2px;
     font-variant-numeric: tabular-nums;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+
+    .carb-kcal {
+      font-size: 11px;
+      font-weight: 400;
+      color: var(--ink-soft);
+      cursor: help;
+    }
   }
   .meal-acts {
     display: flex;

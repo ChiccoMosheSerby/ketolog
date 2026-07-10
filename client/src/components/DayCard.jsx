@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  dayTotal, dayMacroGrams, dayKcal, kcalZone, macroPct, hasMacros, fmt, heDate, zoneInfo, maxRange, TARGET,
+  dayTotal, dayMacroGrams, dayKcal, kcalZone, macroPct, macroKcal, hasMacros, fmt, heDate, zoneInfo, maxRange, TARGET,
 } from '../lib/helpers.js';
 import './DayCard.scss';
 
@@ -188,6 +188,7 @@ export default function DayCard({
                         protein: Number(m.protein) || 0,
                       })
                     : null;
+                const mkcal = macroKcal(m);
                 return (
                 <div className="meal" key={m._id}>
                   <MealTime
@@ -209,11 +210,18 @@ export default function DayCard({
                     </div>
                     {items.length > 0 && (
                       <ul className="meal-items">
-                        {items.map((it, i) => (
+                        {items.map((it, i) => {
+                          const ikcal = macroKcal(it, it.qty || 1);
+                          return (
                           <li key={i}>
                             <span className="mi-name">
                               {it.qty > 1 && <b className="mi-qty">{fmt(it.qty)}×</b>} {it.name}
                             </span>
+                            {ikcal != null && (
+                              <span className="mi-kcal" title="קלוריות לפריט (לפי המאקרו שלו)">
+                                ~{ikcal} קק"ל
+                              </span>
+                            )}
                             <span className="mi-carb">
                               {fmt((Number(it.carbs) || 0) * (it.qty || 1))} ג'
                             </span>
@@ -227,7 +235,8 @@ export default function DayCard({
                               </button>
                             )}
                           </li>
-                        ))}
+                          );
+                        })}
                       </ul>
                     )}
                     {mmp && (
@@ -250,7 +259,14 @@ export default function DayCard({
                       </div>
                     )}
                   </div>
-                  <div className="carb">{fmt(Number(m.carbs) || 0)} ג'</div>
+                  <div className="carb">
+                    {fmt(Number(m.carbs) || 0)} ג'
+                    {mkcal != null && (
+                      <span className="carb-kcal" title="קלוריות לארוחה (לפי המאקרו שתועד)">
+                        ~{mkcal} קק"ל
+                      </span>
+                    )}
+                  </div>
                   <div className="meal-acts">
                     {onSaveTemplate && (
                       <button className="mact" title="שמור כתבנית" onClick={() => onSaveTemplate(m)}>
