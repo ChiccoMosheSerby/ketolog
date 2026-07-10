@@ -20,15 +20,15 @@ function Stats({ stats, mini }) {
         <span className="num">{stats.days}</span>
         <span className="lab">ימים מתועדים</span>
       </div>
-      {stats.todayKcal != null && (() => {
-        const kz = kcalZone(stats.todayKcal, stats.kcalTarget);
+      {stats.avgKcal != null && (() => {
+        const kz = kcalZone(stats.avgKcal, stats.kcalTarget);
         return (
           <div className="stat" title={kz?.cap}>
             <span className="num" style={kz ? { color: kz.color } : undefined}>
-              ~{stats.todayKcal}
+              ~{stats.avgKcal}
             </span>
             <span className="lab">
-              {stats.kcalTarget ? `קק"ל מתוך ${stats.kcalTarget}` : 'קק"ל היום'}
+              {stats.kcalTarget ? `ממוצע קק"ל (יעד ${stats.kcalTarget})` : 'ממוצע קק"ל ליום'}
             </span>
           </div>
         );

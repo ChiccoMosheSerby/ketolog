@@ -6,6 +6,7 @@ import { dayTotal, dayKcal, fmt, todayISO, dayHebrewName, prevISO, TARGET } from
 import { downloadReport } from '../lib/exportLog.js';
 import AddMeal from './AddMeal.jsx';
 import QuickAdd from './QuickAdd.jsx';
+import DayMenu from './DayMenu.jsx';
 import Products from './Products.jsx';
 import DayCard from './DayCard.jsx';
 import Dashboard from './Dashboard.jsx';
@@ -265,17 +266,19 @@ export default function Diary() {
   const t = todayISO();
   // Average over *past* logged days only — today is still in progress, so
   // counting it would drag the average down (matches the insights tab).
-  const totals = days
-    .filter((d) => d.date < t && (d.meals || []).length > 0)
-    .map(dayTotal);
+  const pastDays = days.filter((d) => d.date < t && (d.meals || []).length > 0);
+  const totals = pastDays.map(dayTotal);
   const avg = totals.length ? totals.reduce((a, b) => a + b, 0) / totals.length : 0;
+  // Average daily calories over the same past days (ones with macro detail).
+  const kcals = pastDays.map(dayKcal).filter((k) => k != null);
+  const avgKcal = kcals.length ? Math.round(kcals.reduce((a, b) => a + b, 0) / kcals.length) : null;
   const today = days.find((d) => d.date === t);
   const stats = {
     avg: totals.length ? fmt(avg) : '–',
     days: days.length || '–',
     today: today ? fmt(dayTotal(today)) : '0',
     todayNum: today ? dayTotal(today) : 0,
-    todayKcal: today ? dayKcal(today) : null,
+    avgKcal,
     target,
     kcalTarget,
   };
@@ -403,6 +406,11 @@ export default function Diary() {
       id: 'quick',
       label: 'הוספה מהירה',
       content: <QuickAdd date={activeDate} onDateChange={setActiveDate} onLogged={addMeal} />,
+    },
+    {
+      id: 'menu',
+      label: 'תפריט לדוגמה',
+      content: <DayMenu date={activeDate} onDateChange={setActiveDate} onLogged={addMeal} />,
     },
     {
       id: 'insights',

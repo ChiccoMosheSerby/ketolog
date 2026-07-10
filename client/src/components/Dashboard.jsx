@@ -372,8 +372,13 @@ export default function Dashboard({ days, target = TARGET, kcalTarget = 0, today
     if (!series.length) return { series };
     const best = series.reduce((m, p) => (p.total < m.total ? p : m));
     const worst = series.reduce((m, p) => (p.total > m.total ? p : m));
-    return { series, best, worst };
-  }, [days]);
+    // Daily average over past days only (today is still in progress, like the
+    // carbs average); falls back to everything when only today is logged.
+    const past = series.filter((p) => p.date < today);
+    const pool = past.length ? past : series;
+    const avg = Math.round(pool.reduce((s, p) => s + p.total, 0) / pool.length);
+    return { series, best, worst, avg, avgDays: pool.length };
+  }, [days, today]);
 
   if (!a.hasData) {
     return (
@@ -437,6 +442,19 @@ export default function Dashboard({ days, target = TARGET, kcalTarget = 0, today
         <h2>קלוריות יומיות</h2>
         {kcal.series.length >= 2 ? (
           <>
+            <div className="kcal-hero">
+              <span
+                className="kcal-num"
+                style={{ color: kcalZone(kcal.avg, kcalTarget)?.color }}
+                title={kcalZone(kcal.avg, kcalTarget)?.cap}
+              >
+                ~{kcal.avg.toLocaleString()}
+              </span>
+              <span className="kcal-lab">
+                ממוצע קק"ל ליום · מתוך {kcal.avgDays} ימים
+                {kcalTarget ? ` · יעד ${kcalTarget.toLocaleString()}` : ''}
+              </span>
+            </div>
             <TrendChart
               series={kcal.series}
               target={kcalTarget}

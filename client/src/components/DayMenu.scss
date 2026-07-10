@@ -1,0 +1,212 @@
+/* Daily menu templates — the plan pages, restyled with the app's tokens. */
+.day-menu {
+  .dm-eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    color: var(--amber);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .dm-sub {
+    margin: -8px 0 14px;
+    font-size: 13px;
+    color: var(--ink-soft);
+    max-width: 62ch;
+  }
+
+  .dm-picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+  .dm-pick {
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--paper);
+    font-family: 'Heebo', sans-serif;
+    font-size: 12px;
+    padding: 6px 12px;
+    cursor: pointer;
+    color: var(--ink);
+
+    &.active {
+      background: var(--green-tint);
+      border-color: var(--olive);
+      color: var(--accent-ink);
+      font-weight: 600;
+    }
+  }
+
+  /* ---- totals tiles ---- */
+  .dm-totals {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+  .dm-tot {
+    flex: 1;
+    min-width: 105px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm, 10px);
+    background: var(--paper);
+    padding: 10px 12px;
+    text-align: center;
+
+    .n {
+      display: block;
+      font-family: 'IBM Plex Mono', monospace;
+      font-weight: 600;
+      font-size: 22px;
+      line-height: 1.1;
+      font-variant-numeric: tabular-nums;
+    }
+    .l {
+      font-size: 11px;
+      color: var(--ink-soft);
+    }
+    &.carb .n { color: var(--olive); }
+    &.fat .n { color: var(--amber); }
+    &.prot .n { color: var(--protein); }
+  }
+  .dm-rule {
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    background: var(--tint);
+    border-radius: var(--r-sm, 10px);
+    padding: 9px 13px;
+    margin-bottom: 16px;
+  }
+
+  .qa-date {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    max-width: 180px;
+    margin-bottom: 16px;
+
+    label {
+      font-size: 11px;
+      color: var(--ink-soft);
+      font-weight: 500;
+    }
+  }
+
+  /* ---- meal cards ---- */
+  .dm-meal {
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm, 10px);
+    background: var(--card);
+    padding: 13px 15px;
+    margin-bottom: 12px;
+  }
+  .dm-mhead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .dm-mtitle {
+    font-family: 'Heebo', sans-serif;
+    font-weight: 700;
+    font-size: 15.5px;
+  }
+  .dm-mtime {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--amber);
+  }
+  .dm-mmac {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+    margin: 2px 0 8px;
+
+    b {
+      color: var(--olive);
+    }
+  }
+  .dm-items {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+
+    li {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 4px 0;
+      border-bottom: 1px dashed var(--line);
+      font-size: 13px;
+
+      &:last-child {
+        border-bottom: none;
+      }
+      .c {
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 11px;
+        color: var(--ink-soft);
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+      }
+    }
+  }
+  .dm-swap {
+    margin-top: 9px;
+    font-size: 12px;
+    color: var(--ink-soft);
+    background: var(--tint);
+    border-radius: 8px;
+    padding: 7px 11px;
+
+    b {
+      color: var(--accent-ink);
+    }
+  }
+  .dm-log {
+    margin-top: 10px;
+  }
+
+  /* ---- tips + footer ---- */
+  .dm-h3 {
+    font-family: 'Heebo', sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+    margin: 20px 0 8px;
+  }
+  .dm-tips {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+
+    li {
+      position: relative;
+      padding-inline-start: 18px;
+      margin-bottom: 7px;
+      font-size: 13px;
+
+      &::before {
+        content: '◦';
+        position: absolute;
+        inset-inline-start: 0;
+        color: var(--amber);
+        font-weight: 700;
+      }
+    }
+  }
+  .dm-foot {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+    font-size: 11.5px;
+    color: var(--ink-soft);
+  }
+  .dm-foot + .dm-foot {
+    margin-top: 8px;
+    padding-top: 0;
+    border-top: none;
+  }
+}

@@ -390,6 +390,29 @@
   }
 }
 
+/* ---- daily calories: average hero above the trend chart ---- */
+.kcal-hero {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+
+  .kcal-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    font-size: 34px;
+    line-height: 1;
+    color: var(--accent-ink);
+    letter-spacing: -0.02em;
+  }
+  .kcal-lab {
+    font-size: 12.5px;
+    color: var(--ink-soft);
+  }
+}
+
 /* ---- coffee ---- */
 .coffee {
   .coffee-hero {
