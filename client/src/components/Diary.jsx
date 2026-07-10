@@ -275,6 +275,21 @@ export default function Diary() {
     }
   }
 
+  // Detailed diary Excel workbook (days / meals / items). from/to are inclusive
+  // ISO dates; empty = the full log. exceljs is pulled in on demand so it stays
+  // out of the main bundle.
+  async function exportExcel(from, to) {
+    const { downloadExcel } = await import("../lib/exportExcel.js");
+    await downloadExcel({
+      days,
+      target,
+      kcalTarget,
+      from,
+      to,
+      generatedAt: todayISO(),
+    });
+  }
+
   // ---- summary (persistent header) ----
   const t = todayISO();
   // Average over *past* logged days only — today is still in progress, so
@@ -504,7 +519,12 @@ export default function Diary() {
 
   return (
     <div className="wrap">
-      <Header stats={stats} onExport={exportReport} />
+      <Header
+        stats={stats}
+        onExport={exportReport}
+        onExportExcel={exportExcel}
+        firstDate={days.reduce((m, d) => (!m || d.date < m ? d.date : m), "")}
+      />
 
       <TabShell tabs={tabs} onTabChange={handleTabChange} />
 

@@ -123,3 +123,47 @@
   gap: 8px;
   justify-content: center;
 }
+
+/* diary → Excel export: from/to range + button, default = the whole log */
+.settings-export {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  .settings-lab {
+    font-size: 13.5px;
+    color: var(--ink-soft);
+  }
+  .export-range {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+
+    label {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      span {
+        font-size: 11px;
+        color: var(--ink-soft);
+      }
+    }
+    input[type='date'] {
+      padding: 6px 8px;
+      border: 1px solid var(--line);
+      border-radius: var(--r-sm, 10px);
+      background: var(--paper);
+      color: var(--ink);
+      font: inherit;
+      font-size: 13px;
+    }
+    .export-xlsx {
+      margin-bottom: 1px;
+    }
+  }
+  .export-hint {
+    font-size: 11px;
+    color: var(--ink-soft);
+  }
+}

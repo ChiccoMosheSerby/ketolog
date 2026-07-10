@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../lib/auth.jsx';
 import { useToast } from '../lib/toast.jsx';
 import { useTheme } from '../lib/theme.js';
+import { todayISO } from '../lib/helpers.js';
 import './SettingsModal.scss';
 
 // One place for all profile settings — gender (Hebrew address), daily net-carb
 // target, keto-period goal, and the linked WhatsApp number — saved together with
 // a single Save button. Secondary actions (theme, guided tour, export) live
 // below a divider. Opened from the gear button in the header.
-export default function SettingsModal({ open, onClose, onExport }) {
+export default function SettingsModal({ open, onClose, onExport, onExportExcel, firstDate }) {
   const { user, updateProfile, startOnboarding } = useAuth();
   const { theme, toggle } = useTheme();
   const toast = useToast();
@@ -19,8 +20,12 @@ export default function SettingsModal({ open, onClose, onExport }) {
   const [keto, setKeto] = useState('0');
   const [wa, setWa] = useState('');
   const [saving, setSaving] = useState(false);
+  const [xFrom, setXFrom] = useState('');
+  const [xTo, setXTo] = useState('');
+  const [exporting, setExporting] = useState(false);
 
-  // (Re)seed the form from the current profile whenever the modal opens.
+  // (Re)seed the form from the current profile whenever the modal opens. The
+  // Excel range defaults to the whole log: first logged day → today.
   useEffect(() => {
     if (!open) return;
     setGender(user?.gender || '');
@@ -28,7 +33,9 @@ export default function SettingsModal({ open, onClose, onExport }) {
     setKcalTarget(String(user?.dailyKcalTarget || 0));
     setKeto(String(user?.ketoGoalMonths || 0));
     setWa(user?.whatsappPhone || '');
-  }, [open, user]);
+    setXFrom(firstDate || todayISO());
+    setXTo(todayISO());
+  }, [open, user, firstDate]);
 
   useEffect(() => {
     if (!open) return;
@@ -65,6 +72,20 @@ export default function SettingsModal({ open, onClose, onExport }) {
       toast(e.message || 'השמירה נכשלה');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function exportExcel() {
+    if (xFrom && xTo && xFrom > xTo) return toast('טווח תאריכים לא תקין');
+    setExporting(true);
+    try {
+      await onExportExcel?.(xFrom, xTo);
+      toast('קובץ ה-Excel יוצא');
+      onClose();
+    } catch {
+      toast('ייצוא ה-Excel נכשל');
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -107,6 +128,26 @@ export default function SettingsModal({ open, onClose, onExport }) {
         <button className="settings-save" onClick={save} disabled={saving}>
           {saving ? 'שומר…' : 'שמור'}
         </button>
+
+        <div className="settings-divider" />
+
+        <div className="settings-export">
+          <div className="settings-lab">ייצוא היומן ל-Excel</div>
+          <div className="export-range">
+            <label>
+              <span>מתאריך</span>
+              <input type="date" value={xFrom} max={xTo || undefined} onChange={(e) => setXFrom(e.target.value)} />
+            </label>
+            <label>
+              <span>עד תאריך</span>
+              <input type="date" value={xTo} min={xFrom || undefined} onChange={(e) => setXTo(e.target.value)} />
+            </label>
+            <button className="btn ghost mini export-xlsx" onClick={exportExcel} disabled={exporting}>
+              {exporting ? 'מייצא…' : '📊 ייצוא ל-Excel'}
+            </button>
+          </div>
+          <div className="export-hint">ברירת המחדל: כל היומן — מהיום הראשון ועד היום (כולל).</div>
+        </div>
 
         <div className="settings-divider" />
 

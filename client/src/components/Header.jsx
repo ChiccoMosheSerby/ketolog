@@ -103,7 +103,7 @@ function UserBar({ onOpenSettings, onOpenAdmin }) {
   );
 }
 
-export default function Header({ stats, onExport }) {
+export default function Header({ stats, onExport, onExportExcel, firstDate }) {
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -126,7 +126,13 @@ export default function Header({ stats, onExport }) {
 
   const modals = (
     <>
-      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} onExport={onExport} />
+      <SettingsModal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        onExport={onExport}
+        onExportExcel={onExportExcel}
+        firstDate={firstDate}
+      />
       <AdminUsage open={adminOpen} onClose={() => setAdminOpen(false)} />
     </>
   );
