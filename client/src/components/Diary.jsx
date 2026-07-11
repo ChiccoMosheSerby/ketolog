@@ -17,6 +17,7 @@ import QuickAdd from "./QuickAdd.jsx";
 import DayMenu from "./DayMenu.jsx";
 import Products from "./Products.jsx";
 import DayCard from "./DayCard.jsx";
+import DiaryGrid from "./DiaryGrid.jsx";
 import Dashboard from "./Dashboard.jsx";
 import SmartInsights from "./SmartInsights.jsx";
 import KetoCalc from "./KetoCalc.jsx";
@@ -65,6 +66,15 @@ export default function Diary() {
   const [expanded, setExpanded] = useState(new Set());
   const [viewDate, setViewDate] = useState(""); // '' = show all (history filter)
   const [historyOpen, setHistoryOpen] = useState(false); // folded journal under "today"
+  const [productsOpen, setProductsOpen] = useState(false); // folded products panel (desktop)
+  // journal presentation: card list vs. weekly schedule grid (sticks per device)
+  const [diaryView, setDiaryView] = useState(
+    () => localStorage.getItem("ketolog:diaryView") || "list",
+  );
+  function switchDiaryView(v) {
+    setDiaryView(v);
+    localStorage.setItem("ketolog:diaryView", v);
+  }
   const [jump, setJump] = useState(todayISO());
   const [activeDate, setActiveDate] = useState(todayISO()); // the day the "Today" tab + AddMeal point at
   const [loaded, setLoaded] = useState(false);
@@ -341,7 +351,57 @@ export default function Diary() {
     />
   );
 
-  const historyContent = (
+  // From the calendar grid, a day click opens that day's full card in a
+  // modal — the grid stays behind it, edits land live via the shared handlers.
+  const [modalDate, setModalDate] = useState("");
+  useEffect(() => {
+    if (!modalDate) return;
+    const onKey = (e) => e.key === "Escape" && setModalDate("");
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [modalDate]);
+  const modalDay = modalDate
+    ? days.find((d) => d.date === modalDate) || {
+        date: modalDate,
+        meals: [],
+        metrics: {},
+      }
+    : null;
+
+  const viewToggle = (
+    <div
+      className="view-toggle"
+      role="group"
+      aria-label="תצוגת היומן"
+      style={{ marginInlineStart: "auto" }}
+    >
+      <button
+        className={"vt-btn" + (diaryView === "list" ? " on" : "")}
+        onClick={() => switchDiaryView("list")}
+      >
+        רשימה
+      </button>
+      <button
+        className={"vt-btn" + (diaryView === "grid" ? " on" : "")}
+        onClick={() => switchDiaryView("grid")}
+      >
+        לוח חודשי
+      </button>
+    </div>
+  );
+
+  const historyContent =
+    diaryView === "grid" ? (
+      <>
+        <div className="toolbar">{viewToggle}</div>
+        <DiaryGrid
+          days={days}
+          target={target}
+          kcalTarget={kcalTarget}
+          onOpenDay={setModalDate}
+        />
+      </>
+    ) : (
     <>
       <div className="toolbar">
         <label style={{ fontSize: 12, color: "var(--ink-soft)" }}>
@@ -361,6 +421,7 @@ export default function Diary() {
         <button className="btn ghost mini" onClick={() => setViewDate("")}>
           כל הימים
         </button>
+        {viewToggle}
       </div>
       <div id="days">
         {!loaded ? null : shown.length === 0 ? (
@@ -411,7 +472,30 @@ export default function Diary() {
           </span>
         </div>
       </div>
-      {!isMobile && <div className="grid-top">{productsPanel}</div>}
+      {!isMobile && (
+        <div
+          className={
+            "grid-top journal-fold products-fold" + (productsOpen ? " open" : "")
+          }
+          data-tour="products"
+        >
+          <button
+            className="journal-head"
+            onClick={() => setProductsOpen((o) => !o)}
+            aria-expanded={productsOpen}
+          >
+            <span className="journal-htext">
+              <span className="journal-title">המוצרים שלי</span>
+              <span className="journal-sub">מוצרים קבועים לשימוש חוזר</span>
+            </span>
+            <span className="journal-hright">
+              <span className="journal-count">{products.length}</span>
+              <span className="chev"></span>
+            </span>
+          </button>
+          {productsOpen && <div className="journal-body">{productsPanel}</div>}
+        </div>
+      )}
       <AddMeal
         onLogged={addMeal}
         date={activeDate}
@@ -527,6 +611,42 @@ export default function Diary() {
       />
 
       <TabShell tabs={tabs} onTabChange={handleTabChange} />
+
+      {modalDay && (
+        <div className="dayview-scrim" onClick={() => setModalDate("")}>
+          <div
+            className="dayview-modal"
+            role="dialog"
+            aria-label={dayTitle(modalDate)}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="dayview-close"
+              title="סגירה"
+              onClick={() => setModalDate("")}
+            >
+              ✕
+            </button>
+            <DayCard
+              key={modalDate}
+              iso={modalDate}
+              day={modalDay}
+              title={dayTitle(modalDate)}
+              open
+              onToggle={() => {}}
+              onDeleteMeal={deleteMeal}
+              onSetMealTime={updateMealTime}
+              onSetMetric={setMetric}
+              onCopyMeal={copyMealToActive}
+              onSaveTemplate={saveMealAsTemplate}
+              onSaveProduct={saveMealAsProduct}
+              onSaveItemProduct={saveItemAsProduct}
+              target={target}
+              kcalTarget={kcalTarget}
+            />
+          </div>
+        </div>
+      )}
 
       <div className="foot">
         הנתונים נשמרים בענן (MongoDB) ומסונכרנים לחשבון שלך בכל מכשיר.

@@ -1,0 +1,116 @@
+/* ---------- DiaryGrid: monthly calendar view of the journal ---------- */
+.dgrid {
+  margin-top: 4px;
+}
+
+.dg-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.dg-range {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-inline: 4px;
+}
+
+/* 7-column month calendar; cells keep a shared border via gap on a lined bg */
+.dg-cal {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-xs);
+}
+
+.dg-dow {
+  background: var(--tint);
+  padding: 7px 2px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.dg-blank {
+  background: var(--card);
+  opacity: 0.55;
+}
+
+.dg-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-height: 68px;
+  padding: 6px 2px;
+  background: var(--card);
+  border: 0;
+  font-family: 'Heebo', sans-serif;
+  color: var(--ink);
+  cursor: default;
+
+  .dg-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+  }
+  .dg-carb {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    small {
+      font-size: 10px;
+      font-weight: 400;
+    }
+  }
+  .dg-kcal {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+  }
+  .dg-count {
+    font-size: 10px;
+    color: var(--ink-soft);
+  }
+  .dg-none {
+    color: var(--ink-soft);
+    opacity: 0.5;
+    margin-top: 6px;
+  }
+
+  &.logged {
+    cursor: pointer;
+    &:hover {
+      background: var(--green-tint);
+      .dg-num {
+        color: var(--accent-ink);
+      }
+    }
+  }
+  &.today {
+    background: var(--green-tint);
+    .dg-num {
+      color: var(--accent-ink);
+      font-weight: 700;
+    }
+  }
+}
+
+/* narrow screens: tighter cells, drop the meal count to keep numbers legible */
+@media (max-width: 560px) {
+  .dg-day {
+    min-height: 58px;
+    .dg-count {
+      display: none;
+    }
+  }
+}

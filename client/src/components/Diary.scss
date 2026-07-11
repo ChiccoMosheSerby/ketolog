@@ -200,6 +200,76 @@ header.top {
   }
 }
 
+/* day-in-a-modal: opened from the calendar grid; the DayCard is the modal,
+   so the wrapper only centers it, hosts the close button, and scrolls. */
+.dayview-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 28px 16px;
+  overflow-y: auto;
+}
+.dayview-modal {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  padding-top: 40px; /* room for the close button above the card */
+  .day {
+    margin: 0;
+  }
+}
+.dayview-close {
+  position: absolute;
+  top: 0;
+  inset-inline-end: 0;
+  z-index: 1;
+  background: var(--tint);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  width: 30px;
+  height: 30px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  &:hover {
+    color: var(--ink);
+    background: var(--green-tint);
+  }
+}
+
+/* segmented list / weekly-grid switch for the journal */
+.view-toggle {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  padding: 2px;
+  .vt-btn {
+    font-family: 'Heebo', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    background: none;
+    border: 0;
+    border-radius: 999px;
+    padding: 5px 12px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+    &:hover {
+      color: var(--accent-ink);
+    }
+    &.on {
+      background: var(--green-tint);
+      color: var(--accent-ink);
+    }
+  }
+}
+
 /* one-line hints above the diary: the קק"ל-per-gram formula and the ideal
    keto calorie split. Small, soft ink — reminders, not data. */
 .today-hints {
@@ -307,6 +377,22 @@ header.top {
 .journal-body {
   padding: 0 20px 16px;
   border-top: 1px solid var(--line);
+}
+
+/* products panel folded like the journal — the fold header replaces the
+   panel's own title, and the inner card frame is dropped to avoid a
+   card-in-a-card look. */
+.products-fold .journal-body {
+  padding: 0;
+  .panel {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    margin: 0;
+  }
+  .panel > h2 {
+    display: none;
+  }
 }
 .spacer {
   flex: 1;

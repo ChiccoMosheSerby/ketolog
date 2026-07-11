@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { fmt } from '../lib/helpers.js';
-import { useMediaQuery, MOBILE_QUERY } from '../lib/useMediaQuery.js';
 import './MealShortcuts.scss';
 
 // Compact, foldable quick-add tags shown under the description input: saved
@@ -15,8 +14,7 @@ export default function MealShortcuts({
   onRepeatYesterday,
   canRepeat,
 }) {
-  const isMobile = useMediaQuery(MOBILE_QUERY);
-  const [open, setOpen] = useState(!isMobile);
+  const [open, setOpen] = useState(false); // folded by default on every breakpoint
   const count = (products?.length || 0) + (templates?.length || 0);
 
   return (
