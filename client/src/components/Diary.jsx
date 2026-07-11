@@ -24,7 +24,7 @@ import KetoCalc from "./KetoCalc.jsx";
 import Header from "./Header.jsx";
 import TabShell from "./TabShell.jsx";
 import { useMediaQuery, MOBILE_QUERY } from "../lib/useMediaQuery.js";
-import { useInsightsBadge, markVisited } from "../lib/insightsStore.js";
+import { useInsightsBadge } from "../lib/insightsStore.js";
 import "./Diary.scss";
 
 // strip subdoc id / extras → a clean meal payload for the API
@@ -51,13 +51,9 @@ export default function Diary() {
   const toast = useToast();
   const { user } = useAuth();
   const isMobile = useMediaQuery(MOBILE_QUERY);
+  // Red dot on the תובנות tab while an unseen report exists; it clears only
+  // after the user actually views the report there (not on mere tab entry).
   const insightsBadge = useInsightsBadge(user?.email || "");
-  const handleTabChange = useCallback(
-    (id) => {
-      if (id === "insights") markVisited(user?.email || "");
-    },
-    [user?.email],
-  );
   const target = user?.dailyCarbTarget ?? TARGET;
   const kcalTarget = user?.dailyKcalTarget || 0;
   const [days, setDays] = useState([]); // array of day docs, newest first
@@ -610,7 +606,7 @@ export default function Diary() {
         firstDate={days.reduce((m, d) => (!m || d.date < m ? d.date : m), "")}
       />
 
-      <TabShell tabs={tabs} onTabChange={handleTabChange} />
+      <TabShell tabs={tabs} />
 
       {modalDay && (
         <div className="dayview-scrim" onClick={() => setModalDate("")}>

@@ -188,6 +188,27 @@ export default function SmartInsights() {
   const [error, setError] = useState(null);
   const poll = useRef({ count: 0, timer: null, alive: true });
 
+  // Is the panel actually on screen? On mobile the carousel keeps every tab
+  // mounted, so "mounted" ≠ "the user is looking at it" — without this gate a
+  // new report would be marked seen (and the nav badge cleared) on app load,
+  // before the user ever swiped to תובנות.
+  const rootRef = useRef(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    if (typeof IntersectionObserver === 'undefined') {
+      setVisible(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      ([e]) => setVisible(e.isIntersecting && e.intersectionRatio >= 0.5),
+      { threshold: [0, 0.5] },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [status, reports.length]); // re-attach when the ready panel (re)appears
+
   const applyResponse = useCallback((res) => {
     const c = setFromResponse(key, res);
     setAiOff(c.aiOff);
@@ -253,9 +274,11 @@ export default function SmartInsights() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
-  // Mark the shown report seen after a short dwell (clears its "new" highlight).
+  // Mark the shown report seen after a short dwell — but only while the panel
+  // is actually visible, so the תובנות nav badge stays until the user really
+  // opened the tab and saw the report. Leaving mid-dwell cancels the timer.
   useEffect(() => {
-    if (!selectedId) return;
+    if (!selectedId || !visible) return;
     const r = reports.find((x) => x.id === selectedId);
     if (!r || r.seen) return;
     const t = setTimeout(async () => {
@@ -269,7 +292,7 @@ export default function SmartInsights() {
       }
     }, 3000);
     return () => clearTimeout(t);
-  }, [selectedId, reports, key]);
+  }, [selectedId, reports, key, visible]);
 
   if (status === 'loading') {
     return (
@@ -316,7 +339,7 @@ export default function SmartInsights() {
   const anyUnseen = reports.some((r) => !r.seen);
 
   return (
-    <div className="panel si-panel">
+    <div className="panel si-panel" ref={rootRef}>
       <div className="si-top">
         <h2 className="si-title">
           תובנות חכמות

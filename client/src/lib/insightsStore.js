@@ -12,15 +12,6 @@ export const FRESH_MS = 5 * 60 * 1000; // reuse cached data for 5 min before rev
 let cache = null; // { key, reports, generating, aiOff, enoughData, at }
 let inflight = null; // coalesce concurrent loads (panel + badge on cold start)
 
-// Report ids the user has acknowledged by opening the תובנות tab this session.
-// A newly-generated report gets a fresh id, so it re-shows the badge even after
-// an earlier visit.
-let dismissed = new Set();
-let dismissedKey = null;
-// The user opened the tab before the cache loaded: acknowledge whatever the
-// first fetch turns up so the badge doesn't pop in after the visit.
-let pendingVisit = false;
-
 const subs = new Set();
 function emit() {
   subs.forEach((fn) => fn());
@@ -52,11 +43,6 @@ export function setFromResponse(key, res) {
     enoughData,
     at: Date.now(),
   };
-  if (pendingVisit) {
-    pendingVisit = false;
-    markVisited(key);
-    return cache;
-  }
   emit();
   return cache;
 }
@@ -83,10 +69,22 @@ export async function loadInsights(key) {
   return inflight;
 }
 
+// While the server reports it's still generating, revalidate sooner than the
+// normal freshness window so the finished report pops the badge promptly.
+const GEN_RECHECK_MS = 45 * 1000;
+
 // Populate the cache for the badge if it's missing/stale, without disturbing a
-// fresh cache the panel may already own.
+// fresh cache the panel may already own. A fresh cache with pending generation
+// still refetches (on the shorter interval) — that's how a report that finishes
+// in the background gets picked up.
 export async function ensureLoaded(key) {
-  if (!key || isFresh(key)) return;
+  if (!key) return;
+  const generatingWait =
+    cache &&
+    cache.key === key &&
+    (cache.generating || []).length > 0 &&
+    Date.now() - cache.at > GEN_RECHECK_MS;
+  if (isFresh(key) && !generatingWait) return;
   try {
     await loadInsights(key);
   } catch {
@@ -94,40 +92,39 @@ export async function ensureLoaded(key) {
   }
 }
 
-// The user opened the תובנות tab: acknowledge every currently-unseen report so
-// the badge clears until a genuinely new report arrives.
-export function markVisited(key) {
-  if (!key) return;
-  if (dismissedKey !== key) {
-    dismissed = new Set();
-    dismissedKey = key;
-  }
-  if (cache && cache.key === key) {
-    cache.reports.forEach((r) => {
-      if (!r.seen) dismissed.add(r.id);
-    });
-  } else {
-    // No data yet — acknowledge whatever the first fetch for this user returns.
-    pendingVisit = true;
-  }
-  emit();
-}
-
-// Badge shows when there's an unseen report the user hasn't acknowledged by
-// opening the tab this session.
+// Badge shows while any report is unseen. `seen` is server-persisted and only
+// set after the report was actually displayed to the user (SmartInsights marks
+// it on dwell while visible), so the badge survives reloads and tab switches
+// until the user really saw the new insights.
 export function hasBadge(key) {
   if (!cache || cache.key !== key) return false;
-  const ack = dismissedKey === key ? dismissed : null;
-  return cache.reports.some((r) => !r.seen && !(ack && ack.has(r.id)));
+  return cache.reports.some((r) => !r.seen);
 }
 
-// Reactive badge flag for the nav tab. Loads the cache on mount and re-renders
-// whenever the shared store changes (fetch, seen-mark, or tab visit).
+// How often the badge re-checks for new reports. ensureLoaded no-ops while the
+// cache is fresh, so the actual fetch rate is bounded by FRESH_MS.
+const RECHECK_MS = 60 * 1000;
+
+// Reactive badge flag for the nav tab. Loads the cache on mount, re-renders on
+// every store change (fetch / seen-mark), and keeps revalidating on an interval
+// and on app-foreground so a report generated mid-session pops the badge
+// without a reload.
 export function useInsightsBadge(key) {
   const [, bump] = useReducer((n) => n + 1, 0);
   useEffect(() => subscribe(bump), []);
   useEffect(() => {
-    ensureLoaded(key);
+    if (!key) return;
+    const tick = () => ensureLoaded(key);
+    tick();
+    const iv = setInterval(tick, RECHECK_MS);
+    const onVis = () => document.visibilityState === 'visible' && tick();
+    window.addEventListener('focus', tick);
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      clearInterval(iv);
+      window.removeEventListener('focus', tick);
+      document.removeEventListener('visibilitychange', onVis);
+    };
   }, [key]);
   return hasBadge(key);
 }
