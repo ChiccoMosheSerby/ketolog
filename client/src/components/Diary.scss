@@ -382,6 +382,14 @@ header.top {
 /* products panel folded like the journal — the fold header replaces the
    panel's own title, and the inner card frame is dropped to avoid a
    card-in-a-card look. */
+/* the floating #prodList dropdown is position:absolute and must escape the
+   card, so the fold can't clip while open — the header keeps its own radius */
+.products-fold.open {
+  overflow: visible;
+  .journal-head {
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+  }
+}
 .products-fold .journal-body {
   padding: 0;
   .panel {
