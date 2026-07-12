@@ -98,7 +98,7 @@ function UserBar({ onOpenSettings, onOpenAdmin }) {
   );
 }
 
-export default function Header({ stats, onExport, onExportExcel, firstDate }) {
+export default function Header({ stats, onExport, onExportExcel, firstDate, days, onSaveWeight }) {
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -127,6 +127,8 @@ export default function Header({ stats, onExport, onExportExcel, firstDate }) {
         onExport={onExport}
         onExportExcel={onExportExcel}
         firstDate={firstDate}
+        days={days}
+        onSaveWeight={onSaveWeight}
       />
       <AdminUsage open={adminOpen} onClose={() => setAdminOpen(false)} />
     </>

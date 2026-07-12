@@ -76,7 +76,6 @@ export default function DayCard({
   onToggle,
   onDeleteMeal,
   onSetMealTime,
-  onSetMetric,
   onCopyMeal,
   onSaveTemplate,
   onSaveProduct,
@@ -84,10 +83,6 @@ export default function DayCard({
   target = TARGET,
   kcalTarget = 0,
 }) {
-  const mt = day.metrics || {};
-  const [weight, setWeight] = useState(mt.weight || '');
-  const [status, setStatus] = useState(mt.status || '');
-
   const total = dayTotal(day);
   const zi = zoneInfo(total, target);
   const maxr = maxRange(target);
@@ -294,46 +289,6 @@ export default function DayCard({
             )}
           </div>
 
-          <div className="metrics">
-            <div className="mlabel">מדדים פיזיולוגיים</div>
-            <div className="mrow">
-              <div className="mfld">
-                <label>משקל בוקר (ק"ג)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  placeholder="–"
-                  value={weight}
-                  onChange={(e) => setWeight(e.target.value)}
-                  onBlur={() => onSetMetric(iso, 'weight', weight)}
-                />
-              </div>
-              <label className="mfld">
-                <input
-                  type="checkbox"
-                  checked={!!mt.run}
-                  onChange={(e) => onSetMetric(iso, 'run', e.target.checked)}
-                />{' '}
-                ריצה 10 דק'
-              </label>
-              <label className="mfld">
-                <input
-                  type="checkbox"
-                  checked={!!mt.abs}
-                  onChange={(e) => onSetMetric(iso, 'abs', e.target.checked)}
-                />{' '}
-                תרגילי בטן 5 דק'
-              </label>
-            </div>
-            <div className="status">
-              <textarea
-                placeholder="הרגשה, אנרגיה, סטטוס קטוזיס..."
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                onBlur={() => onSetMetric(iso, 'status', status)}
-              />
-            </div>
-          </div>
         </div>
       )}
     </div>

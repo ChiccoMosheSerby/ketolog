@@ -1,7 +1,9 @@
 import { useMemo } from 'react';
 import { buildAnalytics } from '../lib/analytics.js';
 import { dayKcal, fmt, heDate, kcalZone, zoneInfo, TARGET } from '../lib/helpers.js';
+import { DEFAULT_LOSS_TARGET } from '../lib/energyBalance.js';
 import CarbRing from './CarbRing.jsx';
+import EnergyBalance from './EnergyBalance.jsx';
 import './Dashboard.scss';
 
 const pad2 = (n) => String(n).padStart(2, '0');
@@ -355,7 +357,15 @@ function Coffee({ coffee }) {
   );
 }
 
-export default function Dashboard({ days, target = TARGET, kcalTarget = 0, today, ketoMonths, children }) {
+export default function Dashboard({
+  days,
+  target = TARGET,
+  kcalTarget = 0,
+  lossTarget = DEFAULT_LOSS_TARGET,
+  today,
+  ketoMonths,
+  children,
+}) {
   const a = useMemo(
     () => buildAnalytics(days, target, { today, ketoGoal: { months: ketoMonths } }),
     [days, target, today, ketoMonths]
@@ -468,7 +478,8 @@ export default function Dashboard({ days, target = TARGET, kcalTarget = 0, today
             />
             {!kcalTarget && (
               <div className="d-note">
-                להצגת קו יעד ולצביעת הימים (ירוק/כתום/אדום) — הגדירו "יעד קלוריות יומי" בהגדרות.
+                קו היעד וצביעת הימים (ירוק/כתום/אדום) יופיעו אוטומטית ברגע שתחושב שריפת
+                הקלוריות שלך — ראו "מאזן אנרגיה" למטה.
               </div>
             )}
           </>
@@ -477,6 +488,12 @@ export default function Dashboard({ days, target = TARGET, kcalTarget = 0, today
             צריך לפחות יומיים עם פירוט מאקרו (שומן/חלבון) כדי להציג את גרף הקלוריות.
           </div>
         )}
+      </div>
+
+      {/* energy balance: measured TDEE + surplus/deficit grading */}
+      <div className="panel d-panel">
+        <h2>מאזן אנרגיה ושריפת קלוריות</h2>
+        <EnergyBalance days={days} today={today} lossTarget={lossTarget} />
       </div>
 
       {/* 1 · average macro balance */}

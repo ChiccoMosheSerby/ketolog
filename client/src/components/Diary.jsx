@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api.js";
 import { useToast } from "../lib/toast.jsx";
 import { useAuth } from "../lib/auth.jsx";
@@ -12,6 +12,7 @@ import {
   TARGET,
 } from "../lib/helpers.js";
 import { downloadReport } from "../lib/exportLog.js";
+import { energyBalance } from "../lib/energyBalance.js";
 import AddMeal from "./AddMeal.jsx";
 import QuickAdd from "./QuickAdd.jsx";
 import DayMenu from "./DayMenu.jsx";
@@ -55,7 +56,7 @@ export default function Diary() {
   // after the user actually views the report there (not on mere tab entry).
   const insightsBadge = useInsightsBadge(user?.email || "");
   const target = user?.dailyCarbTarget ?? TARGET;
-  const kcalTarget = user?.dailyKcalTarget || 0;
+  const lossTarget = user?.monthlyLossTarget ?? 2;
   const [days, setDays] = useState([]); // array of day docs, newest first
   const [products, setProducts] = useState([]);
   const [templates, setTemplates] = useState([]);
@@ -74,6 +75,16 @@ export default function Diary() {
   const [jump, setJump] = useState(todayISO());
   const [activeDate, setActiveDate] = useState(todayISO()); // the day the "Today" tab + AddMeal point at
   const [loaded, setLoaded] = useState(false);
+
+  // The daily kcal target is never typed in — it's derived from the user's own
+  // data: measured burn (TDEE, from weekly weigh-ins + logged meals) minus the
+  // deficit the monthly loss goal demands. 0 (no coloring / no target line)
+  // until there's enough data to compute the burn.
+  const eb = useMemo(
+    () => energyBalance(days, { lossTarget, today: todayISO() }),
+    [days, lossTarget],
+  );
+  const kcalTarget = eb.ready ? eb.recommendedIntake : 0;
 
   const reload = useCallback(
     (firstLoad = false) =>
@@ -151,10 +162,13 @@ export default function Diary() {
     }
   }
 
+  // Only weight flows through here now (the weekly weigh-in card); run/abs/
+  // status were retired from the UI, though old data still shows in exports.
+  // An empty value clears that date's weigh-in (delete from the history list).
   async function setMetric(date, field, value) {
     const day = await api.setMetric(date, field, value);
     mergeDay(day);
-    if (field === "run" || field === "abs") toast("נשמר");
+    toast(value === "" ? "השקילה נמחקה" : "המשקל נשמר");
   }
 
   async function addProduct(p) {
@@ -437,7 +451,6 @@ export default function Diary() {
               onToggle={() => toggle(d.date)}
               onDeleteMeal={deleteMeal}
               onSetMealTime={updateMealTime}
-              onSetMetric={setMetric}
               onCopyMeal={copyMealToActive}
               onSaveTemplate={saveMealAsTemplate}
               onSaveProduct={saveMealAsProduct}
@@ -510,7 +523,6 @@ export default function Diary() {
         onToggle={() => toggle(activeDate)}
         onDeleteMeal={deleteMeal}
         onSetMealTime={updateMealTime}
-        onSetMetric={setMetric}
         onCopyMeal={copyMealToActive}
         onSaveTemplate={saveMealAsTemplate}
         onSaveProduct={saveMealAsProduct}
@@ -574,6 +586,7 @@ export default function Diary() {
           days={days}
           target={target}
           kcalTarget={kcalTarget}
+          lossTarget={user?.monthlyLossTarget ?? 2}
           today={todayISO()}
           ketoMonths={user?.ketoGoalMonths || 0}
         >
@@ -604,6 +617,8 @@ export default function Diary() {
         onExport={exportReport}
         onExportExcel={exportExcel}
         firstDate={days.reduce((m, d) => (!m || d.date < m ? d.date : m), "")}
+        days={days}
+        onSaveWeight={(date, kg) => setMetric(date, "weight", kg)}
       />
 
       <TabShell tabs={tabs} />
@@ -632,7 +647,6 @@ export default function Diary() {
               onToggle={() => {}}
               onDeleteMeal={deleteMeal}
               onSetMealTime={updateMealTime}
-              onSetMetric={setMetric}
               onCopyMeal={copyMealToActive}
               onSaveTemplate={saveMealAsTemplate}
               onSaveProduct={saveMealAsProduct}

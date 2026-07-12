@@ -10,10 +10,10 @@ const userSchema = new mongoose.Schema(
     gender: { type: String, enum: ['male', 'female', ''], default: '' },
     // Daily net-carb budget (grams). Drives the live budget meter + carb zones.
     dailyCarbTarget: { type: Number, default: 20, min: 5, max: 200 },
-    // Daily calorie budget (kcal). 0 = no target set; when set it colors the
-    // daily kcal totals (green/amber/red) and draws the target line on the
-    // calories trend chart.
-    dailyKcalTarget: { type: Number, default: 0, min: 0, max: 10000 },
+    // Monthly weight-loss goal (kg/month). The client derives the daily calorie
+    // budget from it (measured TDEE − kg × 7700 / 30) — there is no manual kcal
+    // target; it also drives the surplus/deficit grading of each day.
+    monthlyLossTarget: { type: Number, default: 2, min: 0, max: 10 },
     // Keto-period goal: when the run started (YYYY-MM-DD) + its length in months.
     // months = 0 means no goal set; drives the progress chart on the dashboard.
     ketoStartDate: { type: String, default: '' },

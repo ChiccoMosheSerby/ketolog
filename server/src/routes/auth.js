@@ -37,14 +37,15 @@ const userPayload = (u) => ({
   email: u.email,
   gender: u.gender || '',
   dailyCarbTarget: u.dailyCarbTarget,
-  dailyKcalTarget: u.dailyKcalTarget || 0,
+  monthlyLossTarget: u.monthlyLossTarget ?? 2,
   ketoStartDate: u.ketoStartDate || '',
   ketoGoalMonths: u.ketoGoalMonths || 0,
   whatsappPhone: u.whatsappPhone || '',
   isAdmin: isAdmin(u),
 });
 
-const PROFILE_FIELDS = 'email gender dailyCarbTarget dailyKcalTarget ketoStartDate ketoGoalMonths whatsappPhone';
+const PROFILE_FIELDS =
+  'email gender dailyCarbTarget monthlyLossTarget ketoStartDate ketoGoalMonths whatsappPhone';
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 // Base URL for the approval link in the email.
@@ -256,13 +257,14 @@ router.patch('/me', requireAuth, asyncHandler(async (req, res) => {
     }
     update.dailyCarbTarget = t;
   }
-  if (req.body.dailyKcalTarget != null) {
-    // 0 clears the target; otherwise require a plausible daily calorie budget.
-    const k = Number(req.body.dailyKcalTarget);
-    if (!Number.isFinite(k) || (k !== 0 && (k < 500 || k > 10000))) {
-      return res.status(400).json({ error: 'יעד קלוריות לא תקין (500–10,000 קק"ל, או 0 לביטול)' });
+  if (req.body.monthlyLossTarget != null) {
+    // 0 = maintain; otherwise a plausible monthly loss pace (losing >10 kg/month
+    // isn't a target we'll help chase).
+    const w = Number(req.body.monthlyLossTarget);
+    if (!Number.isFinite(w) || w < 0 || w > 10) {
+      return res.status(400).json({ error: 'יעד ירידה חודשי לא תקין (0–10 ק"ג)' });
     }
-    update.dailyKcalTarget = Math.round(k);
+    update.monthlyLossTarget = Math.round(w * 10) / 10;
   }
   if (req.body.ketoGoalMonths != null) {
     const m = Number(req.body.ketoGoalMonths);

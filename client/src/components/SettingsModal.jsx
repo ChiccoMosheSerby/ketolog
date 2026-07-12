@@ -3,20 +3,31 @@ import { useAuth } from '../lib/auth.jsx';
 import { useToast } from '../lib/toast.jsx';
 import { useTheme } from '../lib/theme.js';
 import { todayISO } from '../lib/helpers.js';
+import WeighIn from './WeighIn.jsx';
 import './SettingsModal.scss';
 
 // One place for all profile settings — gender (Hebrew address), daily net-carb
 // target, keto-period goal, and the linked WhatsApp number — saved together with
-// a single Save button. Secondary actions (theme, guided tour, export) live
-// below a divider. Opened from the gear button in the header.
-export default function SettingsModal({ open, onClose, onExport, onExportExcel, firstDate }) {
+// a single Save button. The weekly weigh-in lives here too (deliberately out of
+// the main diary view), and saves immediately, independent of the Save button.
+// Secondary actions (theme, guided tour, export) live below a divider. Opened
+// from the gear button in the header.
+export default function SettingsModal({
+  open,
+  onClose,
+  onExport,
+  onExportExcel,
+  firstDate,
+  days,
+  onSaveWeight,
+}) {
   const { user, updateProfile, startOnboarding } = useAuth();
   const { theme, toggle } = useTheme();
   const toast = useToast();
 
   const [gender, setGender] = useState('');
   const [target, setTarget] = useState('20');
-  const [kcalTarget, setKcalTarget] = useState('0');
+  const [loss, setLoss] = useState('2');
   const [keto, setKeto] = useState('0');
   const [wa, setWa] = useState('');
   const [saving, setSaving] = useState(false);
@@ -30,7 +41,7 @@ export default function SettingsModal({ open, onClose, onExport, onExportExcel, 
     if (!open) return;
     setGender(user?.gender || '');
     setTarget(String(user?.dailyCarbTarget ?? 20));
-    setKcalTarget(String(user?.dailyKcalTarget || 0));
+    setLoss(String(user?.monthlyLossTarget ?? 2));
     setKeto(String(user?.ketoGoalMonths || 0));
     setWa(user?.whatsappPhone || '');
     setXFrom(firstDate || todayISO());
@@ -49,10 +60,8 @@ export default function SettingsModal({ open, onClose, onExport, onExportExcel, 
   async function save() {
     const t = Number(target);
     if (!Number.isFinite(t) || t < 5 || t > 200) return toast('יעד יומי לא תקין (5–200 גרם)');
-    const k = Number(kcalTarget);
-    if (!Number.isFinite(k) || (k !== 0 && (k < 500 || k > 10000))) {
-      return toast('יעד קלוריות לא תקין (500–10,000 קק"ל, או 0 לביטול)');
-    }
+    const w = Number(loss);
+    if (!Number.isFinite(w) || w < 0 || w > 10) return toast('יעד ירידה חודשי לא תקין (0–10 ק"ג)');
     const m = Number(keto);
     if (!Number.isInteger(m) || m < 0 || m > 60) return toast('יעד קיטו לא תקין (0–60 חודשים)');
     const digits = wa.replace(/\D/g, '');
@@ -62,7 +71,7 @@ export default function SettingsModal({ open, onClose, onExport, onExportExcel, 
       await updateProfile({
         gender,
         dailyCarbTarget: t,
-        dailyKcalTarget: Math.round(k),
+        monthlyLossTarget: w,
         ketoGoalMonths: m,
         whatsappPhone: digits,
       });
@@ -110,10 +119,14 @@ export default function SettingsModal({ open, onClose, onExport, onExportExcel, 
           <input type="number" min="5" max="200" value={target} onChange={(e) => setTarget(e.target.value)} />
         </label>
 
-        <label className="settings-field" data-tour="set-kcal">
-          <span className="settings-lab">יעד קלוריות יומי (קק"ל · 0 = ללא)</span>
-          <input type="number" min="0" max="10000" step="50" value={kcalTarget} onChange={(e) => setKcalTarget(e.target.value)} />
+        <label className="settings-field">
+          <span className="settings-lab">יעד ירידה במשקל (ק"ג לחודש · 0 = שימור)</span>
+          <input type="number" min="0" max="10" step="0.5" value={loss} onChange={(e) => setLoss(e.target.value)} />
         </label>
+        <div className="export-hint">
+          יעד הקלוריות היומי מחושב אוטומטית: השריפה שלך (לפי שקילות + ארוחות) פחות הגרעון
+          שיעד הירידה דורש — אין צורך להזין אותו.
+        </div>
 
         <label className="settings-field" data-tour="set-keto">
           <span className="settings-lab">יעד קיטו (חודשים · 0 = ללא)</span>
@@ -128,6 +141,19 @@ export default function SettingsModal({ open, onClose, onExport, onExportExcel, 
         <button className="settings-save" onClick={save} disabled={saving}>
           {saving ? 'שומר…' : 'שמור'}
         </button>
+
+        {onSaveWeight && (
+          <>
+            <div className="settings-divider" />
+            <div className="settings-weigh">
+              <div className="settings-lab">שקילה שבועית</div>
+              <WeighIn days={days} today={todayISO()} onSave={onSaveWeight} />
+              <div className="export-hint">
+                נשמר מיידית על היום הנוכחי ומזין את חישוב שריפת הקלוריות בלשונית "תובנות".
+              </div>
+            </div>
+          </>
+        )}
 
         <div className="settings-divider" />
 
