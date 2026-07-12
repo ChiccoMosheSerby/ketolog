@@ -244,7 +244,13 @@ export default function Products({ products, onAdd, onRename, onDelete, compact 
                         />
                       ) : (
                         <div className="pname">
-                          {p.key} — <span style={{ fontWeight: 300 }}>{p.label}</span>
+                          {p.key}
+                          {p.label && p.label !== p.key && (
+                            <>
+                              {' — '}
+                              <span style={{ fontWeight: 300 }}>{p.label}</span>
+                            </>
+                          )}
                         </div>
                       )}
                       <div className="pmeta">
