@@ -9,9 +9,11 @@
 //   meal    → {origin}/?add=meal&desc=…&carbs=…&fat=…&protein=…&kcal=…&items=<JSON>&date=…
 //
 // `date` is optional on a meal link (defaults to today). `items` is an optional
-// URL-encoded JSON array of the per-ingredient breakdown ([{name, carbs, …}]),
-// which renders as the meal's itemized rows. `kcal` is informational on both and
-// is never persisted (neither model stores calories).
+// URL-encoded JSON array of the per-ingredient breakdown ([{name, desc, carbs, …}]),
+// which renders as the meal's itemized rows — `desc` is the item's fuller
+// description, shown next to the short name the way catalog products show
+// theirs. `kcal` is informational on both and is never persisted (neither
+// model stores calories).
 
 const ALL_PARAMS = ['add', 'name', 'desc', 'unit', 'cat', 'date', 'carbs', 'fat', 'protein', 'kcal', 'items'];
 
@@ -40,7 +42,7 @@ export function mealLinkTemplate(origin) {
     `&fat=<שומן>` +
     `&protein=<חלבון>` +
     `&kcal=<קלוריות>` +
-    `&items=<מערך JSON של הפריטים, לדוגמה [{"name":"חביתה מ-3 ביצים","carbs":1.2},{"name":"קפה שחור","carbs":0}]>`
+    `&items=<מערך JSON של הפריטים, לדוגמה [{"name":"חביתה","desc":"חביתה מ-3 ביצים בחמאה","carbs":1.2},{"name":"קפה שחור","desc":"קפה שחור ללא סוכר","carbs":0}]>`
   );
 }
 
@@ -93,6 +95,7 @@ function parseItems(raw) {
     .filter((it) => it && (it.name != null || it.carbs != null))
     .map((it) => ({
       name: String(it.name || '').trim(),
+      desc: String(it.desc || '').trim(),
       qty: numOr(it.qty, 1) > 0 ? numOr(it.qty, 1) : 1,
       unit: String(it.unit || '').trim(),
       carbs: numOr(it.carbs, 0),

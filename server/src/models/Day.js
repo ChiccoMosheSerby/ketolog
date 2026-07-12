@@ -7,6 +7,7 @@ import mongoose from 'mongoose';
 const mealItemSchema = new mongoose.Schema(
   {
     name: { type: String, default: '' },
+    desc: { type: String, default: '' }, // fuller description (e.g. from a Claude meal link)
     qty: { type: Number, default: 1 },
     unit: { type: String, default: '' },
     carbs: { type: Number, default: 0 }, // net carbs per single unit

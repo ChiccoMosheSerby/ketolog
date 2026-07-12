@@ -39,6 +39,7 @@ const cleanMeal = (m) => ({
   items: Array.isArray(m.items)
     ? m.items.map((it) => ({
         name: it.name || "",
+        desc: it.desc || "",
         qty: Number(it.qty) > 0 ? Number(it.qty) : 1,
         unit: it.unit || "",
         carbs: Number(it.carbs) || 0,
@@ -253,7 +254,7 @@ export default function Diary() {
     if (name == null || !name.trim()) return;
     await addProduct({
       key: name.trim(),
-      label: (item.name || name).trim(),
+      label: (item.desc || item.name || name).trim(),
       unit: (item.unit || "").trim() || "מנה",
       carbs: Number(item.carbs) || 0,
       fat: Number(item.fat) || 0,

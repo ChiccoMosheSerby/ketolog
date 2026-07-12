@@ -472,6 +472,12 @@ export default function AddMeal({
                       <span className="ci-name">
                         {it.qty > 1 && <b className="ci-qty">{fmt(it.qty)}×</b>}{" "}
                         {it.name}
+                        {it.desc && it.desc !== it.name && (
+                          <>
+                            {" — "}
+                            <span className="ci-desc">{it.desc}</span>
+                          </>
+                        )}
                       </span>
                       <span className="ci-carb">
                         {fmt((Number(it.carbs) || 0) * (it.qty || 1))} ג' פחמ'

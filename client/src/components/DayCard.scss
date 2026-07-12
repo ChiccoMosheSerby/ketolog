@@ -294,6 +294,11 @@
       flex: 1;
       min-width: 0;
     }
+    /* fuller item description (e.g. from a Claude meal link) — same light
+       weight the products catalog uses for its "תיאור מלא" */
+    .mi-desc {
+      font-weight: 300;
+    }
     .mi-qty {
       font-family: 'IBM Plex Mono', monospace;
       font-weight: 600;

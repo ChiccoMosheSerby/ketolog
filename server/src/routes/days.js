@@ -47,6 +47,7 @@ const cleanMealItems = (arr) =>
     ? arr
         .map((it) => ({
           name: String(it?.name || '').trim(),
+          desc: String(it?.desc || '').trim(),
           qty: Number(it?.qty) > 0 ? Number(it.qty) : 1,
           unit: String(it?.unit || '').trim(),
           carbs: Number(it?.carbs) || 0,

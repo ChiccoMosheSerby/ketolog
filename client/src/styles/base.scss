@@ -285,6 +285,11 @@ textarea:focus {
       flex: 1;
       min-width: 0;
     }
+    /* fuller item description (e.g. from a Claude meal link) — same light
+       weight the products catalog uses for its "תיאור מלא" */
+    .ci-desc {
+      font-weight: 300;
+    }
     .ci-qty {
       font-family: 'IBM Plex Mono', monospace;
       font-weight: 600;

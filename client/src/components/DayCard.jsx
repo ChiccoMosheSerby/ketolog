@@ -208,6 +208,12 @@ export default function DayCard({
                           <li key={i}>
                             <span className="mi-name">
                               {it.qty > 1 && <b className="mi-qty">{fmt(it.qty)}×</b>} {it.name}
+                              {it.desc && it.desc !== it.name && (
+                                <>
+                                  {' — '}
+                                  <span className="mi-desc">{it.desc}</span>
+                                </>
+                              )}
                             </span>
                             {ikcal != null && (
                               <span className="mi-kcal" title="קלוריות לפריט (לפי המאקרו שלו)">
