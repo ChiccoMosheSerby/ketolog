@@ -1,15 +1,22 @@
-import { useMemo, useState } from 'react';
-import { useToast } from '../lib/toast.jsx';
-import { useAuth } from '../lib/auth.jsx';
-import { fmt, macroPct, nowHM, prevISO, nextISO, todayISO } from '../lib/helpers.js';
+import { useMemo, useState } from "react";
+import { useToast } from "../lib/toast.jsx";
+import { useAuth } from "../lib/auth.jsx";
+import {
+  fmt,
+  macroPct,
+  nowHM,
+  prevISO,
+  nextISO,
+  todayISO,
+} from "../lib/helpers.js";
 import {
   DEMO_PRODUCTS,
   PRODUCT_TYPES,
   MEAL_COMBOS,
   historicalSuggestions,
-} from '../data/demoProducts.js';
-import { recordSelection, suggestIds } from '../lib/quickAddPatterns.js';
-import './QuickAdd.scss';
+} from "../data/demoProducts.js";
+import { recordSelection, suggestIds } from "../lib/quickAddPatterns.js";
+import "./QuickAdd.scss";
 
 // Quick-Add POC: compose a meal purely by tapping products from a fixed demo
 // DB (built from the user's real log history) — selection only, no free text,
@@ -30,12 +37,15 @@ export default function QuickAdd({ date, onDateChange, onLogged }) {
   // padded with what the log history says they eat at this hour.
   const { suggested, learnedCount } = useMemo(() => {
     const now = new Date();
-    const { ids, learnedCount } = suggestIds(user?.email || '', {
+    const { ids, learnedCount } = suggestIds(user?.email || "", {
       now,
       limit: 4,
       defaults: historicalSuggestions(now.getHours()),
     });
-    return { suggested: ids.map((id) => byId.get(id)).filter(Boolean), learnedCount };
+    return {
+      suggested: ids.map((id) => byId.get(id)).filter(Boolean),
+      learnedCount,
+    };
   }, [user?.email, byId, logged]);
 
   const picked = DEMO_PRODUCTS.filter((p) => qty[p.id] > 0);
@@ -43,7 +53,10 @@ export default function QuickAdd({ date, onDateChange, onLogged }) {
   // First tap adds the product's usual amount (e.g. 5 cherry tomatoes); the
   // steppers then adjust one by one.
   const add = (p) =>
-    setQty((q) => ({ ...q, [p.id]: (q[p.id] || 0) + (q[p.id] ? 1 : p.typicalQty || 1) }));
+    setQty((q) => ({
+      ...q,
+      [p.id]: (q[p.id] || 0) + (q[p.id] ? 1 : p.typicalQty || 1),
+    }));
 
   const bump = (id, delta) =>
     setQty((q) => {
@@ -60,25 +73,35 @@ export default function QuickAdd({ date, onDateChange, onLogged }) {
       for (const it of combo.items) copy[it.id] = (copy[it.id] || 0) + it.qty;
       return copy;
     });
-    toast(combo.name + ' נוסף לארוחה');
+    toast(combo.name + " נוסף לארוחה");
   };
 
   const round2 = (n) => Math.round(n * 100) / 100;
-  const total = (key) => round2(picked.reduce((s, p) => s + (Number(p[key]) || 0) * qty[p.id], 0));
-  const totals = { carbs: total('carbs'), fat: total('fat'), protein: total('protein') };
+  const total = (key) =>
+    round2(picked.reduce((s, p) => s + (Number(p[key]) || 0) * qty[p.id], 0));
+  const totals = {
+    carbs: total("carbs"),
+    fat: total("fat"),
+    protein: total("protein"),
+  };
   const mp = picked.length
     ? macroPct({ carb: totals.carbs, fat: totals.fat, protein: totals.protein })
     : null;
 
   const comboCarbs = (combo) =>
-    round2(combo.items.reduce((s, it) => s + (byId.get(it.id)?.carbs || 0) * it.qty, 0));
+    round2(
+      combo.items.reduce(
+        (s, it) => s + (byId.get(it.id)?.carbs || 0) * it.qty,
+        0,
+      ),
+    );
 
   // Same composition as AddMeal's pickedToText, so the resolver / journal read
   // these meals exactly like shortcut-composed ones.
-  const unitName = (p) => `${p.unit ? p.unit + ' ' : ''}${p.name}`;
+  const unitName = (p) => `${p.unit ? p.unit + " " : ""}${p.name}`;
   const descText = picked
     .map((p) => (qty[p.id] > 1 ? `${qty[p.id]} ${unitName(p)}` : unitName(p)))
-    .join(', ');
+    .join(", ");
 
   async function logMeal() {
     if (!picked.length) return;
@@ -98,31 +121,31 @@ export default function QuickAdd({ date, onDateChange, onLogged }) {
           fat: p.fat,
           protein: p.protein,
         })),
-        source: 'local',
+        source: "local",
       });
       recordSelection(
-        user?.email || '',
+        user?.email || "",
         picked.map((p) => p.id),
       );
       setQty({});
       setLogged((n) => n + 1);
-      toast('הארוחה נרשמה · 🧮 ללא AI (ממאגר המוצרים)');
+      toast("הארוחה נרשמה · 🧮 ללא AI (ממאגר המוצרים)");
     } catch (e) {
-      toast(e.message || 'הרישום נכשל');
+      toast(e.message || "הרישום נכשל");
     } finally {
       setBusy(false);
     }
   }
 
-  const card = (p, extraClass = '') => {
+  const card = (p, extraClass = "") => {
     const n = qty[p.id] || 0;
     return (
-      <div key={p.id} className={'qa-card' + (n > 0 ? ' on' : '') + extraClass}>
+      <div key={p.id} className={"qa-card" + (n > 0 ? " on" : "") + extraClass}>
         <button
           type="button"
           className="qa-card-main"
           onClick={() => add(p)}
-          title={p.desc || 'הוסף לארוחה'}
+          title={p.desc || "הוסף לארוחה"}
         >
           <span className="qa-emoji">{p.emoji}</span>
           <span className="qa-name">{p.name}</span>
@@ -149,13 +172,17 @@ export default function QuickAdd({ date, onDateChange, onLogged }) {
     <div className="panel quick-add">
       <h2>הוספה מהירה ממאגר המוצרים</h2>
       <p className="qa-sub">
-        בוחרים מוצרים בהקשה — בלי הקלדה, בלי טעויות. המאגר נבנה מהיומן האמיתי שלך; הערכים
-        מחושבים מיידית, ללא AI.
+        בוחרים מוצרים בהקשה — בלי הקלדה, בלי טעויות. המאגר נבנה מהיומן האמיתי
+        שלך; הערכים מחושבים מיידית, ללא AI.
       </p>
 
       <div className="qa-date">
         <label>תאריך</label>
-        <input type="date" value={date} onChange={(e) => onDateChange(e.target.value)} />
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => onDateChange(e.target.value)}
+        />
         <div className="date-nav">
           <button
             type="button"
@@ -183,11 +210,13 @@ export default function QuickAdd({ date, onDateChange, onLogged }) {
             ⏰ מומלץ עכשיו
             <small>
               {learnedCount > 0
-                ? 'לפי ההרגלים שלך בשעה הזו'
-                : 'לפי מה שנרשם ביומן שלך בשעות האלה'}
+                ? "לפי ההרגלים שלך בשעה הזו"
+                : "לפי מה שנרשם ביומן שלך בשעות האלה"}
             </small>
           </div>
-          <div className="qa-grid">{suggested.map((p) => card(p, ' hint'))}</div>
+          <div className="qa-grid">
+            {suggested.map((p) => card(p, " hint"))}
+          </div>
         </div>
       )}
 
@@ -208,7 +237,9 @@ export default function QuickAdd({ date, onDateChange, onLogged }) {
               >
                 <span className="plus">+</span>
                 {c.name}
-                <small>{fmt(comboCarbs(c))} פחמ'</small>
+                <small style={{ color: "var(--olive)" }}>
+                  {fmt(comboCarbs(c))} פחמ'
+                </small>
               </button>
             ))}
           </div>
@@ -229,7 +260,7 @@ export default function QuickAdd({ date, onDateChange, onLogged }) {
         );
       })}
 
-      <div className={'qa-cart' + (picked.length ? ' show' : '')}>
+      <div className={"qa-cart" + (picked.length ? " show" : "")}>
         {picked.length === 0 ? (
           <span className="qa-empty">הקישו על מוצר כדי להתחיל לבנות ארוחה</span>
         ) : (
@@ -240,26 +271,33 @@ export default function QuickAdd({ date, onDateChange, onLogged }) {
                   <span className="qa-line-name">
                     {qty[p.id] > 1 && <b>{qty[p.id]}×</b>} {p.name}
                   </span>
-                  <span className="qa-line-carb">{fmt(round2(p.carbs * qty[p.id]))} ג' פחמ'</span>
+                  <span className="qa-line-carb">
+                    {fmt(round2(p.carbs * qty[p.id]))} ג' פחמ'
+                  </span>
                 </li>
               ))}
             </ul>
             <div className="qa-totals">
               <strong>
-                {fmt(totals.carbs)} ג' פחמימות נטו · {fmt(totals.fat)} ג' שומן ·{' '}
+                {fmt(totals.carbs)} ג' פחמימות נטו · {fmt(totals.fat)} ג' שומן ·{" "}
                 {fmt(totals.protein)} ג' חלבון
               </strong>
               {mp && (
                 <span className="qa-mp">
-                  שומן {mp.fat}% · חלבון {mp.protein}% · פחמ' {mp.carb}% (~{mp.kcal} קק"ל)
+                  שומן {mp.fat}% · חלבון {mp.protein}% · פחמ' {mp.carb}% (~
+                  {mp.kcal} קק"ל)
                 </span>
               )}
             </div>
             <div className="qa-actions">
               <button className="btn" disabled={busy} onClick={logMeal}>
-                {busy ? 'רושם…' : 'רשום ארוחה'}
+                {busy ? "רושם…" : "רשום ארוחה"}
               </button>
-              <button className="btn ghost" disabled={busy} onClick={() => setQty({})}>
+              <button
+                className="btn ghost"
+                disabled={busy}
+                onClick={() => setQty({})}
+              >
                 נקה בחירה
               </button>
             </div>

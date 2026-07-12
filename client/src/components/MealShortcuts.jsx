@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { fmt } from '../lib/helpers.js';
-import './MealShortcuts.scss';
+import { useState } from "react";
+import { fmt } from "../lib/helpers.js";
+import "./MealShortcuts.scss";
 
 // Compact, foldable quick-add tags shown under the description input: saved
 // products + meal templates + "repeat yesterday". A click adds the item to the
@@ -20,7 +20,7 @@ export default function MealShortcuts({
   return (
     <div className="shortcuts" data-tour="shortcuts">
       <button
-        className={'sc-head' + (open ? ' open' : '')}
+        className={"sc-head" + (open ? " open" : "")}
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
       >
@@ -38,19 +38,23 @@ export default function MealShortcuts({
                 <span className="sc-empty">— הוסיפו בלשונית "המוצרים שלי"</span>
               ) : (
                 [...products]
-                  .sort((a, b) => (Number(a.carbs) || 0) - (Number(b.carbs) || 0))
+                  .sort(
+                    (a, b) => (Number(a.carbs) || 0) - (Number(b.carbs) || 0),
+                  )
                   .map((p) => (
-                  <button
-                    className="sc-chip"
-                    key={p._id}
-                    onClick={() => onApplyProduct(p)}
-                    title="הוסף לפירוט"
-                  >
-                    <span className="plus">+</span>
-                    {p.unit} {p.key}
-                    <small>{fmt(p.carbs)}</small>
-                  </button>
-                ))
+                    <button
+                      className="sc-chip"
+                      key={p._id}
+                      onClick={() => onApplyProduct(p)}
+                      title="הוסף לפירוט"
+                    >
+                      <span className="plus">+</span>
+                      {p.unit} {p.key}
+                      <small style={{ color: "var(--olive)" }}>
+                        {fmt(p.carbs)}
+                      </small>
+                    </button>
+                  ))
               )}
             </div>
           </div>
@@ -63,7 +67,11 @@ export default function MealShortcuts({
               ) : (
                 templates.map((t) => (
                   <span className="sc-chip-wrap" key={t._id}>
-                    <button className="sc-chip" onClick={() => onApplyTemplate(t)} title="הוסף לפירוט">
+                    <button
+                      className="sc-chip"
+                      onClick={() => onApplyTemplate(t)}
+                      title="הוסף לפירוט"
+                    >
                       <span className="plus">+</span>
                       {t.name}
                       <small>{fmt(t.carbs)} פחמ'</small>
@@ -82,7 +90,11 @@ export default function MealShortcuts({
           </div>
 
           {canRepeat && (
-            <button className="sc-repeat" onClick={onRepeatYesterday} title="העתק את כל ארוחות אתמול ליום הנבחר">
+            <button
+              className="sc-repeat"
+              onClick={onRepeatYesterday}
+              title="העתק את כל ארוחות אתמול ליום הנבחר"
+            >
               ⟳ שכפל את כל ארוחות אתמול
             </button>
           )}
