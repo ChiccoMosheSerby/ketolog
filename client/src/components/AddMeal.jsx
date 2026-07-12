@@ -33,7 +33,7 @@ export default function AddMeal({
   });
   const [items, setItems] = useState([]); // per-item breakdown from the last calc
   const [note, setNote] = useState(null); // { html } via structured fields
-  const [calcSource, setCalcSource] = useState(""); // 'local' | 'catalog' | 'ai' | '' — where the last calc came from
+  const [calcSource, setCalcSource] = useState(""); // 'local' | 'ai' | '' — where the last calc came from
   const [busy, setBusy] = useState(false);
   // Structured list of saved products the user tapped in, kept alongside the free
   // text. `descIsPure` stays true only while the description was built *solely*
@@ -214,13 +214,11 @@ export default function AddMeal({
     setDescIsPure(true);
     clearNote();
     toast(
-      src === "catalog"
-        ? "הארוחה נרשמה · 📖 ללא AI (מהקטלוג)"
-        : src === "local"
-          ? "הארוחה נרשמה · 🧮 ללא AI (מהמוצרים שלך)"
-          : src === "ai"
-            ? "הארוחה נרשמה · 🤖 חושב ב-AI"
-            : "הארוחה נרשמה"
+      src === "local"
+        ? "הארוחה נרשמה · 🧮 ללא AI (מהמוצרים שלך)"
+        : src === "ai"
+          ? "הארוחה נרשמה · 🤖 חושב ב-AI"
+          : "הארוחה נרשמה"
     );
   }
 
@@ -260,7 +258,7 @@ export default function AddMeal({
       const prot = Number(r.protein);
       const mealItems = Array.isArray(r.items) ? r.items : [];
       // 'local' = the server matched the user's own saved products (above all)
-      const src = r.source === "catalog" || r.source === "local" ? r.source : "ai";
+      const src = r.source === "local" ? "local" : "ai";
       setCalcSource(src);
       const carbsValue = isNaN(n) ? "" : fmt(n);
       const macro = {
@@ -281,7 +279,6 @@ export default function AddMeal({
         mp,
         items: mealItems,
         local: src === "local",
-        catalog: src === "catalog",
         ai: src === "ai",
       });
       if (thenLog && !isNaN(n)) await doAdd(carbsValue, macro, mealItems, src);
@@ -460,12 +457,6 @@ export default function AddMeal({
                 <span className="bd">
                   <br />
                   🧮 ללא AI — חושב מהמוצרים השמורים שלך.
-                </span>
-              )}
-              {note.catalog && (
-                <span className="bd">
-                  <br />
-                  📖 ללא AI — חושב מקטלוג המוצרים הנלמד.
                 </span>
               )}
               {note.ai && (

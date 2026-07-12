@@ -73,28 +73,4 @@ export const api = {
 
   // admin — per-user AI cost breakdown (admin accounts only)
   getAdminUsage: () => request('GET', '/admin/usage'),
-  // admin — the global learned-product catalog (map of every food logged)
-  getAdminCatalog: () => request('GET', '/admin/catalog'),
-  // admin — catalog optimization: AI duplicate scan (manual-only), merge
-  // requests (approve/reject; every system proposal awaits the admin), manual
-  // merges/rephrases, and manually-created catalog products
-  scanCatalog: (opts) => request('POST', '/admin/catalog/optimize', opts || {}),
-  // feature kill switch: OFF = estimate meals exactly as before the catalog
-  // feature existed; ON = serve confident meals from the catalog with no AI
-  setCatalogResolver: (enabled) => request('POST', '/admin/catalog/resolver', { enabled }),
-  getCatalogMerges: (status) =>
-    request('GET', `/admin/catalog/merges${status ? `?status=${status}` : ''}`),
-  resolveCatalogMerge: (id, decision, canonicalKey) =>
-    request('POST', `/admin/catalog/merges/${id}`, { decision, canonicalKey }),
-  createCatalogMerge: (canonicalKey, phrases) =>
-    request('POST', '/admin/catalog/merges', { canonicalKey, phrases }),
-  createCatalogItem: (item) => request('POST', '/admin/catalog/items', item),
-  updateCatalogItem: (key, patch) =>
-    request('PATCH', `/admin/catalog/items/${encodeURIComponent(key)}`, patch),
-  // remove an item entirely (its folded rephrases become independent again)
-  deleteCatalogItem: (key) =>
-    request('DELETE', `/admin/catalog/items/${encodeURIComponent(key)}`),
-  // detach a rephrase from its main item (rename = detach + re-add)
-  removeCatalogAlias: (aliasKey) =>
-    request('DELETE', `/admin/catalog/aliases/${encodeURIComponent(aliasKey)}`),
 };

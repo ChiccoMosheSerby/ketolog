@@ -7,8 +7,7 @@ import {
   parseSegment,
   parseMeal,
   buildLookup,
-  resolveFromLookup,
-  resolveFromLookups,
+  resolveFromProducts,
 } from '../src/lib/mealResolver.js';
 
 test('splitSegments: commas, newlines, plus, standalone vav', () => {
@@ -83,14 +82,14 @@ test('buildLookup: unit-prefixed variants (singular + plural) select the item', 
   assert.equal(lookup.get('כוס דאבל אספרסו עם טרוביה'), undefined);
 });
 
-test('resolveFromLookup: shortcut-composed meal (unit prefixes, מ-2, plural) resolves without AI', () => {
+test('resolveFromProducts: shortcut-composed meal (unit prefixes, מ-2, plural) resolves without AI', () => {
   const lookup = buildLookup([
     { key: 'קפה שחור עם טרוביה', name: 'קפה שחור עם טרוביה', unit: 'מנה', carbs: 0, fat: 0, protein: 0 },
     { key: 'חביתה מ-2 ביצים', name: 'חביתה מ-2 ביצים', unit: '', carbs: 0.8, fat: 10, protein: 12 },
     { key: 'גוש חלב פרוסה', name: 'גוש חלב פרוסה', unit: 'פרוסה', carbs: 0, fat: 3, protein: 2 },
     { key: 'מלפפון חמוץ', name: 'מלפפון חמוץ', unit: 'מנה', carbs: 1, fat: 0, protein: 0 },
   ]);
-  const r = resolveFromLookup(
+  const r = resolveFromProducts(
     'מנה קפה שחור עם טרוביה, 1 חביתה מ-2 ביצים, 3 פרוסות גוש חלב פרוסה, מנה מלפפון חמוץ',
     lookup
   );
@@ -101,12 +100,12 @@ test('resolveFromLookup: shortcut-composed meal (unit prefixes, מ-2, plural) re
   assert.equal(r.fat, 19); // 0 + 10 + 3×3 + 0
 });
 
-test('resolveFromLookup: full meal resolves, totals reconcile with breakdown', () => {
+test('resolveFromProducts: full meal resolves, totals reconcile with breakdown', () => {
   const lookup = buildLookup([
     { key: 'ביצה', name: 'ביצה', unit: 'ביצה', carbs: 0.5, fat: 5, protein: 6, aliases: ['ביצים'] },
     { key: 'קפה שחור', name: 'קפה שחור', unit: 'כוס', carbs: 0, fat: 0, protein: 0.3 },
   ]);
-  const r = resolveFromLookup('3 ביצים, קפה שחור', lookup);
+  const r = resolveFromProducts('3 ביצים, קפה שחור', lookup);
   assert.ok(r);
   assert.equal(r.items.length, 2);
   assert.equal(r.items[0].qty, 3);
@@ -115,80 +114,54 @@ test('resolveFromLookup: full meal resolves, totals reconcile with breakdown', (
   assert.equal(r.protein, 18.3);
 });
 
-test('resolveFromLookup: ANY unmatched or ambiguous segment → null (no partial serving)', () => {
+test('resolveFromProducts: ANY unmatched segment → null (no partial serving)', () => {
   const lookup = buildLookup([{ key: 'ביצה', name: 'ביצה', unit: 'ביצה', carbs: 0.5, fat: 5, protein: 6 }]);
-  assert.equal(resolveFromLookup('ביצה, סלט ירקות ביתי', lookup), null);
-  assert.equal(resolveFromLookup('ביצה גדולה', lookup), null);
-  assert.equal(resolveFromLookup('קצת ביצה', lookup), null);
+  assert.equal(resolveFromProducts('ביצה, סלט ירקות ביתי', lookup), null);
+  assert.equal(resolveFromProducts('ביצה גדולה', lookup), null);
+  assert.equal(resolveFromProducts('קצת ביצה', lookup), null);
 });
 
-test('resolveFromLookups: saved product with grams in its NAME resolves (ambiguity-exempt)', () => {
+test('resolveFromProducts: saved product with grams in its NAME resolves (ambiguity-exempt)', () => {
   // the exact text the shortcut chip composes: "<unit> <key>" where the key
   // itself contains a weight — must resolve from the user's product, no AI
   const products = buildLookup([
     { key: '300 גרם סינטה', name: '300 גרם סינטה', unit: 'מנה', carbs: 0, fat: 20, protein: 60 },
   ]);
-  const r = resolveFromLookups('מנה 300 גרם סינטה', products, new Map());
+  const r = resolveFromProducts('מנה 300 גרם סינטה', products);
   assert.ok(r);
-  assert.equal(r.source, 'local');
-  assert.equal(r.result.net_carbs, 0);
-  assert.equal(r.result.items[0].qty, 1);
+  assert.equal(r.net_carbs, 0);
+  assert.equal(r.items[0].qty, 1);
   // a leading count still scales it ("2 מנה ...")
-  const r2 = resolveFromLookups('2 מנה 300 גרם סינטה', products, new Map());
-  assert.equal(r2.result.fat, 40);
-  assert.equal(r2.result.items[0].qty, 2);
+  const r2 = resolveFromProducts('2 מנה 300 גרם סינטה', products);
+  assert.equal(r2.fat, 40);
+  assert.equal(r2.items[0].qty, 2);
 });
 
-test('resolveFromLookups: raw segment matches a product whose name starts with a number (qty stays 1)', () => {
+test('resolveFromProducts: raw segment matches a product whose name starts with a number (qty stays 1)', () => {
   const products = buildLookup([
     { key: '300 גרם סינטה', name: '300 גרם סינטה', unit: 'מנה', carbs: 0, fat: 20, protein: 60 },
   ]);
-  const r = resolveFromLookups('300 גרם סינטה', products, new Map());
+  const r = resolveFromProducts('300 גרם סינטה', products);
   assert.ok(r);
-  assert.equal(r.result.items[0].qty, 1); // NOT 300 portions
-  assert.equal(r.result.fat, 20);
+  assert.equal(r.items[0].qty, 1); // NOT 300 portions
+  assert.equal(r.fat, 20);
 });
 
-test('resolveFromLookups: the exemption is exact-match only — other weights still go to AI', () => {
+test('resolveFromProducts: the exemption is exact-match only — other weights still go to AI', () => {
   const products = buildLookup([
     { key: '300 גרם סינטה', name: '300 גרם סינטה', unit: 'מנה', carbs: 0 },
     { key: 'סינטה', name: 'סינטה', unit: 'מנה', carbs: 0 },
   ]);
-  assert.equal(resolveFromLookups('150 גרם סינטה', products, new Map()), null);
-  assert.equal(resolveFromLookups('קצת סינטה', products, new Map()), null);
+  assert.equal(resolveFromProducts('150 גרם סינטה', products), null);
+  assert.equal(resolveFromProducts('קצת סינטה', products), null);
 });
 
-test('resolveFromLookups: products win over the catalog; mixed meals are source catalog', () => {
-  const products = buildLookup([
-    { key: 'ביצה', name: 'ביצה', unit: 'ביצה', carbs: 0.3, fat: 5, protein: 6 },
-  ]);
-  const catalog = buildLookup([
-    { key: 'ביצה', name: 'ביצה', unit: 'ביצה', carbs: 0.9, fat: 5, protein: 6 },
-    { key: 'קפה שחור', name: 'קפה שחור', unit: 'כוס', carbs: 0, fat: 0, protein: 0 },
-  ]);
-  const pure = resolveFromLookups('2 ביצה', products, catalog);
-  assert.equal(pure.source, 'local');
-  assert.equal(pure.result.net_carbs, 0.6); // the user's value, not the catalog's
-  const mixed = resolveFromLookups('ביצה, קפה שחור', products, catalog);
-  assert.equal(mixed.source, 'catalog');
-  assert.equal(mixed.result.net_carbs, 0.3);
-});
-
-test('resolveFromLookups: catalog tier keeps full precision rules (ambiguous → null)', () => {
-  const catalog = buildLookup([
-    { key: '300 גרם סינטה', name: '300 גרם סינטה', unit: 'מנה', carbs: 0 },
-  ]);
-  // same text that a PRODUCT would resolve — a catalog-only match must not,
-  // because the ambiguity exemption belongs to the user's own data alone
-  assert.equal(resolveFromLookups('מנה 300 גרם סינטה', new Map(), catalog), null);
-});
-
-test('resolveFromLookup: null fat/protein on an entry keeps totals null (renders "?")', () => {
+test('resolveFromProducts: null fat/protein on an entry keeps totals null (renders "?")', () => {
   const lookup = buildLookup([
     { key: 'ביצה', name: 'ביצה', unit: 'ביצה', carbs: 0.5, fat: null, protein: 6 },
     { key: 'קפה', name: 'קפה', unit: 'כוס', carbs: 0, fat: 0, protein: 0 },
   ]);
-  const r = resolveFromLookup('ביצה, קפה', lookup);
+  const r = resolveFromProducts('ביצה, קפה', lookup);
   assert.ok(r);
   assert.equal(r.fat, null);
   assert.equal(r.protein, 6);

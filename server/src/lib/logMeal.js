@@ -1,7 +1,6 @@
 import Product from '../models/Product.js';
 import Day from '../models/Day.js';
 import { estimateMealCached } from './estimateCache.js';
-import { captureItemsToCatalog } from './catalog.js';
 
 // Sunday-indexed, matching JS getDay() / the Intl 'short' weekday order below.
 const HE_DAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
@@ -59,7 +58,7 @@ export async function logMealFromDesc({ userId, desc, date, time }) {
     fat: result.fat == null ? null : Number(result.fat),
     protein: result.protein == null ? null : Number(result.protein),
     items: Array.isArray(result.items) ? result.items : [],
-    source: ['catalog', 'local'].includes(result.source) ? result.source : 'ai',
+    source: result.source === 'local' ? 'local' : 'ai',
   };
 
   const existing = await Day.findOne({ user: userId, date: day0 }).lean();
@@ -73,8 +72,5 @@ export async function logMealFromDesc({ userId, desc, date, time }) {
     { $push: { meals: meal }, $setOnInsert: setOnInsert },
     { new: true, upsert: true }
   );
-  // Feed the global learned-product catalog (best-effort; never blocks the log).
-  captureItemsToCatalog(meal.items, meal.desc, day0);
-
   return { result, meal, day, date: day0 };
 }

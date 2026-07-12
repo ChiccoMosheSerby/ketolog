@@ -2,7 +2,6 @@ import { Router } from 'express';
 import Day from '../models/Day.js';
 import { requireAuth } from '../middleware/auth.js';
 import { asyncHandler } from '../lib/http.js';
-import { captureItemsToCatalog } from '../lib/catalog.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -70,7 +69,7 @@ router.post('/:date/meals', asyncHandler(async (req, res) => {
     fat,
     protein,
     items: cleanMealItems(items),
-    source: ['catalog', 'ai', 'local'].includes(source) ? source : '',
+    source: ['ai', 'local'].includes(source) ? source : '',
   };
   const setOnInsert = { user: req.userId, date };
   if (label) setOnInsert.label = label;
@@ -79,8 +78,6 @@ router.post('/:date/meals', asyncHandler(async (req, res) => {
     { $push: { meals: meal }, $setOnInsert: setOnInsert },
     { new: true, upsert: true }
   );
-  // Feed the global learned-product catalog (best-effort; never blocks the log).
-  captureItemsToCatalog(meal.items, meal.desc, date);
   res.status(201).json(day);
 }));
 

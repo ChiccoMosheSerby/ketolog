@@ -1,18 +1,23 @@
 // Local (no-AI) meal resolution: parse a free-text Hebrew meal description into
-// (qty, food-name) segments and match them against known per-unit macro entries
-// (the global learned catalog + the user's saved products).
+// (qty, food-name) segments and match them against the user's own saved
+// products (their hand-confirmed per-unit macros).
 //
 // PRECISION OVER RECALL — the one safety rule. A result is served only when the
-// ENTIRE description is accounted for: every segment parses cleanly and matches
-// a known entry exactly (by normalized key or alias). Any doubt — an unknown
-// word, a vague amount ("קצת"), a size word ("גדול"), grams — returns null and
-// the caller falls back to the AI estimator. A wrong local number would silently
-// corrupt the log; an unnecessary AI call just costs a cent.
+// ENTIRE description is accounted for: every segment matches a saved product
+// exactly (by normalized name). Any doubt returns null and the caller falls
+// back to the AI estimator. A wrong local number would silently corrupt the
+// log; an unnecessary AI call just costs a cent.
 //
-// Everything here is pure (no DB, no network) so it can be unit-tested and
-// replayed offline (scripts/simulateResolver.js). The DB-facing wrapper that
-// loads CatalogItem/Product entries lives with the estimate path.
-import { catalogKey } from './catalog.js';
+// Everything here is pure (no DB, no network) so it can be unit-tested.
+
+// Canonical key for a food name: trim, collapse internal whitespace, and
+// lowercase (a no-op for Hebrew, but folds latin/brand casing).
+export function foodKey(name) {
+  return String(name || '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+}
 
 // ---- Hebrew quantity vocabulary --------------------------------------------
 // Fraction words scale one whole unit linearly — the same semantics ketoRules
@@ -45,7 +50,7 @@ const COUNT_WORDS = new Map([
 ]);
 
 // Words that make the amount (or the whole segment) unquantifiable from text
-// alone. The catalog stores one fixed per-unit value with no small/large
+// alone. A saved product stores one fixed per-unit value with no small/large
 // calibration, so size words can't be scaled honestly — they go to the AI,
 // which is instructed to scale relative to a medium portion.
 const AMBIGUOUS_WORDS = new Set([
@@ -53,7 +58,7 @@ const AMBIGUOUS_WORDS = new Set([
   'קצת', 'מעט', 'הרבה', 'כמה', 'חופן', 'בערך', 'חתיכת', 'חתיכה', 'טיפה',
   // size modifiers (relative to an uncalibrated "medium")
   'גדול', 'גדולה', 'גדולים', 'גדולות', 'קטן', 'קטנה', 'קטנים', 'קטנות', 'ענק', 'ענקית',
-  // weight/volume units — per-gram serving needs the AI (catalog is per-piece)
+  // weight/volume units — per-gram serving needs the AI (products are per-piece)
   'גרם', "גר'", 'גר', 'ג', 'קילו', 'ק"ג', 'מ"ל', 'מל', 'ליטר',
 ]);
 
@@ -85,10 +90,10 @@ export function splitSegments(desc) {
 export function parseSegment(raw) {
   // Detach digit runs stuck to letters ("2ביצים" -> "2 ביצים") before tokenizing.
   // A hyphen keeps its digit attached: "חביתה מ-2 ביצים" must stay one name whose
-  // key equals the catalog key, not become "מ- 2".
+  // key equals the product key, not become "מ- 2".
   const spaced = String(raw || '').replace(/(\d)(?=[^\d\s.,%])/g, '$1 ').replace(/([^\d\s.,-])(?=\d)/g, '$1 ');
   let tokens = spaced.trim().split(/\s+/).filter(Boolean);
-  const rawKey = catalogKey(raw);
+  const rawKey = foodKey(raw);
 
   while (tokens.length && LEADING_CONNECTIVES.has(tokens[0])) tokens = tokens.slice(1);
   if (!tokens.length) return { qty: 1, name: '', nameKey: '', rawKey, ambiguous: true };
@@ -132,12 +137,12 @@ export function parseSegment(raw) {
   const name = tokens.join(' ');
   if (!name) ambiguous = true;
 
-  return { qty: qty == null ? 1 : qty, name, nameKey: catalogKey(name), rawKey, ambiguous };
+  return { qty: qty == null ? 1 : qty, name, nameKey: foodKey(name), rawKey, ambiguous };
 }
 
 // Parse a whole description. `ok` is false when there is nothing to match or
 // any segment is ambiguous — callers can short-circuit to the AI without a
-// catalog lookup.
+// product lookup.
 export function parseMeal(desc) {
   const segments = splitSegments(desc).map(parseSegment);
   const ok = segments.length > 0 && segments.every((s) => !s.ambiguous && s.nameKey);
@@ -167,7 +172,7 @@ export function buildLookup(entries) {
   for (const e of entries || []) {
     if (!e) continue;
     const put = (k) => {
-      const key = catalogKey(k);
+      const key = foodKey(k);
       if (key && !map.has(key)) map.set(key, e);
     };
     put(e.key);
@@ -177,28 +182,22 @@ export function buildLookup(entries) {
   return map;
 }
 
-const EMPTY_LOOKUP = new Map();
-
-// Resolve a meal against two tiers: the user's own saved products first, then
-// the learned catalog. A saved product is the user's hand-confirmed data, so it
-// outranks everything AND is exempt from the ambiguity rules — its name may
-// itself contain grams/numbers ("300 גרם סינטה") and still match, because the
-// match is exact on the full normalized text. Two product matches are tried per
+// Resolve a meal against the user's saved products. A saved product is the
+// user's hand-confirmed data, so matching is exact on the full normalized text
+// and exempt from the ambiguity rules — its name may itself contain
+// grams/numbers ("300 גרם סינטה") and still match. Two matches are tried per
 // segment: the name left after quantity extraction ("2 מנה X" → qty 2 of "מנה
 // X"), then the raw segment verbatim with qty 1 ("300 גרם סינטה" — the digits
-// belong to the name, not the amount). Catalog matches keep the full
-// precision rules (no ambiguous segment, exact key/alias match).
+// belong to the name, not the amount).
 //
-// Returns { result, source: 'local' | 'catalog' } — 'local' when every segment
-// came from the user's products — or null when ANY segment fails; no partial
-// serving, ever. Totals are derived from the per-item breakdown with the same
-// rounding as normalizeMeal, so the meal card always reconciles.
-export function resolveFromLookups(desc, productsLookup, catalogLookup) {
+// Returns the result or null when ANY segment fails; no partial serving, ever.
+// Totals are derived from the per-item breakdown with the same rounding as
+// normalizeMeal, so the meal card always reconciles.
+export function resolveFromProducts(desc, productsLookup) {
   const { segments } = parseMeal(desc);
   if (!segments.length) return null;
 
   const items = [];
-  let fromCatalog = false;
   for (const seg of segments) {
     let qty = seg.qty;
     let entry = seg.nameKey ? productsLookup.get(seg.nameKey) : null;
@@ -206,12 +205,7 @@ export function resolveFromLookups(desc, productsLookup, catalogLookup) {
       entry = productsLookup.get(seg.rawKey);
       qty = 1;
     }
-    if (!entry) {
-      if (seg.ambiguous || !seg.nameKey) return null;
-      entry = catalogLookup.get(seg.nameKey);
-      if (!entry) return null;
-      fromCatalog = true;
-    }
+    if (!entry) return null;
     items.push({
       name: entry.name || seg.name,
       qty,
@@ -224,18 +218,9 @@ export function resolveFromLookups(desc, productsLookup, catalogLookup) {
 
   const sum = (key) => items.reduce((a, it) => a + (Number(it[key]) || 0) * (it.qty || 1), 0);
   return {
-    result: {
-      net_carbs: round2(sum('carbs')),
-      fat: items.every((it) => it.fat != null) ? round2(sum('fat')) : null,
-      protein: items.every((it) => it.protein != null) ? round2(sum('protein')) : null,
-      items,
-    },
-    source: fromCatalog ? 'catalog' : 'local',
+    net_carbs: round2(sum('carbs')),
+    fat: items.every((it) => it.fat != null) ? round2(sum('fat')) : null,
+    protein: items.every((it) => it.protein != null) ? round2(sum('protein')) : null,
+    items,
   };
-}
-
-// Single-tier resolution (catalog rules in full) — kept for tests/simulation.
-export function resolveFromLookup(desc, lookup) {
-  const r = resolveFromLookups(desc, EMPTY_LOOKUP, lookup);
-  return r ? r.result : null;
 }

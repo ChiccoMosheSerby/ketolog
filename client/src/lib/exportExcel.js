@@ -43,6 +43,7 @@ function kcalStatus(kcal, target) {
   return { font: C.red, fill: C.redFill };
 }
 
+// 'catalog' is legacy: meals logged by the retired learned-catalog feature.
 const SOURCE_HE = { catalog: 'קטלוג מוצרים', local: 'מוצרים שמורים', ai: 'AI' };
 
 // ---- sheet helpers ----

@@ -88,11 +88,6 @@ function UserBar({ onOpenSettings, onOpenAdmin }) {
           💰 שימוש
         </button>
       )}
-      {user?.isAdmin && (
-        <a className="btn ghost mini" href="/admin" title="מפת מוצרים — ניהול הקטלוג">
-          🗺️ מוצרים
-        </a>
-      )}
       <button className="btn ghost mini" onClick={onOpenSettings} title="הגדרות" data-tour="settings">
         ⚙ הגדרות
       </button>

@@ -198,9 +198,6 @@ export default function DayCard({
                   <div className="body">
                     <div className="desc">
                       {m.desc || m.cat}
-                      {m.source === 'catalog' && (
-                        <span className="meal-src" title="חושב מקטלוג המוצרים הנלמד — ללא AI">📖</span>
-                      )}
                       {m.source === 'local' && (
                         <span className="meal-src" title="חושב מהמוצרים השמורים שלך — ללא AI">🧮</span>
                       )}

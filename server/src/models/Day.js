@@ -25,9 +25,9 @@ const mealSchema = new mongoose.Schema(
     fat: { type: Number, default: null },
     protein: { type: Number, default: null },
     items: { type: [mealItemSchema], default: [] },
-    // where the numbers came from: 'catalog' (the learned product catalog, no
-    // AI) | 'local' (client-side sum of tapped saved products, no AI) | 'ai' |
-    // '' (manual entry / pre-feature meals). Makes AI usage visible per meal.
+    // where the numbers came from: 'local' (the user's saved products, no AI)
+    // | 'ai' | '' (manual entry). Older meals may still carry 'catalog' from
+    // the retired learned-catalog feature. Makes AI usage visible per meal.
     source: { type: String, default: '' },
   },
   { _id: true }
