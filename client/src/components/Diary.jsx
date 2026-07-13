@@ -9,6 +9,7 @@ import {
   todayISO,
   dayHebrewName,
   prevISO,
+  nextISO,
   TARGET,
 } from "../lib/helpers.js";
 import { downloadReport } from "../lib/exportLog.js";
@@ -77,13 +78,37 @@ export default function Diary() {
   const [activeDate, setActiveDate] = useState(todayISO()); // the day the "Today" tab + AddMeal point at
   const [loaded, setLoaded] = useState(false);
 
+  // "Close the day": the user declares today finished, so every stat that
+  // waits for midnight (dashboard analytics, averages, energy balance) counts
+  // today as a completed day right away. Persisted per-date in localStorage —
+  // a value from an older date is simply ignored, so the flag auto-expires
+  // when a real new day starts. While closed, "effective today" is tomorrow,
+  // which flips every `date < today` comparison to include today.
+  const [dayClosed, setDayClosed] = useState(
+    () => localStorage.getItem("ketolog:closedDay") === todayISO(),
+  );
+  const effectiveToday = dayClosed ? nextISO(todayISO()) : todayISO();
+
+  function closeDay(closed) {
+    if (closed) localStorage.setItem("ketolog:closedDay", todayISO());
+    else localStorage.removeItem("ketolog:closedDay");
+    setDayClosed(closed);
+    if (closed) {
+      toast("היום נסגר ונכלל בתובנות");
+      // jump straight to the תובנות tab so the closed day shows up immediately
+      window.dispatchEvent(
+        new CustomEvent("ketolog:gotoTab", { detail: "insights" }),
+      );
+    }
+  }
+
   // The daily kcal target is never typed in — it's derived from the user's own
   // data: measured burn (TDEE, from weekly weigh-ins + logged meals) minus the
   // deficit the monthly loss goal demands. 0 (no coloring / no target line)
   // until there's enough data to compute the burn.
   const eb = useMemo(
-    () => energyBalance(days, { lossTarget, today: todayISO() }),
-    [days, lossTarget],
+    () => energyBalance(days, { lossTarget, today: effectiveToday }),
+    [days, lossTarget, effectiveToday],
   );
   const kcalTarget = eb.ready ? eb.recommendedIntake : 0;
 
@@ -315,7 +340,11 @@ export default function Diary() {
   const t = todayISO();
   // Average over *past* logged days only — today is still in progress, so
   // counting it would drag the average down (matches the insights tab).
-  const pastDays = days.filter((d) => d.date < t && (d.meals || []).length > 0);
+  // "Past" is measured against the effective today, so closing the day pulls
+  // today into the averages immediately.
+  const pastDays = days.filter(
+    (d) => d.date < effectiveToday && (d.meals || []).length > 0,
+  );
   const totals = pastDays.map(dayTotal);
   const avg = totals.length
     ? totals.reduce((a, b) => a + b, 0) / totals.length
@@ -413,57 +442,57 @@ export default function Diary() {
         />
       </>
     ) : (
-    <>
-      <div className="toolbar">
-        <label style={{ fontSize: 12, color: "var(--ink-soft)" }}>
-          קפיצה ליום:
-        </label>
-        <input
-          type="date"
-          value={jump}
-          onChange={(e) => setJump(e.target.value)}
-        />
-        <button
-          className="btn ghost mini"
-          onClick={() => jump && setViewDate(jump)}
-        >
-          הצג יום
-        </button>
-        <button className="btn ghost mini" onClick={() => setViewDate("")}>
-          כל הימים
-        </button>
-        {viewToggle}
-      </div>
-      <div id="days">
-        {!loaded ? null : shown.length === 0 ? (
-          <div className="empty">
-            {viewDate
-              ? "אין רישום ליום שנבחר."
-              : "אין עדיין ימים קודמים ביומן."}
-          </div>
-        ) : (
-          shown.map((d) => (
-            <DayCard
-              key={d.date}
-              iso={d.date}
-              day={d}
-              title={dayTitle(d.date)}
-              open={expanded.has(d.date)}
-              onToggle={() => toggle(d.date)}
-              onDeleteMeal={deleteMeal}
-              onSetMealTime={updateMealTime}
-              onCopyMeal={copyMealToActive}
-              onSaveTemplate={saveMealAsTemplate}
-              onSaveProduct={saveMealAsProduct}
-              onSaveItemProduct={saveItemAsProduct}
-              target={target}
-              kcalTarget={kcalTarget}
-            />
-          ))
-        )}
-      </div>
-    </>
-  );
+      <>
+        <div className="toolbar">
+          <label style={{ fontSize: 12, color: "var(--ink-soft)" }}>
+            קפיצה ליום:
+          </label>
+          <input
+            type="date"
+            value={jump}
+            onChange={(e) => setJump(e.target.value)}
+          />
+          <button
+            className="btn ghost mini"
+            onClick={() => jump && setViewDate(jump)}
+          >
+            הצג יום
+          </button>
+          <button className="btn ghost mini" onClick={() => setViewDate("")}>
+            כל הימים
+          </button>
+          {viewToggle}
+        </div>
+        <div id="days">
+          {!loaded ? null : shown.length === 0 ? (
+            <div className="empty">
+              {viewDate
+                ? "אין רישום ליום שנבחר."
+                : "אין עדיין ימים קודמים ביומן."}
+            </div>
+          ) : (
+            shown.map((d) => (
+              <DayCard
+                key={d.date}
+                iso={d.date}
+                day={d}
+                title={dayTitle(d.date)}
+                open={expanded.has(d.date)}
+                onToggle={() => toggle(d.date)}
+                onDeleteMeal={deleteMeal}
+                onSetMealTime={updateMealTime}
+                onCopyMeal={copyMealToActive}
+                onSaveTemplate={saveMealAsTemplate}
+                onSaveProduct={saveMealAsProduct}
+                onSaveItemProduct={saveItemAsProduct}
+                target={target}
+                kcalTarget={kcalTarget}
+              />
+            ))
+          )}
+        </div>
+      </>
+    );
 
   // Desktop: a 2-col grid — products spans the full top row, then AddMeal (right
   // in RTL) and the current day sit below. Mobile: a plain block that stacks
@@ -477,15 +506,15 @@ export default function Diary() {
         </div>
         <div className="keto-balance" title="היעד המאוזן בקיטו — חלוקה קלורית">
           <span className="kb-text">
-            איזון קיטו: שומן 70–75% · חלבון 20–25% · פחמ'{" "}
-            5–10%
+            איזון קיטו: שומן 70–75% · חלבון 20–25% · פחמ' 5–10%
           </span>
         </div>
       </div>
       {!isMobile && (
         <div
           className={
-            "grid-top journal-fold products-fold" + (productsOpen ? " open" : "")
+            "grid-top journal-fold products-fold" +
+            (productsOpen ? " open" : "")
           }
           data-tour="products"
         >
@@ -521,6 +550,8 @@ export default function Diary() {
         day={activeDay}
         title={dayTitle(activeDate)}
         open={expanded.has(activeDate)}
+        onCloseDay={activeDate === t ? closeDay : null}
+        closed={dayClosed}
         onToggle={() => toggle(activeDate)}
         onDeleteMeal={deleteMeal}
         onSetMealTime={updateMealTime}
@@ -588,7 +619,7 @@ export default function Diary() {
           target={target}
           kcalTarget={kcalTarget}
           lossTarget={user?.monthlyLossTarget ?? 2}
-          today={todayISO()}
+          today={effectiveToday}
           ketoMonths={user?.ketoGoalMonths || 0}
         >
           <SmartInsights />
@@ -606,6 +637,7 @@ export default function Diary() {
           days={days}
           target={target}
           ketoMonths={user?.ketoGoalMonths || 0}
+          today={effectiveToday}
         />
       ),
     },

@@ -6,7 +6,9 @@
   box-shadow: var(--shadow-sm);
   margin: 14px 0;
   overflow: hidden;
-  transition: box-shadow 0.18s ease, transform 0.18s ease;
+  transition:
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
   &:hover {
     box-shadow: var(--shadow-md);
   }
@@ -43,7 +45,7 @@
   gap: 14px;
 }
 .day-title {
-  font-family: 'Heebo', sans-serif;
+  font-family: "Heebo", sans-serif;
   font-weight: 700;
   font-size: 18px;
   line-height: 1.15;
@@ -61,7 +63,7 @@
   gap: 1px;
 }
 .day-total {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: "IBM Plex Mono", monospace;
   font-weight: 600;
   font-size: 24px;
   text-align: left;
@@ -75,7 +77,7 @@
   }
 }
 .day-kcal {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: "IBM Plex Mono", monospace;
   font-size: 12px;
   color: var(--ink-soft);
   font-variant-numeric: tabular-nums;
@@ -147,6 +149,50 @@
   padding: 6px 20px 2px;
 }
 
+/* "close the day" row — only on the current day's card */
+.day-close {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 20px 2px;
+  .dc-btn {
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent-ink);
+    background: var(--green-tint);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 5px 14px;
+    cursor: pointer;
+    transition:
+      filter 0.15s ease,
+      box-shadow 0.15s ease;
+    &:hover {
+      filter: brightness(0.97);
+      box-shadow: var(--shadow-sm);
+    }
+  }
+  .day-close-note {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent-ink);
+  }
+  .dc-undo {
+    font-family: inherit;
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-decoration: underline;
+    padding: 2px 4px;
+    &:hover {
+      color: var(--ink);
+    }
+  }
+}
+
 /* macros */
 .macro {
   padding: 14px 20px 2px;
@@ -168,7 +214,7 @@
     gap: 5px;
     transition: width 0.3s ease;
     b {
-      font-family: 'IBM Plex Mono', monospace;
+      font-family: "IBM Plex Mono", monospace;
       font-size: 11px;
       font-weight: 600;
       line-height: 1;
@@ -191,7 +237,7 @@
   font-size: 11.5px;
   color: var(--ink-soft);
   b {
-    font-family: 'IBM Plex Mono', monospace;
+    font-family: "IBM Plex Mono", monospace;
     font-weight: 600;
     color: var(--ink);
     font-variant-numeric: tabular-nums;
@@ -224,7 +270,7 @@
     border-top: none;
   }
   .time {
-    font-family: 'IBM Plex Mono', monospace;
+    font-family: "IBM Plex Mono", monospace;
     font-size: 12px;
     color: var(--accent-ink);
     min-width: 42px;
@@ -239,7 +285,9 @@
     cursor: pointer;
     text-align: start;
     border-radius: 5px;
-    transition: background 0.15s, color 0.15s;
+    transition:
+      background 0.15s,
+      color 0.15s;
     &:hover {
       background: var(--chip, rgba(0, 0, 0, 0.05));
       color: var(--accent);
@@ -253,7 +301,7 @@
     border-radius: 5px;
     background: var(--card, #fff);
     color: var(--accent-ink);
-    font-family: 'IBM Plex Mono', monospace;
+    font-family: "IBM Plex Mono", monospace;
     font-size: 12px;
     font-variant-numeric: tabular-nums;
   }
@@ -300,19 +348,19 @@
       font-weight: 300;
     }
     .mi-qty {
-      font-family: 'IBM Plex Mono', monospace;
+      font-family: "IBM Plex Mono", monospace;
       font-weight: 600;
       color: var(--accent-ink);
       font-variant-numeric: tabular-nums;
     }
     .mi-carb {
-      font-family: 'IBM Plex Mono', monospace;
+      font-family: "IBM Plex Mono", monospace;
       font-variant-numeric: tabular-nums;
       white-space: nowrap;
       color: var(--ink);
     }
     .mi-kcal {
-      font-family: 'IBM Plex Mono', monospace;
+      font-family: "IBM Plex Mono", monospace;
       font-variant-numeric: tabular-nums;
       white-space: nowrap;
       font-size: 11px;
@@ -328,7 +376,9 @@
       border-radius: 999px;
       opacity: 0.5;
       flex: none;
-      transition: opacity 0.15s ease, background 0.15s ease;
+      transition:
+        opacity 0.15s ease,
+        background 0.15s ease;
       &:hover {
         opacity: 1;
         background: var(--green-tint);
@@ -348,7 +398,7 @@
       align-items: center;
       gap: 3px;
       b {
-        font-family: 'IBM Plex Mono', monospace;
+        font-family: "IBM Plex Mono", monospace;
         font-size: 9px;
         font-weight: 600;
         line-height: 1;
@@ -364,7 +414,7 @@
     }
   }
   .carb {
-    font-family: 'IBM Plex Mono', monospace;
+    font-family: "IBM Plex Mono", monospace;
     font-size: 13px;
     font-weight: 500;
     white-space: nowrap;
@@ -399,7 +449,10 @@
     padding: 3px 6px;
     border-radius: 999px;
     opacity: 0.55;
-    transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+    transition:
+      opacity 0.15s ease,
+      background 0.15s ease,
+      color 0.15s ease;
   }
   .del:hover {
     opacity: 1;

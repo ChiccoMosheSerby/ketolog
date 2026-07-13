@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
-import useEmblaCarousel from 'embla-carousel-react';
-import { useMediaQuery, MOBILE_QUERY } from '../lib/useMediaQuery.js';
-import './TabShell.scss';
+import { useCallback, useEffect, useState } from "react";
+import useEmblaCarousel from "embla-carousel-react";
+import { useMediaQuery, MOBILE_QUERY } from "../lib/useMediaQuery.js";
+import "./TabShell.scss";
 
 // tabs: [{ id, label, content, badge? }]  — badge renders a "new" dot on the tab.
 // onTabChange(id): fired when the active tab changes (used to clear a badge).
@@ -25,6 +25,17 @@ export default function TabShell({ tabs, onTabChange }) {
     [tabs, onTabChange],
   );
 
+  // Programmatic tab jumps (e.g. closing the day jumps to תובנות) — any code
+  // can dispatch `ketolog:gotoTab` with the tab id as the event detail.
+  useEffect(() => {
+    const onGoto = (e) => {
+      const i = tabs.findIndex((t) => t.id === e.detail);
+      if (i >= 0) change(i);
+    };
+    window.addEventListener("ketolog:gotoTab", onGoto);
+    return () => window.removeEventListener("ketolog:gotoTab", onGoto);
+  }, [tabs, change]);
+
   if (isMobile) {
     return <Carousel tabs={tabs} active={idx} change={change} />;
   }
@@ -38,7 +49,7 @@ export default function TabShell({ tabs, onTabChange }) {
             role="tab"
             aria-selected={i === idx}
             data-tour-tab={t.id}
-            className={'tabbtn' + (i === idx ? ' active' : '')}
+            className={"tabbtn" + (i === idx ? " active" : "")}
             onClick={() => change(i)}
           >
             {t.label}
@@ -54,17 +65,28 @@ export default function TabShell({ tabs, onTabChange }) {
 }
 
 function Carousel({ tabs, active, change }) {
-  const [emblaRef, emblaApi] = useEmblaCarousel({ direction: 'rtl', align: 'start' });
+  const [emblaRef, emblaApi] = useEmblaCarousel({
+    direction: "rtl",
+    align: "start",
+  });
 
   // Bind once per api: jump to the shared `active` on mount, then mirror swipes back out.
   useEffect(() => {
     if (!emblaApi) return;
     emblaApi.scrollTo(active, true);
     const onSelect = () => change(emblaApi.selectedScrollSnap());
-    emblaApi.on('select', onSelect);
-    return () => emblaApi.off('select', onSelect);
+    emblaApi.on("select", onSelect);
+    return () => emblaApi.off("select", onSelect);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [emblaApi]);
+
+  // Mirror external `active` changes (programmatic jumps) into the carousel —
+  // without this only swipes/dot clicks would move the track.
+  useEffect(() => {
+    if (emblaApi && emblaApi.selectedScrollSnap() !== active) {
+      emblaApi.scrollTo(active);
+    }
+  }, [emblaApi, active]);
 
   const goTo = useCallback((i) => emblaApi && emblaApi.scrollTo(i), [emblaApi]);
 
@@ -77,7 +99,7 @@ function Carousel({ tabs, active, change }) {
             role="tab"
             aria-selected={i === active}
             data-tour-tab={t.id}
-            className={'dot' + (i === active ? ' active' : '')}
+            className={"dot" + (i === active ? " active" : "")}
             onClick={() => goTo(i)}
           >
             {t.label}
