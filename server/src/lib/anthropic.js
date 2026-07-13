@@ -86,7 +86,12 @@ function barcodeFormat(unit, fiberNote) {
   const unitRule = unit ? ` היחידה המבוקשת היא "${unit}".` : '';
   return (
     ' להלן נתוני מוצר ארוז שנסרק לפי ברקוד, מתוך מסד הנתונים Open Food Facts.' +
-    ' חשב פחמימות נטו לפי הכללים הקטוגניים שלמעלה (החסר סיבים; אריתריטול/אלולוז = 0; מלטיטול = חצי).' +
+    // OFF mirrors whatever the physical label said, so the carbs field follows
+    // the label convention of the product's origin — the core rules' label
+    // note applies here too, judged by brand/origin.
+    ' חשב פחמימות נטו לפי הכללים הקטוגניים שלמעלה. ערך הפחמימות משקף את התווית המקורית: ' +
+    'במוצר ישראלי/אירופי הוא בדרך כלל כבר ללא סיבים (אל תחסיר סיבים שוב), במוצר אמריקאי הוא כולל סיבים (החסר אותם). ' +
+    'שפוט לפי המותג ומקור המוצר, וציין בפירוט מה הנחת. רב-כוהליים החסר לפי הכללים (אריתריטול/מניטול = 0; קסיליטול = 60%; מלטיטול = חצי).' +
     fiberNote +
     ' החזר ערכים ל-100 גרם אלא אם המשתמש ביקש יחידה אחרת.' +
     unitRule +
