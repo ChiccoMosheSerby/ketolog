@@ -9,13 +9,27 @@
 //   meal    → {origin}/?add=meal&desc=…&carbs=…&fat=…&protein=…&kcal=…&items=<JSON>&date=…
 //
 // `date` is optional on a meal link (defaults to today). `items` is an optional
-// URL-encoded JSON array of the per-ingredient breakdown ([{name, desc, carbs, …}]),
-// which renders as the meal's itemized rows — `desc` is the item's fuller
-// description, shown next to the short name the way catalog products show
-// theirs. `kcal` is informational on both and is never persisted (neither
-// model stores calories).
+// URL-encoded JSON array of the per-ingredient breakdown
+// ([{name, desc, carbs, fat, protein}]), which renders as the meal's itemized
+// rows — `desc` is the item's fuller description, shown next to the short name
+// the way catalog products show theirs. Per-item fat/protein matter: the journal
+// derives each row's קק"ל from them (macroKcal), so carbs-only items render
+// without calories. `kcal` is informational on both and is never persisted
+// (neither model stores calories).
 
-const ALL_PARAMS = ['add', 'name', 'desc', 'unit', 'cat', 'date', 'carbs', 'fat', 'protein', 'kcal', 'items'];
+const ALL_PARAMS = [
+  "add",
+  "name",
+  "desc",
+  "unit",
+  "cat",
+  "date",
+  "carbs",
+  "fat",
+  "protein",
+  "kcal",
+  "items",
+];
 
 // The product-link template we hand Claude — origin filled in, values as <placeholders>.
 export function productLinkTemplate(origin) {
@@ -42,38 +56,43 @@ export function mealLinkTemplate(origin) {
     `&fat=<שומן>` +
     `&protein=<חלבון>` +
     `&kcal=<קלוריות>` +
-    `&items=<מערך JSON של הפריטים, לדוגמה [{"name":"חביתה","desc":"חביתה מ-3 ביצים בחמאה","carbs":1.2},{"name":"קפה שחור","desc":"קפה שחור ללא סוכר","carbs":0}]>`
+    `&items=<מערך JSON של הפריטים, לדוגמה [{"name":"חביתה","desc":"חביתה מ-3 ביצים בחמאה","carbs":1.2,"fat":21,"protein":19},{"name":"קפה שחור","desc":"קפה שחור ללא סוכר","carbs":0,"fat":0,"protein":0}]>`
   );
 }
 
 // Parse an app deep link out of a location.search string. Returns a draft tagged
 // with its `type` ('product' | 'meal'), or null when the link isn't one of ours.
 export function parseAppLink(search) {
-  const q = new URLSearchParams(search || '');
-  const type = q.get('add');
-  if (type !== 'product' && type !== 'meal') return null;
+  const q = new URLSearchParams(search || "");
+  const type = q.get("add");
+  if (type !== "product" && type !== "meal") return null;
 
   const numOrNull = (v) => {
-    if (v == null || v === '') return null;
+    if (v == null || v === "") return null;
     const n = Number(v);
     return isNaN(n) ? null : n;
   };
-  const str = (k) => (q.get(k) || '').trim();
+  const str = (k) => (q.get(k) || "").trim();
 
   const common = {
     type,
-    desc: str('desc'),
-    carbs: numOrNull(q.get('carbs')),
-    fat: numOrNull(q.get('fat')),
-    protein: numOrNull(q.get('protein')),
-    kcal: numOrNull(q.get('kcal')),
+    desc: str("desc"),
+    carbs: numOrNull(q.get("carbs")),
+    fat: numOrNull(q.get("fat")),
+    protein: numOrNull(q.get("protein")),
+    kcal: numOrNull(q.get("kcal")),
   };
 
-  if (type === 'product') {
-    return { ...common, key: str('name'), unit: str('unit') };
+  if (type === "product") {
+    return { ...common, key: str("name"), unit: str("unit") };
   }
   // meal — parse the optional per-ingredient breakdown (URL-decoded JSON array).
-  return { ...common, cat: str('cat'), date: str('date'), items: parseItems(q.get('items')) };
+  return {
+    ...common,
+    cat: str("cat"),
+    date: str("date"),
+    items: parseItems(q.get("items")),
+  };
 }
 
 // Parse the `items` param (a JSON array) into clean meal-item objects. Returns []
@@ -89,15 +108,15 @@ function parseItems(raw) {
   if (!Array.isArray(arr)) return [];
   const numOr = (v, d) => {
     const n = Number(v);
-    return v != null && v !== '' && !isNaN(n) ? n : d;
+    return v != null && v !== "" && !isNaN(n) ? n : d;
   };
   return arr
     .filter((it) => it && (it.name != null || it.carbs != null))
     .map((it) => ({
-      name: String(it.name || '').trim(),
-      desc: String(it.desc || '').trim(),
+      name: String(it.name || "").trim(),
+      desc: String(it.desc || "").trim(),
       qty: numOr(it.qty, 1) > 0 ? numOr(it.qty, 1) : 1,
-      unit: String(it.unit || '').trim(),
+      unit: String(it.unit || "").trim(),
       carbs: numOr(it.carbs, 0),
       fat: numOr(it.fat, null),
       protein: numOr(it.protein, null),
@@ -109,5 +128,5 @@ function parseItems(raw) {
 export function clearAppLink() {
   const url = new URL(window.location.href);
   ALL_PARAMS.forEach((k) => url.searchParams.delete(k));
-  window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+  window.history.replaceState({}, "", url.pathname + url.search + url.hash);
 }
