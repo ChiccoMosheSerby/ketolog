@@ -1,0 +1,80 @@
+/* One-time record-break banners at the top of the "היום" screen.
+   Good records (streak / cleanest day) get the celebratory green treatment;
+   the "highest day" record uses the danger tint so it clearly reads as a
+   record nobody wants. */
+.record-banners {
+  /* full-width row inside .today-grid — see Diary.scss */
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 12px; /* mobile stacking; the desktop grid zeroes this and uses gap */
+}
+
+.record-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 10px 14px;
+  animation: rb-pop 0.35s ease;
+
+  &.good {
+    background: var(--green-tint);
+    border-color: var(--accent-line);
+    .rb-title {
+      color: var(--accent-ink);
+    }
+  }
+  &.bad {
+    background: var(--danger-tint);
+    border-color: var(--danger-line);
+    .rb-title {
+      color: var(--red);
+    }
+  }
+
+  .rb-icon {
+    font-size: 20px;
+    line-height: 1;
+  }
+  .rb-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .rb-title {
+    font-size: 13.5px;
+  }
+  .rb-msg {
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    line-height: 1.45;
+  }
+  .rb-close {
+    margin-inline-start: auto;
+    border: 0;
+    background: none;
+    color: var(--ink-soft);
+    font-size: 13px;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 6px;
+
+    &:hover {
+      color: var(--ink);
+    }
+  }
+}
+
+@keyframes rb-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

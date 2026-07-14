@@ -21,6 +21,7 @@ import Products from "./Products.jsx";
 import DayCard from "./DayCard.jsx";
 import DiaryGrid from "./DiaryGrid.jsx";
 import Dashboard from "./Dashboard.jsx";
+import RecordBanner from "./RecordBanner.jsx";
 import SmartInsights from "./SmartInsights.jsx";
 import KetoCalc from "./KetoCalc.jsx";
 import Header from "./Header.jsx";
@@ -500,6 +501,12 @@ export default function Diary() {
   // section (no separate tab), so it's one scroll away on every breakpoint.
   const todayTab = (
     <div className="today-grid">
+      <RecordBanner
+        days={days}
+        target={target}
+        today={effectiveToday}
+        email={user?.email || ""}
+      />
       <div className="today-hints">
         <div className="kcal-formula">
           חישוב קק"ל לגרם: שומן = 9 · חלבון = 4 · פחמימות = 4
