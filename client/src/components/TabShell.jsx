@@ -88,6 +88,30 @@ function Carousel({ tabs, active, change }) {
     }
   }, [emblaApi, active]);
 
+  // Adaptive height: the track is a flex row holding EVERY panel, so left
+  // alone the page is always as tall as the tallest tab (e.g. היום scrolls to
+  // the dashboard's height even with the journal folded). Clamp the track to
+  // the active slide and let .embla's overflow:hidden clip the rest. The
+  // ResizeObserver keeps the height live when content inside a slide grows or
+  // shrinks (folds opening, data loading in).
+  useEffect(() => {
+    if (!emblaApi) return;
+    const container = emblaApi.containerNode();
+    const measure = () => {
+      const slide = emblaApi.slideNodes()[emblaApi.selectedScrollSnap()];
+      if (slide) container.style.height = slide.offsetHeight + "px";
+    };
+    measure();
+    emblaApi.on("select", measure);
+    const ro = new ResizeObserver(measure);
+    emblaApi.slideNodes().forEach((s) => ro.observe(s));
+    return () => {
+      emblaApi.off("select", measure);
+      ro.disconnect();
+      container.style.height = "";
+    };
+  }, [emblaApi]);
+
   const goTo = useCallback((i) => emblaApi && emblaApi.scrollTo(i), [emblaApi]);
 
   return (
