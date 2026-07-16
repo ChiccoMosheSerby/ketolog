@@ -55,7 +55,9 @@ export function ketoRules(products = []) {
 }
 
 // ---- per-task output-format instructions (appended after ketoRules) --------
-const MEAL_FORMAT =
+// Exported: the GPT meal estimator (lib/gpt.js) uses the exact same prompt
+// (ketoRules + MEAL_FORMAT), so the two engines differ only in the model.
+export const MEAL_FORMAT =
   ' פרק/י את הארוחה לפריטים נפרדים בדיוק כפי שנרשמו — אל תאחד/י פריטים זהים. ' +
   'אם הפריט נכתב כמה פעמים (למשל "נקניקיה, נקניקיה, נקניקיה"), החזר/י שורה נפרדת לכל מופע, ולא פריט אחד עם כמות. ' +
   'לכל פריט ציין/י את הערכים ל‏יחידה אחת, ואת מספר היחידות (qty) רק כאשר המשתמש ציין במפורש כמות לאותה שורה ' +
@@ -101,12 +103,10 @@ function barcodeFormat(unit, fiberNote) {
   );
 }
 
-export function parseJsonReply(message) {
-  // Only the visible text blocks carry the JSON; thinking blocks are ignored.
-  const text = (message.content || [])
-    .filter((b) => b.type === 'text')
-    .map((b) => b.text)
-    .join('\n')
+// Pull the JSON object out of a raw model reply, tolerating markdown fences and
+// surrounding prose. Shared by both engines (Claude and GPT).
+export function extractJson(raw) {
+  const text = String(raw || '')
     .replace(/```json/g, '')
     .replace(/```/g, '')
     .trim();
@@ -119,6 +119,15 @@ export function parseJsonReply(message) {
     if (start !== -1 && end > start) return JSON.parse(text.slice(start, end + 1));
     throw new Error('Model did not return parseable JSON');
   }
+}
+
+export function parseJsonReply(message) {
+  // Only the visible text blocks carry the JSON; thinking blocks are ignored.
+  const text = (message.content || [])
+    .filter((b) => b.type === 'text')
+    .map((b) => b.text)
+    .join('\n');
+  return extractJson(text);
 }
 
 // ---- output validation -----------------------------------------------------
@@ -156,8 +165,9 @@ const cleanItems = (arr) => {
 };
 
 // Each estimator runs its parsed reply through one of these so callers always
-// get a known shape with trustworthy types.
-const normalizeMeal = (r) => {
+// get a known shape with trustworthy types. normalizeMeal is exported for the
+// GPT estimator, which must return the exact same shape.
+export const normalizeMeal = (r) => {
   const items = cleanItems(r.items);
   let net_carbs = cleanNum(r.net_carbs);
   let fat = cleanNum(r.fat);

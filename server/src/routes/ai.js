@@ -5,6 +5,7 @@ import Conversation from '../models/Conversation.js';
 import User from '../models/User.js';
 import { requireAuth } from '../middleware/auth.js';
 import { estimateImage, interpretBarcode, aiConfigured } from '../lib/anthropic.js';
+import { gptConfigured } from '../lib/gpt.js';
 import { estimateMealCached } from '../lib/estimateCache.js';
 import { fetchProductByBarcode, rawKeto } from '../lib/openfoodfacts.js';
 import { runChatTurn } from '../lib/chatAgent.js';
@@ -40,16 +41,22 @@ router.post('/transcribe', async (req, res) => {
   }
 });
 
-// POST /api/ai/estimate-meal { desc } -> { net_carbs, fat, protein, items[] }
+// POST /api/ai/estimate-meal { desc, engine? } -> { net_carbs, fat, protein, items[] }
+// `engine` picks the AI model: 'claude' (default) or 'gpt'. Both engines run the
+// exact same nutrition prompt; only the model behind it differs.
 router.post('/estimate-meal', async (req, res) => {
-  if (!aiConfigured()) return res.status(503).json({ error: 'מפתח ה-AI לא הוגדר בשרת' });
+  const engine = req.body.engine === 'gpt' ? 'gpt' : 'claude';
+  if (engine === 'gpt' && !gptConfigured())
+    return res.status(503).json({ error: 'מפתח ה-OpenAI לא הוגדר בשרת' });
+  if (engine === 'claude' && !aiConfigured())
+    return res.status(503).json({ error: 'מפתח ה-AI לא הוגדר בשרת' });
   const desc = (req.body.desc || '').trim();
   if (!desc) return res.status(400).json({ error: 'חסר תיאור הארוחה' });
   try {
     const products = await Product.find({ user: req.userId }).lean();
     // Reuse a previously computed estimate for the same description + product
-    // context instead of re-calling the AI; only misses hit Claude.
-    const { result } = await estimateMealCached(req.userId, desc, products);
+    // context instead of re-calling the AI; only misses hit the model.
+    const { result } = await estimateMealCached(req.userId, desc, products, engine);
     res.json(result);
   } catch (err) {
     console.error('estimate-meal failed:', err.message);

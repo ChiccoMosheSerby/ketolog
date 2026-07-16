@@ -54,7 +54,7 @@ export const api = {
   deleteTemplate: (id) => request('DELETE', `/templates/${id}`),
 
   // ai
-  estimateMeal: (desc) => request('POST', '/ai/estimate-meal', { desc }),
+  estimateMeal: (desc, engine) => request('POST', '/ai/estimate-meal', { desc, engine }),
   estimateImage: (image, mediaType, unit) =>
     request('POST', '/ai/estimate-image', { image, mediaType, unit }),
   scanBarcode: (barcode, unit) => request('POST', '/ai/barcode', { barcode, unit }),

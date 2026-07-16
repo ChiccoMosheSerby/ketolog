@@ -35,6 +35,15 @@ export default function AddMeal({
   const [note, setNote] = useState(null); // { html } via structured fields
   const [calcSource, setCalcSource] = useState(""); // 'local' | 'ai' | '' — where the last calc came from
   const [busy, setBusy] = useState(false);
+  // Which AI computes the meal — Claude or GPT (same prompt on both, so the
+  // numbers are directly comparable). Sticky across sessions.
+  const [engine, setEngine] = useState(() =>
+    localStorage.getItem("calcEngine") === "gpt" ? "gpt" : "claude",
+  );
+  function pickEngine(e) {
+    setEngine(e);
+    localStorage.setItem("calcEngine", e);
+  }
   // Structured list of saved products the user tapped in, kept alongside the free
   // text. `descIsPure` stays true only while the description was built *solely*
   // from those taps (no manual typing / dictation / template). When it holds, the
@@ -252,7 +261,7 @@ export default function AddMeal({
     setBusy(true);
     setNote({ loading: true });
     try {
-      const r = await api.estimateMeal(d);
+      const r = await api.estimateMeal(d, engine);
       const n = Number(r.net_carbs);
       const fat = Number(r.fat);
       const prot = Number(r.protein);
@@ -280,6 +289,7 @@ export default function AddMeal({
         items: mealItems,
         local: src === "local",
         ai: src === "ai",
+        engine: r.engine || engine,
       });
       if (thenLog && !isNaN(n)) await doAdd(carbsValue, macro, mealItems, src);
     } catch {
@@ -462,7 +472,7 @@ export default function AddMeal({
               {note.ai && (
                 <span className="bd">
                   <br />
-                  🤖 חושב באמצעות AI.
+                  🤖 חושב באמצעות {note.engine === "gpt" ? "GPT" : "Claude"}.
                 </span>
               )}
               {note.items && note.items.length > 0 && (
@@ -510,6 +520,25 @@ export default function AddMeal({
         >
           איפוס
         </button>
+        <div className="engine-toggle" title="איזה מודל AI יחשב את הארוחה (אותו פרומפט בשניהם)">
+          <span className="engine-label">מנוע:</span>
+          <button
+            type="button"
+            className={"engine-opt" + (engine === "claude" ? " on" : "")}
+            disabled={busy}
+            onClick={() => pickEngine("claude")}
+          >
+            Claude
+          </button>
+          <button
+            type="button"
+            className={"engine-opt" + (engine === "gpt" ? " on" : "")}
+            disabled={busy}
+            onClick={() => pickEngine("gpt")}
+          >
+            GPT
+          </button>
+        </div>
       </div>
     </div>
   );
