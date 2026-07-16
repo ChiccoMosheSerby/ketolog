@@ -101,6 +101,9 @@
 .embla-track {
   display: flex;
   align-items: flex-start; /* slides keep their own height */
+  /* JS clamps this to the active slide's height so the page never scrolls to
+     the tallest tab; animate it so fold/unfold and tab switches feel smooth */
+  transition: height 0.25s ease;
 }
 .embla-slide {
   flex: 0 0 100%;

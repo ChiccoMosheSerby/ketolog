@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { buildAnalytics } from '../lib/analytics.js';
 import { dayKcal, fmt, heDate, kcalZone, zoneInfo, TARGET } from '../lib/helpers.js';
 import { DEFAULT_LOSS_TARGET } from '../lib/energyBalance.js';
+import { useMediaQuery, MOBILE_QUERY } from '../lib/useMediaQuery.js';
 import CarbRing from './CarbRing.jsx';
 import EnergyBalance from './EnergyBalance.jsx';
 import './Dashboard.scss';
@@ -90,7 +91,13 @@ function TrendChart({
   gid = 'trendFill',
   ariaLabel = 'גרף התקדמות פחמימות נטו ליום',
 }) {
-  const W = 340;
+  // The svg scales to the panel width, so the viewBox width sets the zoom
+  // factor. 340 units suit the ≤720px mobile column; on the 1120px desktop
+  // wrap that same box would blow up ~3× — a ~590px-tall, mostly-empty chart
+  // with giant labels. A wider desktop viewBox keeps the rendered scale (and
+  // the chart's real height) close to mobile's.
+  const isMobile = useMediaQuery(MOBILE_QUERY);
+  const W = isMobile ? 340 : 680;
   const H = 184;
   const padL = 30;
   const padR = 10;

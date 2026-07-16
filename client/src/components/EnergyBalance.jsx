@@ -6,6 +6,7 @@ import {
   DEFAULT_LOSS_TARGET,
 } from '../lib/energyBalance.js';
 import { dayKcal, fmt, heDate } from '../lib/helpers.js';
+import { useMediaQuery, MOBILE_QUERY } from '../lib/useMediaQuery.js';
 import './EnergyBalance.scss';
 
 // One place that maps a day's balance grade to its color + Hebrew label, used
@@ -20,7 +21,10 @@ const STATUS_META = {
 // Tiny min–max-scaled weight sparkline (a 0-based axis like TrendChart's would
 // flatten an 80→78 kg story into a straight line).
 function WeightSpark({ weights }) {
-  const W = 340;
+  // Wider viewBox on desktop so the width-scaled svg keeps the same rendered
+  // height as on mobile instead of blowing up ~3× (see TrendChart).
+  const isMobile = useMediaQuery(MOBILE_QUERY);
+  const W = isMobile ? 340 : 680;
   const H = 56;
   const pad = 6;
   const first = weights[0];
