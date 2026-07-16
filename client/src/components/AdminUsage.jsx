@@ -9,8 +9,7 @@ import './AdminUsage.scss';
 
 // Human labels for each usage `kind`.
 const KIND_LABEL = {
-  estimate_meal: 'הערכת ארוחה (Claude)',
-  estimate_meal_gpt: 'הערכת ארוחה (GPT)',
+  estimate_meal: 'הערכת ארוחה',
   estimate_image: 'זיהוי תמונה',
   barcode: 'סריקת ברקוד',
   chat: 'צ׳אט קֶטוֹ',

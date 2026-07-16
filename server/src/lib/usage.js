@@ -24,12 +24,6 @@ const OPENAI_AUDIO_PRICING = {
   default: 0.006,
 };
 
-// OpenAI chat (the GPT meal estimator) — USD per 1,000,000 tokens.
-const OPENAI_CHAT_PRICING = {
-  'gpt-5.1': { input: 1.25, output: 10 },
-  default: { input: 1.25, output: 10 },
-};
-
 // Twilio WhatsApp — USD per message. Real Twilio pricing is conversation-based
 // and varies by country/message category, so this is a flat per-message estimate
 // you tune via env to match your actual bill. Inbound is free on most plans, so
@@ -59,16 +53,6 @@ export function anthropicCost(model, usage = {}) {
   );
 }
 
-// Cost of one OpenAI chat completion from its `usage` block (prompt_tokens /
-// completion_tokens). Returns USD.
-export function openaiChatCost(model, usage = {}) {
-  const p = per(OPENAI_CHAT_PRICING, model);
-  return (
-    ((usage.prompt_tokens || 0) * p.input + (usage.completion_tokens || 0) * p.output) /
-    1_000_000
-  );
-}
-
 // Cost of one Whisper transcription from its audio duration (seconds). Returns USD.
 export function openaiAudioCost(model, seconds = 0) {
   const rate = per(OPENAI_AUDIO_PRICING, model); // per minute
@@ -92,21 +76,6 @@ export function recordAnthropicUsage({ userId, kind, model, usage }) {
     costUsd: anthropicCost(model, usage),
   };
   Usage.create(doc).catch((err) => console.warn('usage log failed:', err.message));
-}
-
-// One GPT chat completion. Token fields map onto the same Usage columns the
-// Anthropic calls use, so the admin breakdown renders them identically.
-export function recordOpenAIChatUsage({ userId, kind, model, usage }) {
-  if (!userId || !usage) return;
-  Usage.create({
-    user: userId,
-    provider: 'openai',
-    model,
-    kind,
-    inputTokens: usage.prompt_tokens || 0,
-    outputTokens: usage.completion_tokens || 0,
-    costUsd: openaiChatCost(model, usage),
-  }).catch((err) => console.warn('usage log failed:', err.message));
 }
 
 export function recordOpenAIUsage({ userId, kind, model, seconds }) {

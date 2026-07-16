@@ -1,7 +1,6 @@
 import { createHash } from 'crypto';
 import MealEstimate from '../models/MealEstimate.js';
 import { estimateMeal } from './anthropic.js';
-import { estimateMealGPT } from './gpt.js';
 import { buildLookup, resolveFromProducts } from './mealResolver.js';
 
 // Normalize a meal description into a stable lookup key: trim, collapse runs of
@@ -46,11 +45,9 @@ function productsLookupOf(products = []) {
 //      never overridden by cache/AI, and free (no AI call);
 //   1. per-user cache of previous AI answers;
 //   2. the AI estimator (cached for next time).
-// `engine` picks the AI: 'claude' (default) or 'gpt' — both run the same prompt.
-// The result carries `source: 'local' | 'ai'` (plus `engine` on AI results) so
-// meals can show where the numbers came from, and callers get `{ cached, source }`
-// alongside.
-export async function estimateMealCached(userId, desc, products = [], engine = 'claude') {
+// The result carries `source: 'local' | 'ai'` so meals can show where the
+// numbers came from, and callers get `{ cached, source }` alongside.
+export async function estimateMealCached(userId, desc, products = []) {
   let own = null;
   try {
     if (products.length) own = resolveFromProducts(desc, productsLookupOf(products));
@@ -61,19 +58,12 @@ export async function estimateMealCached(userId, desc, products = [], engine = '
   if (own) return { result: { ...own, source: 'local' }, cached: false, source: 'local' };
 
   const key = normKey(desc);
-  // The two engines answer differently, so they must not share cache entries.
-  // The engine is folded into the fingerprint (claude keeps the bare products
-  // fingerprint so all pre-existing cached answers stay valid) rather than added
-  // as a schema field — no migration, and the unique (user, key, fp) index keeps
-  // doing its job per engine.
-  const baseFp = productsFingerprint(products);
-  const fp = engine === 'gpt' ? `gpt:${baseFp}` : baseFp;
+  const fp = productsFingerprint(products);
 
   const hit = await MealEstimate.findOne({ user: userId, key, fp }).lean();
-  if (hit) return { result: { ...hit.result, source: 'ai', engine }, cached: true, source: 'ai' };
+  if (hit) return { result: { ...hit.result, source: 'ai' }, cached: true, source: 'ai' };
 
-  const estimator = engine === 'gpt' ? estimateMealGPT : estimateMeal;
-  const result = await estimator(desc, products, { userId });
+  const result = await estimateMeal(desc, products, { userId });
 
   // upsert so two concurrent identical requests don't create duplicates (the
   // unique index would otherwise reject the second insert).
@@ -83,5 +73,5 @@ export async function estimateMealCached(userId, desc, products = [], engine = '
     { upsert: true }
   );
 
-  return { result: { ...result, source: 'ai', engine }, cached: false, source: 'ai' };
+  return { result: { ...result, source: 'ai' }, cached: false, source: 'ai' };
 }

@@ -113,45 +113,6 @@
   color: var(--ink-soft);
 }
 
-/* Claude/GPT engine picker next to the calc buttons */
-.engine-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-inline-start: auto;
-}
-.engine-label {
-  font-size: 11.5px;
-  color: var(--ink-soft);
-  white-space: nowrap;
-}
-.engine-opt {
-  font-family: 'Heebo', sans-serif;
-  font-size: 11.5px;
-  font-weight: 600;
-  cursor: pointer;
-  background: var(--card);
-  color: var(--ink-soft);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 4px 12px;
-  width: auto;
-  white-space: nowrap;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-  &:hover:not(:disabled) {
-    border-color: var(--olive-soft);
-  }
-  &.on {
-    background: var(--olive);
-    color: #fff;
-    border-color: var(--olive);
-  }
-  &:disabled {
-    opacity: 0.6;
-    cursor: default;
-  }
-}
-
 /* prev/next day arrows under the date field */
 .date-nav {
   display: flex;
