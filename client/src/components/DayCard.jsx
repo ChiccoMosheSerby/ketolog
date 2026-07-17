@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useToast } from "../lib/toast.jsx";
 import {
   dayTotal,
   dayMacroGrams,
@@ -16,6 +17,33 @@ import {
 import "./DayCard.scss";
 
 const HM_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+// Tiny "add to the meal text box" button, next to each meal's description and
+// each item's description. Dispatches a window event the composer (AddMeal)
+// listens for, so it works from the journal and the calendar modal too.
+// Stops propagation so it works inside clickable rows/headers.
+function AddToTextBtn({ text }) {
+  const toast = useToast();
+  return (
+    <button
+      type="button"
+      className="addto-btn"
+      title="הוסף לתיבת הטקסט"
+      aria-label="הוסף לתיבת הטקסט"
+      onClick={(e) => {
+        e.stopPropagation();
+        const t = String(text ?? "").trim();
+        if (!t) return;
+        window.dispatchEvent(
+          new CustomEvent("ketolog:addToMeal", { detail: t }),
+        );
+        toast("נוסף לתיבת הטקסט");
+      }}
+    >
+      +
+    </button>
+  );
+}
 
 // Keep only digits and lay them out as HH:MM (a colon after the 2nd digit).
 // Typing "0930" yields "09:30"; anything non-numeric is dropped.
@@ -47,7 +75,8 @@ function MealTime({ value, onSave }) {
         className="time time-btn"
         data-tour="meal-time"
         title="הקש/י לעריכת השעה"
-        onClick={() => {
+        onClick={(e) => {
+          e.stopPropagation(); // the meal row behind toggles its fold
           setVal(value || "");
           setEditing(true);
         }}
@@ -66,6 +95,7 @@ function MealTime({ value, onSave }) {
       maxLength={5}
       placeholder="--:--"
       value={val}
+      onClick={(e) => e.stopPropagation()}
       onChange={(e) => setVal(formatHM(e.target.value))}
       onBlur={commit}
       onKeyDown={(e) => {
@@ -107,9 +137,36 @@ export default function DayCard({
   const kcal = dayKcal(day);
   const kz = kcalZone(kcal, kcalTarget);
 
+  // Per-meal fold: rows show only time · title · carbs; tapping a row reveals
+  // the item breakdown, macro split and the row actions.
+  const [openMeals, setOpenMeals] = useState(() => new Set());
+  const toggleMeal = (id) =>
+    setOpenMeals((prev) => {
+      const s = new Set(prev);
+      if (s.has(id)) s.delete(id);
+      else s.add(id);
+      return s;
+    });
+  const allOpen =
+    meals.length > 0 && meals.every((m) => openMeals.has(m._id));
+  const toggleAllMeals = () =>
+    setOpenMeals(allOpen ? new Set() : new Set(meals.map((m) => m._id)));
+
   return (
     <div className={"day" + (open ? " open" : "")}>
-      <button className="day-head" onClick={onToggle} aria-expanded={open}>
+      <div
+        className="day-head"
+        role="button"
+        tabIndex={0}
+        onClick={onToggle}
+        aria-expanded={open}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onToggle();
+          }
+        }}
+      >
         <span className="day-htext">
           <span className="day-title">{title || day.label || iso}</span>
           <span className="day-date">{heDate(iso)}</span>
@@ -131,7 +188,7 @@ export default function DayCard({
           </span>
           <span className="chev"></span>
         </span>
-      </button>
+      </div>
 
       <div className="meter">
         <span style={{ width: zi.pct + "%", background: zi.color }}></span>
@@ -220,6 +277,20 @@ export default function DayCard({
             <div className="macro-na">מאקרו (שומן/חלבון) לא תועד ליום זה</div>
           )}
 
+          {meals.length > 1 && (
+            <div className="meals-tools">
+              <button
+                type="button"
+                className="fold-all"
+                onClick={toggleAllMeals}
+              >
+                {allOpen ? "כווץ הכל" : "פתח הכל"}
+                <span
+                  className={"chev fold-all-chev" + (allOpen ? " up" : "")}
+                ></span>
+              </button>
+            </div>
+          )}
           <div className="meals">
             {meals.length === 0 ? (
               <div
@@ -240,19 +311,47 @@ export default function DayCard({
                       })
                     : null;
                 const mkcal = macroKcal(m);
+                const mopen = openMeals.has(m._id);
                 return (
-                  <div className="meal" key={m._id}>
-                    <MealTime
-                      value={m.time}
-                      onSave={
-                        onSetMealTime
-                          ? (t) => onSetMealTime(iso, m._id, t)
-                          : null
-                      }
-                    />
-                    <div className="body">
+                  <div className={"meal" + (mopen ? " open" : "")} key={m._id}>
+                    <div
+                      className="meal-row"
+                      role="button"
+                      tabIndex={0}
+                      aria-expanded={mopen}
+                      onClick={() => toggleMeal(m._id)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          toggleMeal(m._id);
+                        }
+                      }}
+                    >
+                      <MealTime
+                        value={m.time}
+                        onSave={
+                          onSetMealTime
+                            ? (t) => onSetMealTime(iso, m._id, t)
+                            : null
+                        }
+                      />
                       <div className="desc">
                         {m.desc || m.cat}
+                        <AddToTextBtn text={m.desc || m.cat} />
+                        {onSaveProduct && (
+                          <button
+                            type="button"
+                            className="mini-act"
+                            title="הוסף כמוצר"
+                            aria-label="הוסף כמוצר"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onSaveProduct(m);
+                            }}
+                          >
+                            📦
+                          </button>
+                        )}
                         {m.source === "local" && (
                           <span
                             className="meal-src"
@@ -267,6 +366,21 @@ export default function DayCard({
                           </span>
                         )}
                       </div>
+                      <div className="carb">
+                        {fmt(Number(m.carbs) || 0)} ג'
+                        {mkcal != null && (
+                          <span
+                            className="carb-kcal"
+                            title="קלוריות לארוחה (לפי המאקרו שתועד)"
+                          >
+                            ~{mkcal} קק"ל
+                          </span>
+                        )}
+                      </div>
+                      <span className="chev meal-chev"></span>
+                    </div>
+                    {mopen && (
+                    <div className="meal-more">
                       {items.length > 0 && (
                         <ul className="meal-items">
                           {items.map((it, i) => {
@@ -284,6 +398,21 @@ export default function DayCard({
                                       <span className="mi-desc">{it.desc}</span>
                                     </>
                                   )}
+                                  <AddToTextBtn text={it.desc || it.name} />
+                                  {onSaveItemProduct && (
+                                    <button
+                                      type="button"
+                                      className="mini-act"
+                                      title="הוסף כמוצר"
+                                      aria-label="הוסף כמוצר"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onSaveItemProduct(it);
+                                      }}
+                                    >
+                                      📦
+                                    </button>
+                                  )}
                                 </span>
                                 {ikcal != null && (
                                   <span
@@ -297,15 +426,6 @@ export default function DayCard({
                                   {fmt((Number(it.carbs) || 0) * (it.qty || 1))}{" "}
                                   ג'
                                 </span>
-                                {onSaveItemProduct && (
-                                  <button
-                                    className="mi-save"
-                                    title="הוסף למוצרים שלי"
-                                    onClick={() => onSaveItemProduct(it)}
-                                  >
-                                    📦
-                                  </button>
-                                )}
                               </li>
                             );
                           })}
@@ -339,18 +459,6 @@ export default function DayCard({
                           </span>
                         </div>
                       )}
-                    </div>
-                    <div className="carb">
-                      {fmt(Number(m.carbs) || 0)} ג'
-                      {mkcal != null && (
-                        <span
-                          className="carb-kcal"
-                          title="קלוריות לארוחה (לפי המאקרו שתועד)"
-                        >
-                          ~{mkcal} קק"ל
-                        </span>
-                      )}
-                    </div>
                     <div className="meal-acts">
                       {onSaveTemplate && (
                         <button
@@ -359,15 +467,6 @@ export default function DayCard({
                           onClick={() => onSaveTemplate(m)}
                         >
                           ★
-                        </button>
-                      )}
-                      {onSaveProduct && (
-                        <button
-                          className="mact"
-                          title="הוסף למוצרים שלי"
-                          onClick={() => onSaveProduct(m)}
-                        >
-                          📦
                         </button>
                       )}
                       {onCopyMeal && (
@@ -387,6 +486,8 @@ export default function DayCard({
                         ✕
                       </button>
                     </div>
+                    </div>
+                    )}
                   </div>
                 );
               })

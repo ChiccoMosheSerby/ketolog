@@ -1,0 +1,104 @@
+/* ---------- ClaudeCalcModal: popup claude.ai calc (meal / product) ---------- */
+.ccm-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 14px;
+}
+.ccm-modal {
+  width: 100%;
+  max-width: 520px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-md);
+  padding: 18px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ccm-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ccm-htext {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.ccm-title {
+  font-family: "Heebo", sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+}
+.ccm-sub {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+}
+.ccm-close {
+  flex: none;
+  background: var(--tint);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  width: 30px;
+  height: 30px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  &:hover {
+    color: var(--ink);
+    background: var(--green-tint);
+  }
+}
+.ccm-input {
+  min-height: 96px;
+  line-height: 1.6;
+  resize: vertical;
+}
+.ccm-btns {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.ccm-hint {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--accent-ink);
+  background: var(--green-tint);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--r-md);
+  padding: 10px 12px;
+}
+.ccm-link {
+  display: inline;
+  margin-inline-start: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--accent-ink);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+@media (max-width: 520px) {
+  .ccm-scrim {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .ccm-modal {
+    max-width: none;
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+  }
+}

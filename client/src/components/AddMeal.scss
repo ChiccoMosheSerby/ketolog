@@ -1,66 +1,139 @@
-/* ---------- AddMeal: voice mic, quick-add product tags ---------- */
-
-/* The three macro inputs share one row, equal width, and stay side-by-side even
-   on narrow panels (they only wrap when truly cramped). */
-.row.macros {
-  gap: 8px;
-  .fld {
-    flex: 1 1 0;
-    min-width: 84px;
-  }
-  label {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .unit {
-    color: var(--ink-soft);
-    font-weight: 400;
-  }
-  input {
-    font-family: 'IBM Plex Mono', monospace;
-    font-variant-numeric: tabular-nums;
-  }
+/* ---------- AddMeal: minimal one-row composer — CTAs · calendar · text box · submit ---------- */
+.panel.addmeal {
+  padding: 8px 10px;
 }
 
-.desc-label {
+.composer {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  align-items: stretch;
+  gap: 6px;
+  flex-wrap: wrap;
 }
-.mic {
-  font-family: 'Heebo', sans-serif;
-  font-size: 11.5px;
-  font-weight: 600;
-  cursor: pointer;
+
+/* the main CTAs (products / Claude meal / Claude product) — slim pills */
+.composer-ctas {
+  display: flex;
+  gap: 5px;
+  flex: none;
+}
+.cta {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
-  background: var(--card);
-  color: var(--accent-ink);
+  padding: 5px 9px;
+  font-family: inherit;
+  color: var(--ink);
+  background: var(--paper);
   border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 4px 12px;
-  width: auto;
-  white-space: nowrap;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.06s ease;
   &:hover {
     background: var(--green-tint);
     border-color: var(--olive-soft);
   }
-  .mic-dot {
-    font-size: 12px;
-    line-height: 1;
+  &:active {
+    transform: translateY(1px);
+  }
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--ring);
+  }
+}
+.cta-ico {
+  font-size: 14px;
+  line-height: 1;
+}
+.cta-title {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+/* the calendar: prev/next arrows around a compact date input */
+.cal-nav {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  flex: none;
+  input[type="date"] {
+    width: 122px;
+    padding: 5px 7px;
+    font-size: 12.5px;
+  }
+}
+.date-arrow {
+  flex: none;
+  width: 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    border-color: var(--olive-soft);
+    background: var(--green-tint);
+  }
+  &:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+}
+
+/* the shared text box, mic tucked inside its corner */
+.desc-wrap {
+  position: relative;
+  flex: 1 1 220px;
+  min-width: 200px;
+  display: flex;
+  textarea {
+    width: 100%;
+    min-height: 34px;
+    padding: 7px 9px;
+    padding-inline-end: 36px; /* room for the mic */
+    font-size: 13px;
+    line-height: 1.4;
+    resize: vertical;
+  }
+}
+.mic-mini {
+  position: absolute;
+  inset-inline-end: 6px;
+  top: 6px;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+  &:hover {
+    background: var(--green-tint);
+    border-color: var(--olive-soft);
   }
   &.rec {
-    color: #fff;
     background: var(--red);
     border-color: var(--red);
     animation: mic-pulse 1.4s ease-in-out infinite;
-    &:hover {
-      background: #c23f32;
-    }
+  }
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
   }
 }
 @keyframes mic-pulse {
@@ -73,68 +146,117 @@
   }
 }
 
-/* quick-add tags */
-.tags-hint {
-  font-size: 11.5px;
-  color: var(--ink-soft);
-  margin-top: 14px;
-}
-.tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 9px;
-}
-.tag {
+/* the log button — "חשב והוסף ארוחה" / "הוסף ארוחה" */
+.composer-submit {
+  flex: none;
+  align-self: stretch;
+  padding: 6px 12px;
   font-size: 12.5px;
-  font-weight: 500;
-  border: 1px solid var(--line);
-  color: var(--accent-ink);
-  background: var(--card);
-  border-radius: 999px;
-  padding: 6px 14px;
-  cursor: pointer;
-  font-family: inherit;
-  line-height: 1.2;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-  &:hover {
-    background: var(--olive);
-    color: #fff;
-    border-color: var(--olive);
-  }
-  .plus {
-    opacity: 0.55;
-    margin-inline-end: 4px;
-    font-weight: 600;
-  }
-}
-.tags-empty {
-  font-size: 11.5px;
-  color: var(--ink-soft);
 }
 
-/* prev/next day arrows under the date field */
-.date-nav {
+/* tiny in-bar tools: calc-only 🧮 and reset ↺ */
+.composer-tools {
   display: flex;
-  gap: 6px;
-  margin-top: 6px;
+  align-items: center;
+  gap: 4px;
+  flex: none;
 }
-.date-arrow {
-  flex: 1;
-  padding: 4px 0;
+.mini-tool {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid var(--line);
-  border-radius: var(--r-sm, 10px);
+  border-radius: 999px;
   background: var(--paper);
-  color: var(--ink);
-  font-size: 16px;
+  font-size: 12px;
   line-height: 1;
   cursor: pointer;
-
-  &:hover:not(:disabled) {
+  opacity: 0.8;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    opacity 0.15s ease;
+  &:hover {
+    opacity: 1;
+    background: var(--green-tint);
     border-color: var(--olive-soft);
   }
   &:disabled {
     opacity: 0.4;
     cursor: default;
+  }
+}
+
+/* mobile: two tight rows — [CTAs · calendar] then [text box · submit · tools] */
+@media (max-width: 700px) {
+  .panel.addmeal {
+    padding: 6px 8px;
+  }
+  .composer {
+    gap: 5px;
+  }
+  .composer-ctas {
+    gap: 4px;
+    .cta {
+      width: 34px;
+      height: 34px;
+      padding: 0;
+    }
+    .cta-title {
+      display: none; /* icon-only; the popup titles explain themselves */
+    }
+    .cta-ico {
+      font-size: 16px;
+    }
+  }
+  .cal-nav {
+    /* native date inputs refuse to shrink below their intrinsic width on
+       iOS/Android — give the calendar a stable size and let it wrap to its
+       own line when the CTA row leaves too little room */
+    flex: 1 1 170px;
+    min-width: 170px;
+    height: 34px;
+    input[type="date"] {
+      flex: 1;
+      width: 100%;
+      min-width: 110px;
+      height: 34px;
+      padding: 0 6px;
+      font-size: 13px;
+      text-align: center;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    /* iOS quirk: without this the picked date renders stuck to the top edge */
+    input[type="date"]::-webkit-date-and-time-value {
+      text-align: center;
+      line-height: 34px;
+      margin: 0;
+    }
+    .date-arrow {
+      width: 30px;
+      height: 34px;
+    }
+  }
+  .desc-wrap {
+    flex: 1 1 150px;
+    min-width: 0;
+    textarea {
+      min-height: 36px;
+    }
+  }
+  .composer-submit {
+    padding: 0 10px;
+    min-height: 36px;
+    font-size: 12px;
+  }
+  .composer-tools {
+    gap: 3px;
+  }
+  .mini-tool {
+    width: 24px;
+    height: 24px;
   }
 }

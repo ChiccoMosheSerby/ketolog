@@ -36,13 +36,22 @@ router.post('/', asyncHandler(async (req, res) => {
   res.status(201).json(product);
 }));
 
-// PATCH /api/products/:id -> rename (only the display name / key)
+// PATCH /api/products/:id -> partial update: name (key), category, starred
 router.patch('/:id', asyncHandler(async (req, res) => {
-  const { key } = req.body;
-  if (!key || !String(key).trim()) return res.status(400).json({ error: 'תן/י שם למוצר' });
+  const up = {};
+  if (req.body.key !== undefined) {
+    const key = String(req.body.key).trim();
+    if (!key) return res.status(400).json({ error: 'תן/י שם למוצר' });
+    up.key = key;
+  }
+  if (req.body.cat !== undefined) {
+    up.cat = String(req.body.cat).trim() || 'נשנוש / ביניים';
+  }
+  if (req.body.starred !== undefined) up.starred = !!req.body.starred;
+  if (!Object.keys(up).length) return res.status(400).json({ error: 'אין מה לעדכן' });
   const product = await Product.findOneAndUpdate(
     { _id: req.params.id, user: req.userId },
-    { key: String(key).trim() },
+    up,
     { new: true }
   );
   if (!product) return res.status(404).json({ error: 'מוצר לא נמצא' });

@@ -12,36 +12,37 @@
 .mbar {
   display: flex;
   align-items: center;
-  gap: 10px;
-  /* bleed to the screen edges past .wrap's side padding */
-  margin: -30px -18px 0;
-  padding: 10px 14px;
+  gap: 6px;
+  /* bleed to the screen edges past .wrap's side padding (matches .wrap's
+     top padding, which it cancels out) */
+  margin: -10px -18px 0;
+  padding: 4px 10px;
   border-bottom: 1px solid var(--line);
 }
 
 .stats-mini {
   flex: 1;
-  gap: 6px;
+  gap: 4px;
   .stat {
     min-width: 0;
-    padding: 6px 9px;
+    padding: 2px 6px;
     border-radius: var(--r-sm);
-    gap: 2px;
+    gap: 1px;
   }
-  /* mini value zone matches the 40px mini ring so labels line up */
+  /* mini value zone matches the 34px mini ring so labels line up */
   .stat .num,
   .stat .ring {
-    height: 40px;
+    height: 34px;
   }
   .num {
-    font-size: 17px;
+    font-size: 14px;
   }
   .lab {
-    font-size: 9px;
+    font-size: 8px;
     line-height: 1.2;
   }
   .stat-today .ring-num {
-    font-size: 11px;
+    font-size: 10px;
   }
 }
 
@@ -96,8 +97,8 @@
 /* hamburger */
 .hamburger {
   flex: none;
-  width: 38px;
-  height: 38px;
+  width: 32px;
+  height: 32px;
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
   background: var(--card);

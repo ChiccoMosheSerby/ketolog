@@ -3,20 +3,71 @@ import { api } from '../lib/api.js';
 import { useToast } from '../lib/toast.jsx';
 import { fmt } from '../lib/helpers.js';
 import { toThumbnail, dataUrl } from '../lib/image.js';
+import { loadCats, addCat, removeCat, DEFAULT_CATS, DEFAULT_CAT } from '../lib/categories.js';
 import './Products.scss';
 
 // Scanner pulls in ZXing (large) — load it only when the user opens the camera.
 const BarcodeScanner = lazy(() => import('./BarcodeScanner.jsx'));
 const CameraCapture = lazy(() => import('./CameraCapture.jsx'));
 
-export default function Products({ products, onAdd, onRename, onDelete, compact }) {
+const NEW_CAT = '__new__';
+
+export default function Products({ products, onAdd, onRename, onUpdate, onDelete, compact }) {
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState(null); // product being renamed inline
   const [editName, setEditName] = useState('');
+  const [search, setSearch] = useState(''); // filters the product list dropdown
+  const [cats, setCats] = useState(() => loadCats(products));
+  const [catsOpen, setCatsOpen] = useState(false); // the category manager fold
+  const [newCat, setNewCat] = useState('');
   const [form, setForm] = useState({
-    key: '', label: '', unit: '', perPack: '', carb: '', fat: '', prot: '', image: '',
+    key: '', label: '', unit: '', perPack: '', carb: '', fat: '', prot: '', image: '', cat: '',
   });
+
+  // keep the category choices in sync with the products' actual cats
+  useEffect(() => {
+    setCats(loadCats(products));
+  }, [products]);
+
+  // The category <select> for the add form: existing choices + "new…" which
+  // prompts for a name and adds it to the catalog.
+  function onPickCat(e) {
+    const v = e.target.value;
+    if (v !== NEW_CAT) {
+      setForm((f) => ({ ...f, cat: v }));
+      return;
+    }
+    const name = (window.prompt('שם הקטגוריה החדשה:') || '').trim();
+    if (!name) return;
+    addCat(name);
+    setCats(loadCats(products));
+    setForm((f) => ({ ...f, cat: name }));
+  }
+
+  function addNewCat() {
+    const name = newCat.trim();
+    if (!name) return;
+    addCat(name);
+    setCats(loadCats(products));
+    setNewCat('');
+    toast('הקטגוריה נוספה');
+  }
+
+  // Delete a custom category; its products (if any) move to the default one.
+  async function deleteCat(cat) {
+    const inCat = products.filter((p) => (p.cat || DEFAULT_CAT) === cat);
+    if (inCat.length) {
+      const ok = window.confirm(
+        `בקטגוריה "${cat}" יש ${inCat.length} מוצרים — הם יעברו ל"${DEFAULT_CAT}". להמשיך?`,
+      );
+      if (!ok) return;
+      for (const p of inCat) await onUpdate(p._id, { cat: DEFAULT_CAT });
+    }
+    removeCat(cat);
+    setCats(loadCats(products.map((p) => ((p.cat || '') === cat ? { ...p, cat: DEFAULT_CAT } : p))));
+    toast('הקטגוריה נמחקה');
+  }
   const [note, setNote] = useState(null);
   const [imgBusy, setImgBusy] = useState(false);
   const [barBusy, setBarBusy] = useState(false);
@@ -42,16 +93,22 @@ export default function Products({ products, onAdd, onRename, onDelete, compact 
       toast('תן/י שם למוצר');
       return;
     }
+    // a category is always chosen explicitly — that's what keeps the picker organized
+    if (!form.cat.trim()) {
+      toast('בחר/י קטגוריה למוצר');
+      return;
+    }
     await onAdd({
       key: form.key.trim(),
       label: form.label.trim() || form.key.trim(),
       unit: form.unit.trim() || 'מנה',
+      cat: form.cat.trim(),
       carbs: Number(form.carb) || 0,
       fat: Number(form.fat) || 0,
       protein: Number(form.prot) || 0,
       image: form.image || '',
     });
-    setForm({ key: '', label: '', unit: '', perPack: '', carb: '', fat: '', prot: '', image: '' });
+    setForm({ key: '', label: '', unit: '', perPack: '', carb: '', fat: '', prot: '', image: '', cat: '' });
     setNote(null);
     toast('המוצר נוסף');
   }
@@ -124,7 +181,8 @@ export default function Products({ products, onAdd, onRename, onDelete, compact 
         prot: isNaN(p) ? '' : fmt(p),
       };
       // keep the thumbnail captured above (its setState may race this one)
-      setForm((prev) => ({ ...next, image: prev.image }));
+      // and the category the user already picked
+      setForm((prev) => ({ ...next, image: prev.image, cat: prev.cat }));
       const src = userPP > 0 ? 'לפי הכמות שציינת' : modelPP > 0 ? 'הערכה אוטומטית' : 'אריזה שלמה';
       setNote({
         name: r.name || 'מוצר',
@@ -218,12 +276,25 @@ export default function Products({ products, onAdd, onRename, onDelete, compact 
           </button>
           {open && (
             <div id="prodList">
+              <input
+                type="search"
+                className="prod-search"
+                placeholder="חיפוש מוצר…"
+                value={search}
+                autoFocus
+                onChange={(e) => setSearch(e.target.value)}
+              />
               {products.length === 0 ? (
                 <div style={{ fontSize: 12, color: 'var(--ink-soft)', padding: '6px 0' }}>
                   אין מוצרים שמורים עדיין.
                 </div>
               ) : (
-                products.map((p) => (
+                products
+                  .filter((p) => {
+                    const q = search.trim();
+                    return !q || (p.key || '').includes(q) || (p.label || '').includes(q);
+                  })
+                  .map((p) => (
                   <div className="prod" key={p._id}>
                     {p.image ? (
                       <img className="pthumb" src={p.image} alt="" loading="lazy" />
@@ -256,7 +327,33 @@ export default function Products({ products, onAdd, onRename, onDelete, compact 
                       <div className="pmeta">
                         ל{p.unit}: {fmt(p.carbs)} פחמ' · {fmt(p.fat)} שומן · {fmt(p.protein)} חלבון
                       </div>
+                      {onUpdate && (
+                        <select
+                          className="pcat"
+                          value={p.cat || DEFAULT_CAT}
+                          title="קטגוריה"
+                          onChange={(e) => onUpdate(p._id, { cat: e.target.value })}
+                        >
+                          {cats.map((c) => (
+                            <option key={c} value={c}>
+                              {c}
+                            </option>
+                          ))}
+                          {!cats.includes(p.cat || DEFAULT_CAT) && (
+                            <option value={p.cat}>{p.cat}</option>
+                          )}
+                        </select>
+                      )}
                     </div>
+                    {onUpdate && (
+                      <button
+                        className={'pstar' + (p.starred ? ' on' : '')}
+                        title={p.starred ? 'הסר ממועדפים' : 'הוסף למועדפים'}
+                        onClick={() => onUpdate(p._id, { starred: !p.starred })}
+                      >
+                        {p.starred ? '★' : '☆'}
+                      </button>
+                    )}
                     {editId === p._id ? (
                       <>
                         <button className="pedit" title="שמור" onClick={() => saveEdit(p._id)}>
@@ -305,6 +402,49 @@ export default function Products({ products, onAdd, onRename, onDelete, compact 
             onChange={onFile}
           />
         </div>
+      </div>
+
+      {/* the user's category catalog: add new ones, delete custom ones
+          (their products fall back to the default category) */}
+      <div className="cat-manage">
+        <button
+          className={'cm-head' + (catsOpen ? ' open' : '')}
+          onClick={() => setCatsOpen((o) => !o)}
+          aria-expanded={catsOpen}
+        >
+          <span className="chev"></span>
+          ניהול קטגוריות
+          <span className="cm-count">{cats.length}</span>
+        </button>
+        {catsOpen && (
+          <div className="cm-body">
+            {cats.map((c) => {
+              const n = products.filter((p) => (p.cat || DEFAULT_CAT) === c).length;
+              return (
+                <span className="cm-chip" key={c}>
+                  {c}
+                  <b>{n}</b>
+                  {!DEFAULT_CATS.includes(c) && (
+                    <button className="cm-del" title="מחק קטגוריה" onClick={() => deleteCat(c)}>
+                      ✕
+                    </button>
+                  )}
+                </span>
+              );
+            })}
+            <span className="cm-add">
+              <input
+                placeholder="קטגוריה חדשה…"
+                value={newCat}
+                onChange={(e) => setNewCat(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && addNewCat()}
+              />
+              <button className="btn ghost mini" onClick={addNewCat}>
+                הוסף
+              </button>
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="prod-add">
@@ -362,6 +502,18 @@ export default function Products({ products, onAdd, onRename, onDelete, compact 
           <div className="fld">
             <label>יחידה</label>
             <input placeholder="שורה" value={form.unit} onChange={set('unit')} />
+          </div>
+          <div className="fld">
+            <label>קטגוריה</label>
+            <select value={form.cat} onChange={onPickCat}>
+              <option value="">בחר/י…</option>
+              {cats.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+              <option value={NEW_CAT}>+ קטגוריה חדשה…</option>
+            </select>
           </div>
           <div className="fld">
             <label>באריזה</label>

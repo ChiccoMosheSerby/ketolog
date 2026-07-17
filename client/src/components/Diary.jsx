@@ -202,9 +202,15 @@ export default function Diary() {
     const created = await api.addProduct(p);
     setProducts((prev) => [...prev, created]);
   }
-  async function renameProduct(id, key) {
-    const updated = await api.updateProduct(id, { key });
+  // Partial product update (name / category / star) — shared by the products
+  // panel and the picker popup.
+  async function updateProduct(id, patch) {
+    const updated = await api.updateProduct(id, patch);
     setProducts((prev) => prev.map((p) => (p._id === id ? updated : p)));
+    return updated;
+  }
+  async function renameProduct(id, key) {
+    await updateProduct(id, { key });
     toast("השם עודכן");
   }
   async function deleteProduct(id) {
@@ -387,6 +393,7 @@ export default function Diary() {
       products={products}
       onAdd={addProduct}
       onRename={renameProduct}
+      onUpdate={updateProduct}
       onDelete={deleteProduct}
       compact={!isMobile}
     />
@@ -507,6 +514,41 @@ export default function Diary() {
         today={effectiveToday}
         email={user?.email || ""}
       />
+      <AddMeal
+        onLogged={addMeal}
+        date={activeDate}
+        onDateChange={setActiveDate}
+        products={products}
+        templates={templates}
+        onUpdateProduct={updateProduct}
+        onDeleteProduct={deleteProduct}
+        onDeleteTemplate={deleteTemplate}
+        onRepeatYesterday={repeatYesterday}
+        canRepeat={canRepeat}
+        days={days}
+        target={target}
+        ketoMonths={user?.ketoGoalMonths || 0}
+        avg={avg}
+      />
+      <DayCard
+        iso={activeDate}
+        day={activeDay}
+        title={dayTitle(activeDate)}
+        open={expanded.has(activeDate)}
+        onCloseDay={activeDate === t ? closeDay : null}
+        closed={dayClosed}
+        onToggle={() => toggle(activeDate)}
+        onDeleteMeal={deleteMeal}
+        onSetMealTime={updateMealTime}
+        onCopyMeal={copyMealToActive}
+        onSaveTemplate={saveMealAsTemplate}
+        onSaveProduct={saveMealAsProduct}
+        onSaveItemProduct={saveItemAsProduct}
+        target={target}
+        kcalTarget={kcalTarget}
+      />
+
+      {/* small reference lines — below the day so the top stays clean */}
       <div className="today-hints">
         <div className="kcal-formula">
           חישוב קק"ל לגרם: שומן = 9 · חלבון = 4 · פחמימות = 4
@@ -517,6 +559,9 @@ export default function Diary() {
           </span>
         </div>
       </div>
+
+      {/* products management (add/scan/edit) — folded, below the current day;
+          picking products into a meal happens in the composer's popup above */}
       {!isMobile && (
         <div
           className={
@@ -542,33 +587,6 @@ export default function Diary() {
           {productsOpen && <div className="journal-body">{productsPanel}</div>}
         </div>
       )}
-      <AddMeal
-        onLogged={addMeal}
-        date={activeDate}
-        onDateChange={setActiveDate}
-        products={products}
-        templates={templates}
-        onDeleteTemplate={deleteTemplate}
-        onRepeatYesterday={repeatYesterday}
-        canRepeat={canRepeat}
-      />
-      <DayCard
-        iso={activeDate}
-        day={activeDay}
-        title={dayTitle(activeDate)}
-        open={expanded.has(activeDate)}
-        onCloseDay={activeDate === t ? closeDay : null}
-        closed={dayClosed}
-        onToggle={() => toggle(activeDate)}
-        onDeleteMeal={deleteMeal}
-        onSetMealTime={updateMealTime}
-        onCopyMeal={copyMealToActive}
-        onSaveTemplate={saveMealAsTemplate}
-        onSaveProduct={saveMealAsProduct}
-        onSaveItemProduct={saveItemAsProduct}
-        target={target}
-        kcalTarget={kcalTarget}
-      />
 
       <div className={"journal-fold" + (historyOpen ? " open" : "")}>
         <button

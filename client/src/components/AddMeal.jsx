@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../lib/api.js";
 import { useToast } from "../lib/toast.jsx";
 import { useSpeech, speechErrorMessage } from "../lib/useSpeech.js";
@@ -11,7 +11,9 @@ import {
   todayISO,
 } from "../lib/helpers.js";
 import { parseAppLink, clearAppLink } from "../lib/appLink.js";
-import MealShortcuts from "./MealShortcuts.jsx";
+import { useMediaQuery, MOBILE_QUERY } from "../lib/useMediaQuery.js";
+import ProductPicker from "./ProductPicker.jsx";
+import ClaudeCalcModal from "./ClaudeCalcModal.jsx";
 import "./AddMeal.scss";
 
 export default function AddMeal({
@@ -20,11 +22,19 @@ export default function AddMeal({
   onDateChange,
   products,
   templates,
+  onUpdateProduct,
+  onDeleteProduct,
   onDeleteTemplate,
   onRepeatYesterday,
   canRepeat,
+  // context for the "calc with Claude" popups (same prompt as the חישוב מדדים tab)
+  days = [],
+  target,
+  ketoMonths = 0,
+  avg = 0,
 }) {
   const toast = useToast();
+  const isMobile = useMediaQuery(MOBILE_QUERY);
   const [carb, setCarb] = useState("");
   const [desc, setDesc] = useState("");
   const [pendingMacro, setPendingMacro] = useState({
@@ -35,6 +45,8 @@ export default function AddMeal({
   const [note, setNote] = useState(null); // { html } via structured fields
   const [calcSource, setCalcSource] = useState(""); // 'local' | 'ai' | '' — where the last calc came from
   const [busy, setBusy] = useState(false);
+  // which popup is open: '' | 'products' | 'claude-meal' | 'claude-product'
+  const [modal, setModal] = useState("");
   // Structured list of saved products the user tapped in, kept alongside the free
   // text. `descIsPure` stays true only while the description was built *solely*
   // from those taps (no manual typing / dictation / template). When it holds, the
@@ -62,6 +74,43 @@ export default function AddMeal({
       speech.start();
     }
   }
+
+  // Escape closes whichever composer popup is open (the picker/Claude modals
+  // also listen themselves; closing twice is a no-op).
+  useEffect(() => {
+    if (!modal) return;
+    const onKey = (e) => e.key === "Escape" && setModal("");
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [modal]);
+
+  // "הוסף לתיבת הטקסט" buttons on the day cards (meal / item descriptions)
+  // dispatch this event — append their text to the shared description.
+  useEffect(() => {
+    const onAddText = (e) => {
+      const text = String(e.detail || "").trim();
+      if (!text) return;
+      setDesc((d) => (d.trim() ? d.trim() + ", " + text : text));
+      markManual();
+      clearNote();
+    };
+    window.addEventListener("ketolog:addToMeal", onAddText);
+    return () => window.removeEventListener("ketolog:addToMeal", onAddText);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // How often each saved product was actually logged (by item name across the
+  // whole journal) — drives the "לפי שימוש" sort in the products popup.
+  const usage = useMemo(() => {
+    const m = new Map();
+    for (const d of days)
+      for (const meal of d.meals || [])
+        for (const it of meal.items || []) {
+          const k = (it.name || "").trim();
+          if (k) m.set(k, (m.get(k) || 0) + 1);
+        }
+    return m;
+  }, [days]);
 
   // Opened via a Claude meal deep link (?add=meal&…): prefill this form with the
   // computed values so the meal lands on the existing entry form, ready to log on
@@ -195,8 +244,8 @@ export default function AddMeal({
       return;
     }
     const src = source ?? calcSource;
-    // Macros may arrive as numbers (from a calc) or as strings (hand-typed into
-    // the fat/protein fields) — normalize to a number or null either way.
+    // Macros may arrive as numbers (from a calc) or as strings — normalize to a
+    // number or null either way.
     const toNum = (v) => (v == null || v === "" ? null : Number(v));
     const meal = {
       time: nowHM(),
@@ -284,8 +333,7 @@ export default function AddMeal({
       if (thenLog && !isNaN(n)) await doAdd(carbsValue, macro, mealItems, src);
     } catch {
       setNote({
-        error:
-          "לא הצלחתי לחשב אוטומטית כרגע — אפשר להזין מספר פחמימות ידנית ולרשום.",
+        error: "לא הצלחתי לחשב אוטומטית כרגע — נסו שוב בעוד רגע.",
       });
     } finally {
       setBusy(false);
@@ -310,124 +358,135 @@ export default function AddMeal({
     toast("הטופס אופס");
   }
 
+  const onDescChange = (e) => {
+    setDesc(e.target.value);
+    markManual();
+    clearNote();
+  };
+
   return (
-    <div className="panel" data-tour="add-meal">
-      <h2>הוספת ארוחה</h2>
-      <div className="row">
-        <div className="fld">
-          <label>תאריך</label>
+    <div className="panel addmeal" data-tour="add-meal">
+      {/* one top row: CTAs · calendar (prev/next) · the text box · submit.
+          Every entry point feeds the same text box. */}
+      <div className="composer">
+        <div className="composer-ctas">
+          <button
+            type="button"
+            className="cta"
+            data-tour="shortcuts"
+            onClick={() => setModal("products")}
+          >
+            <span className="cta-ico">🧺</span>
+            <span className="cta-title">המוצרים שלי</span>
+          </button>
+          <button
+            type="button"
+            className="cta"
+            onClick={() => setModal("claude-meal")}
+          >
+            <span className="cta-ico">🤖</span>
+            <span className="cta-title">חשב עם קלוד</span>
+          </button>
+          <button
+            type="button"
+            className="cta"
+            onClick={() => setModal("claude-product")}
+          >
+            <span className="cta-ico">📦</span>
+            <span className="cta-title">מוצר עם קלוד</span>
+          </button>
+        </div>
+
+        <div className="cal-nav">
+          <button
+            type="button"
+            className="date-arrow"
+            title="יום הבא"
+            disabled={date >= todayISO()}
+            onClick={() => onDateChange(nextISO(date))}
+          >
+            ‹
+          </button>
           <input
             type="date"
             value={date}
             onChange={(e) => onDateChange(e.target.value)}
           />
-          <div className="date-nav">
-            <button
-              type="button"
-              className="date-arrow"
-              title="יום הבא"
-              disabled={date >= todayISO()}
-              onClick={() => onDateChange(nextISO(date))}
-            >
-              ‹
-            </button>
-            <button
-              type="button"
-              className="date-arrow"
-              title="יום קודם"
-              onClick={() => onDateChange(prevISO(date))}
-            >
-              ›
-            </button>
-          </div>
+          <button
+            type="button"
+            className="date-arrow"
+            title="יום קודם"
+            onClick={() => onDateChange(prevISO(date))}
+          >
+            ›
+          </button>
         </div>
-      </div>
 
-      <div className="row macros" style={{ marginTop: 10 }}>
-        <div className="fld">
-          <label>פחמימות נטו <span className="unit">(גרם)</span></label>
-          <input
-            type="number"
-            step="0.1"
-            min="0"
-            placeholder="חישוב אוטומטי"
-            value={carb}
-            onChange={(e) => setCarb(e.target.value)}
+        <div className="desc-wrap">
+          <textarea
+            data-tour="meal-desc"
+            rows={1}
+            placeholder="מה אכלת? תיאור חופשי — המערכת תחשב לבד"
+            value={desc}
+            onChange={onDescChange}
           />
-        </div>
-        <div className="fld">
-          <label>חלבון <span className="unit">(גרם)</span></label>
-          <input
-            type="number"
-            step="0.1"
-            min="0"
-            placeholder="—"
-            value={pendingMacro.protein ?? ""}
-            onChange={(e) =>
-              setPendingMacro((m) => ({
-                ...m,
-                protein: e.target.value === "" ? null : e.target.value,
-              }))
-            }
-          />
-        </div>
-        <div className="fld">
-          <label>שומן <span className="unit">(גרם)</span></label>
-          <input
-            type="number"
-            step="0.1"
-            min="0"
-            placeholder="—"
-            value={pendingMacro.fat ?? ""}
-            onChange={(e) =>
-              setPendingMacro((m) => ({ ...m, fat: e.target.value === "" ? null : e.target.value }))
-            }
-          />
-        </div>
-      </div>
-      <div className="row" style={{ marginTop: 10 }}>
-        <div className="fld wide">
-          <label className="desc-label">
-            <span>פירוט (מה אכלת) — תיאור חופשי, המערכת תחשב לבד</span>
-            {speech.supported && (
-              <button
-                type="button"
-                className={"mic" + (speech.listening ? " rec" : "")}
-                onClick={toggleMic}
-                disabled={speech.transcribing}
-                title={speech.listening ? "עצור הקלטה" : "הקלט במקום להקליד"}
-              >
-                <span className="mic-dot">🎤</span>
-                {speech.transcribing
+          {speech.supported && (
+            <button
+              type="button"
+              className={"mic-mini" + (speech.listening ? " rec" : "")}
+              onClick={toggleMic}
+              disabled={speech.transcribing}
+              title={
+                speech.transcribing
                   ? "מתמלל…"
                   : speech.listening
                     ? "מקליט… הקש/י לעצירה"
-                    : "הקלטה קולית"}
-              </button>
-            )}
-          </label>
-          <textarea
-            data-tour="meal-desc"
-            placeholder="לדוגמה: חביתה מ-3 ביצים, פרוסת גאודה, מלפפון לא קלוף, חופן שרי"
-            value={desc}
-            onChange={(e) => {
-              setDesc(e.target.value);
-              markManual();
-              clearNote();
-            }}
-          />
+                    : "הקלטה קולית"
+              }
+            >
+              🎤
+            </button>
+          )}
+        </div>
+
+        <button
+          className="btn composer-submit"
+          data-tour="meal-submit"
+          disabled={busy}
+          onClick={onAddClick}
+        >
+          {busy
+            ? "מחשב…"
+            : carb !== ""
+              ? isMobile
+                ? "הוסף"
+                : "הוסף ארוחה"
+              : isMobile
+                ? "חשב והוסף"
+                : "חשב והוסף ארוחה"}
+        </button>
+
+        <div className="composer-tools">
+          <button
+            type="button"
+            className="mini-tool"
+            title="חשב פחמימות בלבד — בלי לרשום"
+            disabled={busy}
+            onClick={() => runCalc(false)}
+          >
+            🧮
+          </button>
+          <button
+            type="button"
+            className="mini-tool"
+            title="איפוס: היום, ניקוי שדות"
+            disabled={busy}
+            onClick={resetForm}
+          >
+            ↺
+          </button>
         </div>
       </div>
-
-      <MealShortcuts
-        products={products}
-        templates={templates}
-        onApplyProduct={applyProduct}
-        onApplyTemplate={applyTemplate}
-        onDeleteTemplate={onDeleteTemplate}
-        onRepeatYesterday={onRepeatYesterday}
-        canRepeat={canRepeat}
-      />
 
       {note && (
         <div className="calc-note">
@@ -450,7 +509,7 @@ export default function AddMeal({
               {note.claude && (
                 <span className="bd">
                   <br />
-                  🔗 מולא מקלוד — בדקו את הערכים ולחצו "חשב ורשום ארוחה".
+                  🔗 מולא מקלוד — בדקו את הערכים ולחצו "הוסף ארוחה".
                 </span>
               )}
               {note.local && (
@@ -491,26 +550,35 @@ export default function AddMeal({
         </div>
       )}
 
-      <div className="row" style={{ marginTop: 12, alignItems: "center" }}>
-        <button className="btn" data-tour="meal-submit" disabled={busy} onClick={onAddClick}>
-          {busy ? "מחשב…" : "חשב ורשום ארוחה"}
-        </button>
-        <button
-          className="btn ghost"
-          disabled={busy}
-          onClick={() => runCalc(false)}
-        >
-          חשב פחמימות בלבד
-        </button>
-        <button
-          className="btn ghost"
-          disabled={busy}
-          onClick={resetForm}
-          title="איפוס: היום, ניקוי שדות"
-        >
-          איפוס
-        </button>
-      </div>
+      {/* ---- CTA popups — all of them feed the same text box above ---- */}
+      {modal === "products" && (
+        <ProductPicker
+          products={products}
+          templates={templates}
+          usage={usage}
+          desc={desc}
+          onApplyProduct={applyProduct}
+          onApplyTemplate={applyTemplate}
+          onUpdateProduct={onUpdateProduct}
+          onDeleteProduct={onDeleteProduct}
+          onDeleteTemplate={onDeleteTemplate}
+          onRepeatYesterday={onRepeatYesterday}
+          canRepeat={canRepeat}
+          onClose={() => setModal("")}
+        />
+      )}
+
+      {(modal === "claude-meal" || modal === "claude-product") && (
+        <ClaudeCalcModal
+          mode={modal === "claude-meal" ? "meal" : "product"}
+          initialText={modal === "claude-meal" ? desc : ""}
+          days={days}
+          target={target}
+          ketoMonths={ketoMonths}
+          avg={avg}
+          onClose={() => setModal("")}
+        />
+      )}
     </div>
   );
 }

@@ -48,6 +48,33 @@
     background: var(--tint);
     color: inherit;
   }
+  /* compact per-product category select */
+  .pcat {
+    margin-top: 4px;
+    width: auto;
+    max-width: 190px;
+    padding: 3px 8px;
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    background: var(--tint);
+    border-radius: 999px;
+  }
+  .pstar {
+    background: none;
+    border: none;
+    color: var(--ink-soft);
+    cursor: pointer;
+    font-size: 15px;
+    padding: 3px 6px;
+    border-radius: 999px;
+    opacity: 0.55;
+    transition: opacity 0.15s ease, color 0.15s ease;
+    &:hover,
+    &.on {
+      opacity: 1;
+      color: var(--protein);
+    }
+  }
   .pedit,
   .pdel {
     background: none;
@@ -215,6 +242,100 @@
   border-radius: var(--r-md);
   box-shadow: var(--shadow-md);
   padding: 4px 12px;
+}
+/* search (auto-complete filter) pinned at the top of the dropdown */
+.prod-search {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  width: 100%;
+  margin: 6px 0;
+  padding: 7px 10px;
+  font-size: 13px;
+  background: var(--card);
+}
+
+/* ---------- category manager: chips with counts, add / delete ---------- */
+.cat-manage {
+  margin-top: 12px;
+}
+.cm-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  padding: 2px 0;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--accent-ink);
+  cursor: pointer;
+  .chev {
+    width: 8px;
+    height: 8px;
+  }
+  &.open .chev {
+    transform: rotate(-135deg);
+    margin-bottom: -2px;
+  }
+}
+.cm-count {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--accent-ink);
+  background: var(--green-tint);
+  border: 1px solid var(--accent-line);
+  border-radius: 999px;
+  padding: 0 8px;
+}
+.cm-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+.cm-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  border-radius: 999px;
+  padding: 4px 10px;
+  b {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    color: var(--ink-soft);
+    font-weight: 600;
+  }
+}
+.cm-del {
+  background: none;
+  border: none;
+  color: var(--ink-soft);
+  font-size: 10px;
+  line-height: 1;
+  padding: 2px;
+  cursor: pointer;
+  border-radius: 999px;
+  &:hover {
+    color: var(--red);
+    background: var(--danger-tint);
+  }
+}
+.cm-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  input {
+    width: 150px;
+    padding: 5px 10px;
+    font-size: 12px;
+    border-radius: 999px;
+  }
 }
 
 /* Compact variant — used in the desktop header slot, where the panel sits

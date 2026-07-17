@@ -39,6 +39,72 @@
   flex-direction: column;
   gap: 2px;
 }
+
+/* tiny "add to the meal text box" button (meal desc / item desc) */
+.addto-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--green-tint);
+  border: 1px solid var(--accent-line);
+  color: var(--accent-ink);
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1;
+  padding: 0;
+  margin-inline-start: 6px;
+  cursor: pointer;
+  opacity: 0.7;
+  vertical-align: middle;
+  transition:
+    opacity 0.15s ease,
+    border-color 0.15s ease;
+  &:hover {
+    opacity: 1;
+    border-color: var(--olive-soft);
+  }
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--ring);
+    opacity: 1;
+  }
+}
+
+/* tiny "save as product" button, sits right next to the addto-btn */
+.mini-act {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--tint);
+  border: 1px solid var(--line);
+  font-size: 10px;
+  line-height: 1;
+  padding: 0;
+  margin-inline-start: 4px;
+  cursor: pointer;
+  opacity: 0.7;
+  vertical-align: middle;
+  transition:
+    opacity 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease;
+  &:hover {
+    opacity: 1;
+    background: var(--green-tint);
+    border-color: var(--olive-soft);
+  }
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--ring);
+    opacity: 1;
+  }
+}
 .day-hright {
   display: flex;
   align-items: center;
@@ -92,6 +158,9 @@
 }
 .day-body {
   display: block;
+  /* the card itself can be as wide as the page, but the readable content
+     (meals, macro split) stays capped so lines don't stretch edge to edge */
+  max-width: 760px;
 }
 
 /* meter — the carb line */
@@ -260,14 +329,81 @@
 .meals {
   padding: 10px 20px 6px;
 }
-.meal {
+/* fold/unfold all the meal rows at once */
+.meals-tools {
   display: flex;
-  gap: 14px;
-  align-items: flex-start;
-  padding: 11px 0;
+  justify-content: flex-end;
+  margin-bottom: 2px;
+}
+.fold-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: none;
+  border: none;
+  padding: 3px 6px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease;
+  &:hover {
+    color: var(--accent-ink);
+    background: var(--green-tint);
+  }
+  .fold-all-chev {
+    width: 6px;
+    height: 6px;
+    margin-bottom: 2px;
+  }
+  .fold-all-chev.up {
+    transform: rotate(-135deg);
+    margin-bottom: -2px;
+  }
+}
+
+.meal {
   border-top: 1px solid var(--line);
   &:first-child {
     border-top: none;
+  }
+  /* folded header row: time · title · carbs · chevron (tap to expand) */
+  .meal-row {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    padding: 11px 0;
+    cursor: pointer;
+    border-radius: var(--r-sm);
+    transition: background 0.15s ease;
+    &:hover {
+      background: var(--green-tint);
+    }
+    &:focus-visible {
+      outline: none;
+      box-shadow: var(--ring);
+    }
+    .desc {
+      flex: 1;
+      min-width: 0;
+    }
+  }
+  .meal-chev {
+    width: 8px;
+    height: 8px;
+    margin-top: 8px;
+  }
+  &.open .meal-chev {
+    transform: rotate(-135deg);
+  }
+  /* expanded details: item breakdown, macro split, row actions */
+  .meal-more {
+    padding: 0 0 12px;
+    padding-inline-start: 56px; /* aligns under the title (time col + gap) */
   }
   .time {
     font-family: "IBM Plex Mono", monospace;
@@ -304,10 +440,6 @@
     font-family: "IBM Plex Mono", monospace;
     font-size: 12px;
     font-variant-numeric: tabular-nums;
-  }
-  .body {
-    flex: 1;
-    min-width: 0;
   }
   .desc {
     font-size: 13.5px;
@@ -434,9 +566,10 @@
   }
   .meal-acts {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
+    justify-content: flex-end;
     gap: 2px;
-    flex: none;
+    margin-top: 8px;
   }
   .del,
   .mact {
@@ -470,14 +603,16 @@
    gets the full card width instead of being squeezed into a narrow column. */
 @media (max-width: 700px) {
   .meal {
-    flex-wrap: wrap;
-    column-gap: 10px;
-    row-gap: 2px;
+    .meal-row {
+      column-gap: 10px;
+    }
+    .meal-more {
+      padding-inline-start: 0;
+    }
     .time {
       min-width: 38px;
     }
     .meal-acts {
-      flex-basis: 100%;
       justify-content: flex-end;
       gap: 4px;
     }

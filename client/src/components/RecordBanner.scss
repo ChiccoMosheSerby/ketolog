@@ -6,17 +6,17 @@
   /* full-width row inside .today-grid — see Diary.scss */
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin: 0 0 12px; /* mobile stacking; the desktop grid zeroes this and uses gap */
+  gap: 6px;
+  margin: 0 0 8px; /* mobile stacking; the desktop grid zeroes this and uses gap */
 }
 
 .record-banner {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   border: 1px solid var(--line);
   border-radius: var(--r-md);
-  padding: 10px 14px;
+  padding: 6px 12px;
   animation: rb-pop 0.35s ease;
 
   &.good {
@@ -35,22 +35,22 @@
   }
 
   .rb-icon {
-    font-size: 20px;
+    font-size: 16px;
     line-height: 1;
   }
   .rb-text {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 1px;
     min-width: 0;
   }
   .rb-title {
-    font-size: 13.5px;
+    font-size: 12.5px;
   }
   .rb-msg {
-    font-size: 12.5px;
+    font-size: 11.5px;
     color: var(--ink-soft);
-    line-height: 1.45;
+    line-height: 1.4;
   }
   .rb-close {
     margin-inline-start: auto;
