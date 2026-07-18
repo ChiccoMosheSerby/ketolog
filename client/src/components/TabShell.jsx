@@ -5,10 +5,12 @@ import "./TabShell.scss";
 
 // tabs: [{ id, label, content, badge? }]  — badge renders a "new" dot on the tab.
 // onTabChange(id): fired when the active tab changes (used to clear a badge).
+// extra: optional node pinned into the tab row itself (desktop tabbar end /
+// mobile dots row) — used for the global day calendar.
 // Desktop renders a tab bar + only the active panel.
 // Mobile mounts an Embla carousel with all panels + synced dots.
 // One `active` index is shared, so switching breakpoints keeps your place.
-export default function TabShell({ tabs, onTabChange }) {
+export default function TabShell({ tabs, onTabChange, extra }) {
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const [active, setActive] = useState(0);
   // The tab list can shrink across breakpoints (products is desktop-header-only),
@@ -37,7 +39,7 @@ export default function TabShell({ tabs, onTabChange }) {
   }, [tabs, change]);
 
   if (isMobile) {
-    return <Carousel tabs={tabs} active={idx} change={change} />;
+    return <Carousel tabs={tabs} active={idx} change={change} extra={extra} />;
   }
 
   return (
@@ -56,6 +58,7 @@ export default function TabShell({ tabs, onTabChange }) {
             {t.badge && <span className="tab-badge" aria-label="חדש" />}
           </button>
         ))}
+        {extra && <div className="tabbar-extra">{extra}</div>}
       </div>
       <div className="tabpanel" role="tabpanel">
         {tabs[idx].content}
@@ -64,7 +67,7 @@ export default function TabShell({ tabs, onTabChange }) {
   );
 }
 
-function Carousel({ tabs, active, change }) {
+function Carousel({ tabs, active, change, extra }) {
   const [emblaRef, emblaApi] = useEmblaCarousel({
     direction: "rtl",
     align: "start",
@@ -130,6 +133,7 @@ function Carousel({ tabs, active, change }) {
             {t.badge && <span className="tab-badge" aria-label="חדש" />}
           </button>
         ))}
+        {extra && <div className="tabbar-extra">{extra}</div>}
       </div>
       <div className="embla" ref={emblaRef}>
         <div className="embla-track">

@@ -668,6 +668,35 @@ export default function Diary() {
     },
   ];
 
+  // The active-day calendar (prev/next + date input) sits in the tab row itself,
+  // steering the same date the Today tab, AddMeal, quick add and menu use.
+  const calNav = (
+    <div className="cal-nav">
+      <button
+        type="button"
+        className="date-arrow"
+        title="יום הבא"
+        disabled={activeDate >= todayISO()}
+        onClick={() => setActiveDate(nextISO(activeDate))}
+      >
+        ‹
+      </button>
+      <input
+        type="date"
+        value={activeDate}
+        onChange={(e) => setActiveDate(e.target.value)}
+      />
+      <button
+        type="button"
+        className="date-arrow"
+        title="יום קודם"
+        onClick={() => setActiveDate(prevISO(activeDate))}
+      >
+        ›
+      </button>
+    </div>
+  );
+
   return (
     <div className="wrap">
       <Header
@@ -679,7 +708,7 @@ export default function Diary() {
         onSaveWeight={(date, kg) => setMetric(date, "weight", kg)}
       />
 
-      <TabShell tabs={tabs} />
+      <TabShell tabs={tabs} extra={calNav} />
 
       {modalDay && (
         <div className="dayview-scrim" onClick={() => setModalDate("")}>

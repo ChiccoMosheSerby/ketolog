@@ -6,12 +6,9 @@ import {
   fmt,
   macroPct,
   nowHM,
-  prevISO,
-  nextISO,
   todayISO,
 } from "../lib/helpers.js";
 import { parseAppLink, clearAppLink } from "../lib/appLink.js";
-import { useMediaQuery, MOBILE_QUERY } from "../lib/useMediaQuery.js";
 import ProductPicker from "./ProductPicker.jsx";
 import ClaudeCalcModal from "./ClaudeCalcModal.jsx";
 import "./AddMeal.scss";
@@ -34,7 +31,6 @@ export default function AddMeal({
   avg = 0,
 }) {
   const toast = useToast();
-  const isMobile = useMediaQuery(MOBILE_QUERY);
   const [carb, setCarb] = useState("");
   const [desc, setDesc] = useState("");
   const [pendingMacro, setPendingMacro] = useState({
@@ -366,59 +362,34 @@ export default function AddMeal({
 
   return (
     <div className="panel addmeal" data-tour="add-meal">
-      {/* one top row: CTAs · calendar (prev/next) · the text box · submit.
-          Every entry point feeds the same text box. */}
+      {/* one top row: CTAs · the text box · submit. Every entry point feeds
+          the same text box. The calendar lives up in the tab bar (TabShell). */}
       <div className="composer">
         <div className="composer-ctas">
           <button
             type="button"
             className="cta"
             data-tour="shortcuts"
+            title="המוצרים שלי"
             onClick={() => setModal("products")}
           >
             <span className="cta-ico">🧺</span>
-            <span className="cta-title">המוצרים שלי</span>
           </button>
           <button
             type="button"
             className="cta"
+            title="חשב עם קלוד"
             onClick={() => setModal("claude-meal")}
           >
             <span className="cta-ico">🤖</span>
-            <span className="cta-title">חשב עם קלוד</span>
           </button>
           <button
             type="button"
             className="cta"
+            title="מוצר עם קלוד"
             onClick={() => setModal("claude-product")}
           >
             <span className="cta-ico">📦</span>
-            <span className="cta-title">מוצר עם קלוד</span>
-          </button>
-        </div>
-
-        <div className="cal-nav">
-          <button
-            type="button"
-            className="date-arrow"
-            title="יום הבא"
-            disabled={date >= todayISO()}
-            onClick={() => onDateChange(nextISO(date))}
-          >
-            ‹
-          </button>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => onDateChange(e.target.value)}
-          />
-          <button
-            type="button"
-            className="date-arrow"
-            title="יום קודם"
-            onClick={() => onDateChange(prevISO(date))}
-          >
-            ›
           </button>
         </div>
 
@@ -453,17 +424,10 @@ export default function AddMeal({
           className="btn composer-submit"
           data-tour="meal-submit"
           disabled={busy}
+          title={busy ? "מחשב…" : carb !== "" ? "הוסף ארוחה" : "חשב והוסף ארוחה"}
           onClick={onAddClick}
         >
-          {busy
-            ? "מחשב…"
-            : carb !== ""
-              ? isMobile
-                ? "הוסף"
-                : "הוסף ארוחה"
-              : isMobile
-                ? "חשב והוסף"
-                : "חשב והוסף ארוחה"}
+          {busy ? "…" : "✓"}
         </button>
 
         <div className="composer-tools">

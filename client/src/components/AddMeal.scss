@@ -10,7 +10,8 @@
   flex-wrap: wrap;
 }
 
-/* the main CTAs (products / Claude meal / Claude product) — slim pills */
+/* the main CTAs (products / Claude meal / Claude product) — icon-only squares,
+   the title attribute carries the label */
 .composer-ctas {
   display: flex;
   gap: 5px;
@@ -20,8 +21,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  padding: 5px 9px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
   font-family: inherit;
   color: var(--ink);
   background: var(--paper);
@@ -45,47 +47,8 @@
   }
 }
 .cta-ico {
-  font-size: 14px;
-  line-height: 1;
-}
-.cta-title {
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  white-space: nowrap;
-}
-
-/* the calendar: prev/next arrows around a compact date input */
-.cal-nav {
-  display: flex;
-  align-items: stretch;
-  gap: 4px;
-  flex: none;
-  input[type="date"] {
-    width: 122px;
-    padding: 5px 7px;
-    font-size: 12.5px;
-  }
-}
-.date-arrow {
-  flex: none;
-  width: 28px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  background: var(--paper);
-  color: var(--ink);
   font-size: 15px;
   line-height: 1;
-  cursor: pointer;
-
-  &:hover:not(:disabled) {
-    border-color: var(--olive-soft);
-    background: var(--green-tint);
-  }
-  &:disabled {
-    opacity: 0.4;
-    cursor: default;
-  }
 }
 
 /* the shared text box, mic tucked inside its corner */
@@ -96,10 +59,10 @@
   display: flex;
   textarea {
     width: 100%;
-    min-height: 34px;
-    padding: 7px 9px;
+    min-height: 32px;
+    padding: 8px 9px;
     padding-inline-end: 36px; /* room for the mic */
-    font-size: 13px;
+    font-size: 11.5px;
     line-height: 1.4;
     resize: vertical;
   }
@@ -146,12 +109,14 @@
   }
 }
 
-/* the log button — "חשב והוסף ארוחה" / "הוסף ארוחה" */
+/* the log button — a compact ✓; the title attribute says calc-and-add vs add */
 .composer-submit {
   flex: none;
   align-self: stretch;
-  padding: 6px 12px;
-  font-size: 12.5px;
+  min-width: 40px;
+  padding: 0 12px;
+  font-size: 15px;
+  line-height: 1;
 }
 
 /* tiny in-bar tools: calc-only 🧮 and reset ↺ */
@@ -189,71 +154,52 @@
   }
 }
 
-/* mobile: two tight rows — [CTAs · calendar] then [text box · submit · tools] */
+/* mobile: the text box spans the composer's full height alongside two stacked
+   rows — [CTAs] on top, [tools · submit] below */
 @media (max-width: 700px) {
   .panel.addmeal {
     padding: 6px 8px;
   }
   .composer {
+    display: grid;
     gap: 5px;
+    grid-template-columns: 1fr auto auto;
+    grid-template-areas:
+      "desc ctas ctas"
+      "desc tools submit";
+    align-items: stretch;
   }
   .composer-ctas {
+    grid-area: ctas;
     gap: 4px;
+    justify-content: flex-end;
     .cta {
       width: 34px;
       height: 34px;
-      padding: 0;
-    }
-    .cta-title {
-      display: none; /* icon-only; the popup titles explain themselves */
     }
     .cta-ico {
       font-size: 16px;
     }
   }
-  .cal-nav {
-    /* native date inputs refuse to shrink below their intrinsic width on
-       iOS/Android — give the calendar a stable size and let it wrap to its
-       own line when the CTA row leaves too little room */
-    flex: 1 1 170px;
-    min-width: 170px;
-    height: 34px;
-    input[type="date"] {
-      flex: 1;
-      width: 100%;
-      min-width: 110px;
-      height: 34px;
-      padding: 0 6px;
-      font-size: 13px;
-      text-align: center;
-      -webkit-appearance: none;
-      appearance: none;
-    }
-    /* iOS quirk: without this the picked date renders stuck to the top edge */
-    input[type="date"]::-webkit-date-and-time-value {
-      text-align: center;
-      line-height: 34px;
-      margin: 0;
-    }
-    .date-arrow {
-      width: 30px;
-      height: 34px;
-    }
-  }
   .desc-wrap {
-    flex: 1 1 150px;
+    grid-area: desc;
     min-width: 0;
     textarea {
-      min-height: 36px;
+      height: 100%;
+      min-height: 0;
     }
   }
-  .composer-submit {
-    padding: 0 10px;
-    min-height: 36px;
-    font-size: 12px;
-  }
   .composer-tools {
+    grid-area: tools;
     gap: 3px;
+    justify-content: flex-end;
+  }
+  .composer-submit {
+    grid-area: submit;
+    align-self: stretch;
+    min-width: 44px;
+    padding: 0 10px;
+    min-height: 34px;
   }
   .mini-tool {
     width: 24px;

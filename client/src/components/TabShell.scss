@@ -38,6 +38,48 @@
   }
 }
 
+/* the active-day calendar pinned into the tab row (desktop: pushed to the row's
+   far end; mobile: inline among the wrapping dots) */
+.tabbar-extra {
+  margin-inline-start: auto;
+  display: flex;
+  align-items: center;
+  padding: 3px 0;
+  align-self: flex-end;
+    margin-right: auto;
+}
+.cal-nav {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  flex: none;
+  input[type="date"] {
+    width: 118px;
+    padding: 3px 7px;
+    font-size: 12px;
+  }
+}
+.date-arrow {
+  flex: none;
+  width: 26px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    border-color: var(--olive-soft);
+    background: var(--green-tint);
+  }
+  &:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+}
+
 /* "new report" dot on a tab — cleared once the user opens that tab */
 .tab-badge {
   display: inline-block;
@@ -68,7 +110,7 @@
   z-index: 30;
   display: flex;
   gap: 7px;
-  justify-content: center;
+  justify-content: flex-start;
   flex-wrap: wrap;
   /* bleed to the screen edges past .wrap's side padding */
   margin: 0 -18px;
@@ -77,6 +119,35 @@
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--line);
 }
+/* mobile: the calendar rides the dots row, centered with the wrapping pills */
+.dots .tabbar-extra {
+  margin-inline-start: 0;
+  padding: 0;
+  .cal-nav {
+    height: 26px;
+    input[type="date"] {
+      width: 112px;
+      min-width: 0;
+      height: 26px;
+      padding: 0 6px;
+      font-size: 12px;
+      text-align: center;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    /* iOS quirk: without this the picked date renders stuck to the top edge */
+    input[type="date"]::-webkit-date-and-time-value {
+      text-align: center;
+      line-height: 26px;
+      margin: 0;
+    }
+    .date-arrow {
+      width: 26px;
+      height: 26px;
+    }
+  }
+}
+
 .dot {
   appearance: none;
   border: 1px solid var(--line);
