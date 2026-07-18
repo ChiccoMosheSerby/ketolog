@@ -37,6 +37,7 @@ export default function ProductPicker({
   desc,
   onApplyProduct,
   onApplyTemplate,
+  onClear,
   onUpdateProduct,
   onDeleteProduct,
   onDeleteTemplate,
@@ -385,6 +386,15 @@ export default function ProductPicker({
                 title="העתק את כל ארוחות אתמול ליום הנבחר"
               >
                 ⟳ שכפל את ארוחות אתמול
+              </button>
+            )}
+            {onClear && desc?.trim() && (
+              <button
+                className="btn ghost mini"
+                onClick={onClear}
+                title="נקה את פירוט הארוחה שנבנה"
+              >
+                ✕ נקה
               </button>
             )}
             <button className="btn mini" onClick={onClose}>

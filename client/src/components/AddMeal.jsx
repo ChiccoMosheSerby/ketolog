@@ -341,16 +341,22 @@ export default function AddMeal({
     else doAdd(carb, pendingMacro, items);
   }
 
-  // Reset the form back to a clean "log something now" state: date → today,
-  // and clear the description / carbs / calc result. The meal's time is stamped
-  // automatically at log time, so there is no time field to reset.
-  function resetForm() {
-    onDateChange(todayISO());
+  // Clear the meal being composed: description / picked products / carbs /
+  // calc result. Also used by the products popup's "נקה" button.
+  function clearComposer() {
     setCarb("");
     setDesc("");
     setPicked([]);
     setDescIsPure(true);
     clearNote();
+  }
+
+  // Reset the form back to a clean "log something now" state: date → today,
+  // and clear the composed meal. The meal's time is stamped automatically at
+  // log time, so there is no time field to reset.
+  function resetForm() {
+    onDateChange(todayISO());
+    clearComposer();
     toast("הטופס אופס");
   }
 
@@ -515,6 +521,10 @@ export default function AddMeal({
           desc={desc}
           onApplyProduct={applyProduct}
           onApplyTemplate={applyTemplate}
+          onClear={() => {
+            clearComposer();
+            toast("הפירוט נוקה");
+          }}
           onUpdateProduct={onUpdateProduct}
           onDeleteProduct={onDeleteProduct}
           onDeleteTemplate={onDeleteTemplate}
