@@ -3,7 +3,7 @@
 //
 //   server/src/lib/anthropic.js  → ketoRules(): system prompt for the in-app
 //                                  estimators (meal / image / barcode)
-//   client/src/lib/ketoPromptRules.js → the claude.ai redirect prompt (KetoCalc)
+//   client/src/lib/ketoPromptRules.js → the claude.ai redirect prompt (ClaudeCalcModal)
 //
 // Edit here and both flows stay in agreement. Keep it prompt-shaped (plain
 // Hebrew instructions) and reasonably compact: the client embeds it in a

@@ -24,7 +24,7 @@ export default function AddMeal({
   onDeleteTemplate,
   onRepeatYesterday,
   canRepeat,
-  // context for the "calc with Claude" popups (same prompt as the חישוב מדדים tab)
+  // context for the "calc with Claude" popups
   days = [],
   target,
   ketoMonths = 0,
@@ -41,7 +41,7 @@ export default function AddMeal({
   const [note, setNote] = useState(null); // { html } via structured fields
   const [calcSource, setCalcSource] = useState(""); // 'local' | 'ai' | '' — where the last calc came from
   const [busy, setBusy] = useState(false);
-  // which popup is open: '' | 'products' | 'claude-meal' | 'claude-product'
+  // which popup is open: '' | 'products' | 'claude'
   const [modal, setModal] = useState("");
   // Structured list of saved products the user tapped in, kept alongside the free
   // text. `descIsPure` stays true only while the description was built *solely*
@@ -378,18 +378,10 @@ export default function AddMeal({
           <button
             type="button"
             className="cta"
-            title="חשב עם קלוד"
-            onClick={() => setModal("claude-meal")}
+            title="חשב עם קלוד — ארוחה או מוצר"
+            onClick={() => setModal("claude")}
           >
             <span className="cta-ico">🤖</span>
-          </button>
-          <button
-            type="button"
-            className="cta"
-            title="מוצר עם קלוד"
-            onClick={() => setModal("claude-product")}
-          >
-            <span className="cta-ico">📦</span>
           </button>
         </div>
 
@@ -532,10 +524,9 @@ export default function AddMeal({
         />
       )}
 
-      {(modal === "claude-meal" || modal === "claude-product") && (
+      {modal === "claude" && (
         <ClaudeCalcModal
-          mode={modal === "claude-meal" ? "meal" : "product"}
-          initialText={modal === "claude-meal" ? desc : ""}
+          initialText={desc}
           days={days}
           target={target}
           ketoMonths={ketoMonths}

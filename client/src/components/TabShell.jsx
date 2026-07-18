@@ -13,8 +13,7 @@ import "./TabShell.scss";
 export default function TabShell({ tabs, onTabChange, extra }) {
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const [active, setActive] = useState(0);
-  // The tab list can shrink across breakpoints (products is desktop-header-only),
-  // so clamp to avoid indexing past the end.
+  // Clamp in case the tab list ever shrinks, to avoid indexing past the end.
   const idx = Math.min(active, tabs.length - 1);
 
   // Single funnel for tab changes so the badge-clear fires from every entry

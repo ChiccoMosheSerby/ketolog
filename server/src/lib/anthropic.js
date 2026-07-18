@@ -31,7 +31,7 @@ export const CHAT_MODEL = () => process.env.CHAT_MODEL || 'claude-opus-4-8';
 // appends its own output-format instruction (below), so there is no need to
 // strip a baked-in format back off — the meal/image/barcode shapes stay distinct
 // and explicit. The nutrition core lives in shared/ketoCore.js so the client's
-// claude.ai redirect prompt (KetoCalc) computes with the exact same rules;
+// claude.ai redirect prompt (ClaudeCalcModal) computes with the exact same rules;
 // only the persona/task framing and the products context are added here.
 export function ketoRules(products = []) {
   let base =

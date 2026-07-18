@@ -15,18 +15,14 @@ import {
 import { downloadReport } from "../lib/exportLog.js";
 import { energyBalance } from "../lib/energyBalance.js";
 import AddMeal from "./AddMeal.jsx";
-import QuickAdd from "./QuickAdd.jsx";
-import DayMenu from "./DayMenu.jsx";
 import Products from "./Products.jsx";
 import DayCard from "./DayCard.jsx";
 import DiaryGrid from "./DiaryGrid.jsx";
 import Dashboard from "./Dashboard.jsx";
 import RecordBanner from "./RecordBanner.jsx";
 import SmartInsights from "./SmartInsights.jsx";
-import KetoCalc from "./KetoCalc.jsx";
 import Header from "./Header.jsx";
 import TabShell from "./TabShell.jsx";
-import { useMediaQuery, MOBILE_QUERY } from "../lib/useMediaQuery.js";
 import { useInsightsBadge } from "../lib/insightsStore.js";
 import "./Diary.scss";
 
@@ -54,7 +50,6 @@ const cleanMeal = (m) => ({
 export default function Diary() {
   const toast = useToast();
   const { user } = useAuth();
-  const isMobile = useMediaQuery(MOBILE_QUERY);
   // Red dot on the תובנות tab while an unseen report exists; it clears only
   // after the user actually views the report there (not on mere tab entry).
   const insightsBadge = useInsightsBadge(user?.email || "");
@@ -66,7 +61,6 @@ export default function Diary() {
   const [expanded, setExpanded] = useState(new Set());
   const [viewDate, setViewDate] = useState(""); // '' = show all (history filter)
   const [historyOpen, setHistoryOpen] = useState(false); // folded journal under "today"
-  const [productsOpen, setProductsOpen] = useState(false); // folded products panel (desktop)
   // journal presentation: card list vs. weekly schedule grid (sticks per device)
   const [diaryView, setDiaryView] = useState(
     () => localStorage.getItem("ketolog:diaryView") || "list",
@@ -395,7 +389,6 @@ export default function Diary() {
       onRename={renameProduct}
       onUpdate={updateProduct}
       onDelete={deleteProduct}
-      compact={!isMobile}
     />
   );
 
@@ -560,34 +553,6 @@ export default function Diary() {
         </div>
       </div>
 
-      {/* products management (add/scan/edit) — folded, below the current day;
-          picking products into a meal happens in the composer's popup above */}
-      {!isMobile && (
-        <div
-          className={
-            "grid-top journal-fold products-fold" +
-            (productsOpen ? " open" : "")
-          }
-          data-tour="products"
-        >
-          <button
-            className="journal-head"
-            onClick={() => setProductsOpen((o) => !o)}
-            aria-expanded={productsOpen}
-          >
-            <span className="journal-htext">
-              <span className="journal-title">המוצרים שלי</span>
-              <span className="journal-sub">מוצרים קבועים לשימוש חוזר</span>
-            </span>
-            <span className="journal-hright">
-              <span className="journal-count">{products.length}</span>
-              <span className="chev"></span>
-            </span>
-          </button>
-          {productsOpen && <div className="journal-body">{productsPanel}</div>}
-        </div>
-      )}
-
       <div className={"journal-fold" + (historyOpen ? " open" : "")}>
         <button
           className="journal-head"
@@ -609,31 +574,8 @@ export default function Diary() {
     </div>
   );
 
-  // Products lives at the top of the today grid on desktop, so it's only a tab on mobile.
   const tabs = [
     { id: "today", label: "היום", content: todayTab },
-    {
-      id: "quick",
-      label: "הוספה מהירה",
-      content: (
-        <QuickAdd
-          date={activeDate}
-          onDateChange={setActiveDate}
-          onLogged={addMeal}
-        />
-      ),
-    },
-    {
-      id: "menu",
-      label: "תפריט לדוגמה",
-      content: (
-        <DayMenu
-          date={activeDate}
-          onDateChange={setActiveDate}
-          onLogged={addMeal}
-        />
-      ),
-    },
     {
       id: "insights",
       label: "תובנות",
@@ -651,21 +593,7 @@ export default function Diary() {
         </Dashboard>
       ),
     },
-    ...(isMobile
-      ? [{ id: "products", label: "המוצרים שלי", content: productsPanel }]
-      : []),
-    {
-      id: "calc",
-      label: "חישוב מדדים",
-      content: (
-        <KetoCalc
-          days={days}
-          target={target}
-          ketoMonths={user?.ketoGoalMonths || 0}
-          today={effectiveToday}
-        />
-      ),
-    },
+    { id: "products", label: "המוצרים שלי", content: productsPanel },
   ];
 
   // The active-day calendar (prev/next + date input) sits in the tab row itself,

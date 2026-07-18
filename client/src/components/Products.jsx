@@ -12,7 +12,7 @@ const CameraCapture = lazy(() => import('./CameraCapture.jsx'));
 
 const NEW_CAT = '__new__';
 
-export default function Products({ products, onAdd, onRename, onUpdate, onDelete, compact }) {
+export default function Products({ products, onAdd, onRename, onUpdate, onDelete }) {
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState(null); // product being renamed inline
@@ -246,7 +246,7 @@ export default function Products({ products, onAdd, onRename, onUpdate, onDelete
   const busy = imgBusy || barBusy;
 
   return (
-    <div className={'panel' + (compact ? ' compact' : '')} data-tour="products">
+    <div className="panel" data-tour="products">
       {scanning && (
         <Suspense fallback={null}>
           <BarcodeScanner onResult={runBarcode} onClose={() => setScanning(false)} />

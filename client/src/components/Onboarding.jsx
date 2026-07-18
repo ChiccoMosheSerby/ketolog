@@ -170,9 +170,6 @@ function buildSteps(isMobile) {
   const navHint = isMobile
     ? 'החלקה שמאלה/ימינה מחליפה ביניהן.'
     : 'לחיצה על לשונית מחליפה את התצוגה.';
-  // Products & the barcode scanner live in a dedicated tab on mobile, but sit at
-  // the top of the "היום" grid on desktop — so point at the right place per device.
-  const productsTab = isMobile ? 'products' : 'today';
   return [
     {
       emoji: '🥑',
@@ -190,7 +187,7 @@ function buildSteps(isMobile) {
       anchor: 'tabs',
       emoji: '🧭',
       title: 'הניווט הראשי',
-      text: `כאן עוברים בין "היום", "תובנות"${isMobile ? ' ו"המוצרים שלי"' : ''}. ${navHint}`,
+      text: `כאן עוברים בין "היום", "תובנות" ו"המוצרים שלי". ${navHint}`,
     },
     {
       anchor: 'add-meal',
@@ -250,14 +247,14 @@ function buildSteps(isMobile) {
     },
     {
       anchor: 'products',
-      tab: productsTab,
+      tab: 'products',
       emoji: '📦',
       title: 'המוצרים שלי',
       text: 'שומרים כאן מוצרים קבועים שאת/ה אוכל/ת הרבה, עם הערכים התזונתיים שלהם. הם קופצים כתגיות מהירות בהוספת ארוחה — וה-AI משתמש בערכים המדויקים שלך.',
     },
     {
       anchor: 'barcode',
-      tab: productsTab,
+      tab: 'products',
       emoji: '📷',
       title: 'סריקת ברקוד',
       text: 'הכפתור פותח את סורק הברקוד במצלמה — מכוונים לברקוד המוצר וכל הערכים התזונתיים נמשכים אוטומטית. אפשר גם לזהות מוצר מתמונה או להקליד ברקוד ידנית.',

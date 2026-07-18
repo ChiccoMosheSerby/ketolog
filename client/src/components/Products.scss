@@ -337,35 +337,3 @@
     border-radius: 999px;
   }
 }
-
-/* Compact variant — used in the desktop header slot, where the panel sits
-   beside the live stats and needs to stay tight. */
-.panel.compact {
-  margin: 0;
-  padding: 14px 16px;
-
-  h2 {
-    font-size: 14px;
-    margin-bottom: 8px;
-  }
-  /* the long explainer is redundant in the always-visible header slot */
-  .phelp {
-    display: none;
-  }
-  .prod-add {
-    margin-top: 12px;
-    padding-top: 12px;
-    gap: 10px;
-  }
-
-  /* shorter controls so the whole panel sits low */
-  input,
-  .btn,
-  .prod-toggle {
-    padding-top: 7px;
-    padding-bottom: 7px;
-  }
-  .fld {
-    gap: 3px;
-  }
-}

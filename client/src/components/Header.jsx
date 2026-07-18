@@ -38,7 +38,7 @@ function Stats({ stats, mini }) {
           consumed={stats.todayNum}
           target={stats.target}
           size={mini ? 34 : 38}
-          stroke={mini ? 4 : 5}
+          stroke={mini ? 4 : 2}
         >
           <span className="ring-num">{stats.today}</span>
         </CarbRing>

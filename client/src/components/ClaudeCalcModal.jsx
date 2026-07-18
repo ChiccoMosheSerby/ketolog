@@ -4,12 +4,13 @@ import { openClaudeCalc, copyText } from "../lib/claudeCalc.js";
 import { useToast } from "../lib/toast.jsx";
 import "./ClaudeCalcModal.scss";
 
-// Popup version of the "חישוב מדדים" flow, opened from the composer CTAs.
-// mode 'meal'  — Claude replies with a deep link that prefills the meal form.
-// mode 'product' — Claude replies with a deep link that opens the add-product
-// confirmation. Both open claude.ai in a new tab with the prompt prefilled.
+// "Calc with Claude" popup, opened from the composer's 🤖 CTA. A meal/product
+// toggle picks what Claude's reply link does:
+// meal — the deep link prefills the meal form; product — it opens the
+// add-product confirmation. Both open claude.ai in a new tab with the prompt
+// prefilled.
 export default function ClaudeCalcModal({
-  mode,
+  initialMode = "meal",
   initialText = "",
   days,
   target,
@@ -18,6 +19,7 @@ export default function ClaudeCalcModal({
   onClose,
 }) {
   const toast = useToast();
+  const [mode, setMode] = useState(initialMode);
   const [text, setText] = useState(initialText);
   const [sent, setSent] = useState(false);
   const lastPrompt = useRef("");
@@ -58,14 +60,12 @@ export default function ClaudeCalcModal({
       <div
         className="ccm-modal"
         role="dialog"
-        aria-label={isMeal ? "חישוב ארוחה עם קלוד" : "מוצר חדש עם קלוד"}
+        aria-label="חישוב עם קלוד"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="ccm-head">
           <div className="ccm-htext">
-            <span className="ccm-title">
-              {isMeal ? "🤖 חישוב ארוחה עם קלוד" : "📦 מוצר חדש עם קלוד"}
-            </span>
+            <span className="ccm-title">🤖 חישוב עם קלוד</span>
             <span className="ccm-sub">
               {isMeal
                 ? "ייפתח צ׳אט קלוד שיחשב את המאקרו ויחזיר קישור — לחיצה עליו תמלא את טופס הארוחה כאן, ותצטרכו רק לאשר ולרשום."
@@ -74,6 +74,27 @@ export default function ClaudeCalcModal({
           </div>
           <button className="ccm-close" title="סגירה" onClick={onClose}>
             ✕
+          </button>
+        </div>
+
+        <div className="ccm-seg" role="tablist" aria-label="מה לחשב">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={isMeal}
+            className={"ccm-seg-btn" + (isMeal ? " on" : "")}
+            onClick={() => setMode("meal")}
+          >
+            🍽️ ארוחה ליומן
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={!isMeal}
+            className={"ccm-seg-btn" + (!isMeal ? " on" : "")}
+            onClick={() => setMode("product")}
+          >
+            📦 מוצר חדש
           </button>
         </div>
 

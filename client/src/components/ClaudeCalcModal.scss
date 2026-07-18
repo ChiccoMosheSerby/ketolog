@@ -60,6 +60,37 @@
     background: var(--green-tint);
   }
 }
+/* meal / product segmented toggle */
+.ccm-seg {
+  display: inline-flex;
+  align-self: flex-start;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  padding: 2px;
+}
+.ccm-seg-btn {
+  font-family: "Heebo", sans-serif;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  background: none;
+  border: 0;
+  border-radius: 999px;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+  &:hover {
+    color: var(--accent-ink);
+  }
+  &.on {
+    background: var(--green-tint);
+    color: var(--accent-ink);
+  }
+}
+
 .ccm-input {
   min-height: 96px;
   line-height: 1.6;

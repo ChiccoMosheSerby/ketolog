@@ -1,7 +1,6 @@
 // Shared "calc with Claude" flow: build the prefilled claude.ai prompt and
-// open it in a new tab. Used by the חישוב מדדים tab (KetoCalc) and by the
-// composer popups on the main tab — one prompt builder keeps the two entry
-// points identical.
+// open it in a new tab. Used by the composer popups on the main tab
+// (ClaudeCalcModal).
 import { todayISO } from "./helpers.js";
 import { productLinkTemplate, mealLinkTemplate } from "./appLink.js";
 import { KETO_PROMPT_RULES } from "./ketoPromptRules.js";
@@ -25,18 +24,6 @@ export function ketoDayNumber(days) {
   const [ty, tm, td] = todayISO().split("-").map(Number);
   const ms = Date.UTC(ty, tm - 1, td) - Date.UTC(ey, em - 1, ed);
   return Math.max(1, Math.round(ms / 86400000) + 1);
-}
-
-// Average net carbs over past logged days only (matches the header / insights).
-// `today` is the effective today, so a manually closed day counts here too.
-export function avgNetCarbs(days, today) {
-  const t = today || todayISO();
-  const totals = days
-    .filter((d) => d.date < t && (d.meals || []).length > 0)
-    .map((d) =>
-      (d.meals || []).reduce((s, m) => s + (Number(m.carbs) || 0), 0),
-    );
-  return totals.length ? totals.reduce((a, b) => a + b, 0) / totals.length : 0;
 }
 
 // Assemble the full prompt that gets URL-encoded into the Claude link.
