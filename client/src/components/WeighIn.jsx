@@ -23,6 +23,8 @@ export default function WeighIn({ days, today, onSave }) {
   const [val, setVal] = useState('');
   const [saving, setSaving] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [editDate, setEditDate] = useState(null); // history row being edited
+  const [editVal, setEditVal] = useState('');
   const open = due || editing;
 
   async function save() {
@@ -33,6 +35,19 @@ export default function WeighIn({ days, today, onSave }) {
       await onSave(today, String(kg));
       setVal('');
       setEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveEdit(date) {
+    const kg = parseFloat(String(editVal).replace(',', '.'));
+    if (!Number.isFinite(kg) || kg < 20 || kg > 400) return;
+    setSaving(true);
+    try {
+      await onSave(date, String(kg));
+      setEditDate(null);
+      setEditVal('');
     } finally {
       setSaving(false);
     }
@@ -91,7 +106,7 @@ export default function WeighIn({ days, today, onSave }) {
               </small>
             </span>
             <button className="btn ghost mini" onClick={() => setEditing(true)}>
-              עדכון
+              Add
             </button>
           </>
         )}
@@ -114,26 +129,69 @@ export default function WeighIn({ days, today, onSave }) {
               {[...weights].reverse().map((p, ri) => {
                 const i = weights.length - 1 - ri; // index in the ascending array
                 const d = i > 0 ? Math.round((p.kg - weights[i - 1].kg) * 10) / 10 : null;
+                const isEditing = editDate === p.date;
                 return (
                   <li key={p.date}>
                     <span className="wi-date">{heDate(p.date)}</span>
-                    <b className="wi-kg">{fmt(p.kg)} ק"ג</b>
-                    {d != null && d !== 0 && (
-                      <i className={'wi-delta ' + (d < 0 ? 'good' : 'bad')}>
-                        {d > 0 ? '+' : ''}{fmt(d)}
-                      </i>
+                    {isEditing ? (
+                      <>
+                        <input
+                          className="wi-edit-input"
+                          type="number"
+                          inputMode="decimal"
+                          step="0.1"
+                          min="20"
+                          max="400"
+                          value={editVal}
+                          autoFocus
+                          onChange={(e) => setEditVal(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') saveEdit(p.date);
+                            if (e.key === 'Escape') setEditDate(null);
+                          }}
+                        />
+                        <button
+                          className="btn mini"
+                          onClick={() => saveEdit(p.date)}
+                          disabled={saving || !editVal}
+                        >
+                          {saving ? 'שומר…' : 'שמור'}
+                        </button>
+                        <button className="btn ghost mini" onClick={() => setEditDate(null)}>
+                          ביטול
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <b className="wi-kg">{fmt(p.kg)} ק"ג</b>
+                        {d != null && d !== 0 && (
+                          <i className={'wi-delta ' + (d < 0 ? 'good' : 'bad')}>
+                            {d > 0 ? '+' : ''}{fmt(d)}
+                          </i>
+                        )}
+                        <button
+                          className="wi-edit"
+                          title="ערוך שקילה זו"
+                          onClick={() => {
+                            setEditDate(p.date);
+                            setEditVal(String(p.kg));
+                          }}
+                        >
+                          ✎
+                        </button>
+                        <button
+                          className="wi-del"
+                          title="מחק שקילה זו"
+                          onClick={() => {
+                            if (window.confirm(`למחוק את השקילה של ${heDate(p.date)} (${fmt(p.kg)} ק"ג)?`)) {
+                              onSave(p.date, '');
+                            }
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </>
                     )}
-                    <button
-                      className="wi-del"
-                      title="מחק שקילה זו"
-                      onClick={() => {
-                        if (window.confirm(`למחוק את השקילה של ${heDate(p.date)} (${fmt(p.kg)} ק"ג)?`)) {
-                          onSave(p.date, '');
-                        }
-                      }}
-                    >
-                      ✕
-                    </button>
                   </li>
                 );
               })}

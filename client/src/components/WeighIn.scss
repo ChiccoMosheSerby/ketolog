@@ -107,7 +107,8 @@
       font-variant-numeric: tabular-nums;
       color: var(--ink);
     }
-    .wi-del {
+    .wi-del,
+    .wi-edit {
       background: none;
       border: none;
       cursor: pointer;
@@ -115,11 +116,19 @@
       font-size: 11px;
       padding: 2px 4px;
       border-radius: 4px;
-
-      &:hover {
-        color: var(--red);
-        background: var(--danger-tint);
-      }
+    }
+    .wi-del:hover {
+      color: var(--red);
+      background: var(--danger-tint);
+    }
+    .wi-edit:hover {
+      color: var(--accent-ink);
+      background: var(--green-tint);
+    }
+    .wi-edit-input {
+      width: 70px;
+      padding: 3px 8px;
+      font-size: 12px;
     }
   }
 }
