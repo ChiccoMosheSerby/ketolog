@@ -246,6 +246,12 @@
 .picker-item.open .pi-tip {
   display: flex;
 }
+/* rows near the top of the scrolling list flip the bubble below the row,
+   otherwise the scroll container clips it at its top edge */
+.picker-item.tip-below .pi-tip {
+  bottom: auto;
+  top: calc(100% + 6px);
+}
 .pi-star {
   flex: none;
   width: 26px;

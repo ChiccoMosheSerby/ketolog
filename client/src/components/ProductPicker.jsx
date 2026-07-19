@@ -52,10 +52,22 @@ export default function ProductPicker({
   // categories start folded — only favorites and what the user opens are open
   const [openCats, setOpenCats] = useState(() => new Set([STARRED_CAT]));
   // the row whose details tooltip is open (tap toggles; only one at a time —
-  // tapping the same row again, another row, or the background closes it)
-  const [openInfoId, setOpenInfoId] = useState("");
-  const toggleInfo = (id) =>
-    setOpenInfoId((prev) => (prev === id ? "" : id));
+  // tapping the same row again, another row, or the background closes it).
+  // `below` flips the bubble under the row when the row sits near the top of
+  // the scrolling list — otherwise the scroll container clips the tooltip.
+  const [openInfo, setOpenInfo] = useState({ id: "", below: false });
+  const openInfoId = openInfo.id;
+  const toggleInfo = (id, e) => {
+    const row = e.currentTarget.closest(".picker-item");
+    const body = e.currentTarget.closest(".picker-body");
+    const spaceAbove =
+      row && body
+        ? row.getBoundingClientRect().top - body.getBoundingClientRect().top
+        : Infinity;
+    setOpenInfo((prev) =>
+      prev.id === id ? { id: "", below: false } : { id, below: spaceAbove < 110 },
+    );
+  };
 
   function switchSort(id) {
     setSort(id);
@@ -136,7 +148,10 @@ export default function ProductPicker({
 
   const productRow = (p) => (
     <div
-      className={"picker-item" + (openInfoId === p._id ? " open" : "")}
+      className={
+        "picker-item" +
+        (openInfoId === p._id ? " open" + (openInfo.below ? " tip-below" : "") : "")
+      }
       key={p._id}
     >
       {onUpdateProduct && (
@@ -154,7 +169,7 @@ export default function ProductPicker({
         className="pi-main"
         onClick={(e) => {
           e.stopPropagation();
-          toggleInfo(p._id);
+          toggleInfo(p._id, e);
         }}
       >
         {p.image ? (
@@ -210,7 +225,10 @@ export default function ProductPicker({
 
   const templateRow = (t) => (
     <div
-      className={"picker-item" + (openInfoId === t._id ? " open" : "")}
+      className={
+        "picker-item" +
+        (openInfoId === t._id ? " open" + (openInfo.below ? " tip-below" : "") : "")
+      }
       key={t._id}
     >
       <button
@@ -218,7 +236,7 @@ export default function ProductPicker({
         className="pi-main"
         onClick={(e) => {
           e.stopPropagation();
-          toggleInfo(t._id);
+          toggleInfo(t._id, e);
         }}
       >
         <span className="pi-thumb pi-thumb-ph" aria-hidden="true">
@@ -321,7 +339,10 @@ export default function ProductPicker({
           </div>
         </div>
 
-        <div className="picker-body" onClick={() => setOpenInfoId("")}>
+        <div
+          className="picker-body"
+          onClick={() => setOpenInfo({ id: "", below: false })}
+        >
           {q ? (
             foundProducts.length === 0 && foundTemplates.length === 0 ? (
               <div className="picker-empty">לא נמצא כלום עבור "{q}".</div>
