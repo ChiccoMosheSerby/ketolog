@@ -16,7 +16,7 @@
 
 .au-modal {
   width: 100%;
-  max-width: 520px;
+  max-width: min(800px, 94vw);
   max-height: 90vh;
   overflow-y: auto;
   background: var(--card);

@@ -213,7 +213,7 @@ header.top {
 .dayview-modal {
   position: relative;
   width: 100%;
-  max-width: 560px;
+  max-width: min(760px, 94vw);
   padding-top: 40px; /* room for the close button above the card */
   .day {
     margin: 0;

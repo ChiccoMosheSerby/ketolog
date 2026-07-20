@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { fmt } from "../lib/helpers.js";
-import { DEFAULT_CAT } from "../lib/categories.js";
+import { DEFAULT_CAT, DEFAULT_CATS, loadCats, addCat } from "../lib/categories.js";
 import "./ProductPicker.scss";
 
 const SORT_KEY = "ketolog:pickerSort";
@@ -11,20 +11,14 @@ const SORTS = [
   { id: "name", label: "א־ב" },
 ];
 
-// Products whose name/label reads like a drink get their own משקאות category
-// (unless the user gave the product an explicit category of its own).
-const DRINK_RE =
-  /(קפה|תה|משקה|מים|סודה|יין|בירה|מיץ|קולה|שתיה|שתייה|שוקו|לימונדה|אספרסו|קפוצ|לאטה|זירו)/;
-
 const STARRED_CAT = "⭐ מועדפים";
 const TEMPLATES_CAT = "ארוחות שמורות";
+const NEW_CAT = "__new__"; // sentinel option: prompt for a fresh category name
 
-function catOf(p) {
-  const c = (p.cat || "").trim();
-  if (c && c !== DEFAULT_CAT) return c;
-  if (DRINK_RE.test(`${p.key || ""} ${p.label || ""}`)) return "משקאות";
-  return c || DEFAULT_CAT;
-}
+// Group strictly by the product's own category — every product carries an
+// explicit `cat` (the server defaults it on create), so no name-based guessing
+// here: guessing filed "טונה במים" under משקאות because of the "מים".
+const catOf = (p) => (p.cat || "").trim() || DEFAULT_CAT;
 
 // Popup catalog of the user's saved products + saved meals (templates),
 // grouped into foldable categories (folded by default; starred favorites are
@@ -115,8 +109,25 @@ export default function ProductPicker({
     [products, sortItems],
   );
 
+  // category choices for the move-to-category select (defaults + custom + in-use)
+  const [cats, setCats] = useState(() => loadCats(products || []));
+  useEffect(() => setCats(loadCats(products || [])), [products]);
+
+  // Standalone "create category" (footer button): adds it to the catalog and
+  // an empty group shows up right away — products move in via their select.
+  function createCat() {
+    const name = (window.prompt("שם הקטגוריה החדשה:") || "").trim();
+    if (!name) return;
+    addCat(name);
+    setCats(loadCats(products || []));
+    setOpenCats((prev) => new Set(prev).add(name));
+  }
+
   const groups = useMemo(() => {
     const by = new Map();
+    // custom categories keep a group even when empty — so a freshly created
+    // one is visible; empty defaults stay hidden to avoid clutter
+    for (const c of cats) if (!DEFAULT_CATS.includes(c)) by.set(c, []);
     for (const p of products || []) {
       const cat = catOf(p);
       if (!by.has(cat)) by.set(cat, []);
@@ -125,7 +136,7 @@ export default function ProductPicker({
     return [...by.entries()]
       .sort((a, b) => a[0].localeCompare(b[0], "he"))
       .map(([cat, list]) => [cat, sortItems(list)]);
-  }, [products, sortItems]);
+  }, [products, sortItems, cats]);
 
   const sortedTemplates = useMemo(
     () => sortItems(templates || []),
@@ -201,6 +212,35 @@ export default function ProductPicker({
           <span className="pi-carb">{fmt(p.carbs)} פחמ'</span> · {fmt(p.fat)}{" "}
           שומן · {fmt(p.protein)} חלבון
         </span>
+        {onUpdateProduct && (
+          <label className="pi-tip-cat" onClick={(e) => e.stopPropagation()}>
+            קטגוריה:
+            <select
+              value={catOf(p)}
+              onChange={(e) => {
+                let cat = e.target.value;
+                if (cat === NEW_CAT) {
+                  cat = (window.prompt("שם הקטגוריה החדשה:") || "").trim();
+                  if (!cat) {
+                    // canceled — no state change follows, so reset the DOM value
+                    e.target.value = catOf(p);
+                    return;
+                  }
+                  addCat(cat);
+                }
+                onUpdateProduct(p._id, { cat });
+                setOpenInfo({ id: "", below: false });
+              }}
+            >
+              {cats.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+              <option value={NEW_CAT}>+ קטגוריה חדשה…</option>
+            </select>
+          </label>
+        )}
       </span>
       <button
         type="button"
@@ -382,7 +422,18 @@ export default function ProductPicker({
                 )}
 
               {groups.map(([cat, list]) =>
-                renderGroup(cat, list.map(productRow), list.length),
+                renderGroup(
+                  cat,
+                  list.length ? (
+                    list.map(productRow)
+                  ) : (
+                    <div className="picker-gempty">
+                      אין מוצרים בקטגוריה — מעבירים אליה מוצר דרך חלון הפרטים
+                      שלו (לחיצה על השורה).
+                    </div>
+                  ),
+                  list.length,
+                ),
               )}
 
               {sortedTemplates.length > 0 &&
@@ -400,6 +451,13 @@ export default function ProductPicker({
             {desc?.trim() ? desc : "עדיין לא נבחר כלום…"}
           </div>
           <div className="picker-actions">
+            <button
+              className="btn ghost mini"
+              onClick={createCat}
+              title="הוספת קטגוריה חדשה לרשימה"
+            >
+              + קטגוריה חדשה
+            </button>
             {canRepeat && (
               <button
                 className="btn ghost mini"

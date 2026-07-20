@@ -12,7 +12,7 @@
 
 .bc-modal {
   width: 100%;
-  max-width: 420px;
+  max-width: min(640px, 94vw);
   background: var(--card);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-md);

@@ -12,7 +12,7 @@
 
 .plc-modal {
   width: 100%;
-  max-width: 440px;
+  max-width: min(640px, 94vw);
   max-height: 90vh;
   overflow-y: auto;
   background: var(--card);

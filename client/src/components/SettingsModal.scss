@@ -14,7 +14,7 @@
 
 .settings-modal {
   width: 100%;
-  max-width: 420px;
+  max-width: min(680px, 94vw);
   max-height: 90vh;
   overflow-y: auto;
   background: var(--card);

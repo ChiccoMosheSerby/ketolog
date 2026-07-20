@@ -11,7 +11,7 @@
 }
 .ccm-modal {
   width: 100%;
-  max-width: 520px;
+  max-width: min(760px, 94vw);
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
