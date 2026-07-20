@@ -42,6 +42,19 @@ export function addCat(name) {
   return n;
 }
 
+// Rename a custom category in the stored catalog (defaults are fixed).
+// Products that use the old name must be moved by the caller — the old name
+// reappears otherwise, since in-use cats are always offered.
+export function renameCat(oldName, newName) {
+  const o = String(oldName || "").trim();
+  const n = String(newName || "").trim();
+  if (!n || n === o) return o;
+  const list = stored().filter((c) => c !== o);
+  if (!DEFAULT_CATS.includes(n) && !list.includes(n)) list.push(n);
+  localStorage.setItem(KEY, JSON.stringify(list));
+  return n;
+}
+
 // Forget a custom category name. (Products that still use it should be moved
 // to another category by the caller — the name reappears otherwise, since
 // in-use cats are always offered.)

@@ -3,7 +3,7 @@ import { api } from '../lib/api.js';
 import { useToast } from '../lib/toast.jsx';
 import { fmt } from '../lib/helpers.js';
 import { toThumbnail, dataUrl } from '../lib/image.js';
-import { loadCats, addCat, removeCat, DEFAULT_CATS, DEFAULT_CAT } from '../lib/categories.js';
+import { loadCats, addCat, renameCat, removeCat, DEFAULT_CATS, DEFAULT_CAT } from '../lib/categories.js';
 import './Products.scss';
 
 // Scanner pulls in ZXing (large) — load it only when the user opens the camera.
@@ -52,6 +52,17 @@ export default function Products({ products, onAdd, onRename, onUpdate, onDelete
     setCats(loadCats(products));
     setNewCat('');
     toast('הקטגוריה נוספה');
+  }
+
+  // Rename a custom category; its products move to the new name.
+  async function renameCategory(cat) {
+    const name = (window.prompt(`שם חדש לקטגוריה "${cat}":`, cat) || '').trim();
+    if (!name || name === cat) return;
+    renameCat(cat, name);
+    const inCat = products.filter((p) => (p.cat || DEFAULT_CAT) === cat);
+    for (const p of inCat) await onUpdate(p._id, { cat: name });
+    setCats(loadCats(products.map((p) => ((p.cat || DEFAULT_CAT) === cat ? { ...p, cat: name } : p))));
+    toast('שם הקטגוריה עודכן');
   }
 
   // Delete a custom category; its products (if any) move to the default one.
@@ -425,9 +436,18 @@ export default function Products({ products, onAdd, onRename, onUpdate, onDelete
                   {c}
                   <b>{n}</b>
                   {!DEFAULT_CATS.includes(c) && (
-                    <button className="cm-del" title="מחק קטגוריה" onClick={() => deleteCat(c)}>
-                      ✕
-                    </button>
+                    <>
+                      <button
+                        className="cm-edit"
+                        title="שינוי שם הקטגוריה"
+                        onClick={() => renameCategory(c)}
+                      >
+                        ✎
+                      </button>
+                      <button className="cm-del" title="מחק קטגוריה" onClick={() => deleteCat(c)}>
+                        ✕
+                      </button>
+                    </>
                   )}
                 </span>
               );

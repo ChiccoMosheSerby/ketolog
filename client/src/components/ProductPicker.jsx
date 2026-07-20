@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { fmt } from "../lib/helpers.js";
-import { DEFAULT_CAT, DEFAULT_CATS, loadCats, addCat } from "../lib/categories.js";
+import {
+  DEFAULT_CAT,
+  DEFAULT_CATS,
+  loadCats,
+  addCat,
+  renameCat,
+} from "../lib/categories.js";
 import "./ProductPicker.scss";
 
 const SORT_KEY = "ketolog:pickerSort";
@@ -121,6 +127,24 @@ export default function ProductPicker({
     addCat(name);
     setCats(loadCats(products || []));
     setOpenCats((prev) => new Set(prev).add(name));
+  }
+
+  // Rename a custom category (pencil in the group header): the catalog entry
+  // is renamed and every product in it moves to the new name.
+  async function renameCategory(cat) {
+    const name = (window.prompt(`שם חדש לקטגוריה "${cat}":`, cat) || "").trim();
+    if (!name || name === cat) return;
+    renameCat(cat, name);
+    for (const p of products || []) {
+      if (catOf(p) === cat) await onUpdateProduct(p._id, { cat: name });
+    }
+    setCats(loadCats(products || []));
+    // the folded/open state follows the renamed group
+    setOpenCats((prev) => {
+      const s = new Set(prev);
+      if (s.delete(cat)) s.add(name);
+      return s;
+    });
   }
 
   const groups = useMemo(() => {
@@ -315,7 +339,7 @@ export default function ProductPicker({
     </div>
   );
 
-  function renderGroup(cat, children, count, pinnedOpen = false) {
+  function renderGroup(cat, children, count, pinnedOpen = false, onRename = null) {
     const open = pinnedOpen || openCats.has(cat);
     return (
       <div className={"picker-group" + (open ? " open" : "")} key={cat}>
@@ -327,6 +351,28 @@ export default function ProductPicker({
         >
           <span className="picker-glabel">{cat}</span>
           <span className="picker-gright">
+            {/* a span, not a button — the whole header is already a button */}
+            {onRename && (
+              <span
+                role="button"
+                tabIndex={0}
+                className="picker-gedit"
+                title="שינוי שם הקטגוריה"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRename();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onRename();
+                  }
+                }}
+              >
+                ✎
+              </span>
+            )}
             <span className="picker-gcount">{count}</span>
             {!pinnedOpen && <span className="chev"></span>}
           </span>
@@ -433,6 +479,11 @@ export default function ProductPicker({
                     </div>
                   ),
                   list.length,
+                  false,
+                  // defaults keep their names; custom categories are renameable
+                  !DEFAULT_CATS.includes(cat) && onUpdateProduct
+                    ? () => renameCategory(cat)
+                    : null,
                 ),
               )}
 

@@ -167,6 +167,29 @@
   gap: 10px;
   flex: none;
 }
+/* rename pencil in a custom category's header */
+.picker-gedit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  font-size: 11px;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease;
+  &:hover {
+    color: var(--accent-ink);
+    background: var(--green-tint);
+  }
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--ring);
+  }
+}
 .picker-gcount {
   font-family: "IBM Plex Mono", monospace;
   font-variant-numeric: tabular-nums;
