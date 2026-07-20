@@ -7,6 +7,7 @@ import {
   loadCats,
   addCat,
   renameCat,
+  removeCat,
 } from "../lib/categories.js";
 import "./ProductPicker.scss";
 
@@ -143,6 +144,34 @@ export default function ProductPicker({
     setOpenCats((prev) => {
       const s = new Set(prev);
       if (s.delete(cat)) s.add(name);
+      return s;
+    });
+  }
+
+  // Delete a custom category (✕ in the group header); its products (if any)
+  // move to the default category after a confirm.
+  async function deleteCategory(cat) {
+    const inCat = (products || []).filter((p) => catOf(p) === cat);
+    if (inCat.length) {
+      const ok = window.confirm(
+        `בקטגוריה "${cat}" יש ${inCat.length} מוצרים — הם יעברו ל"${DEFAULT_CAT}". להמשיך?`,
+      );
+      if (!ok) return;
+      for (const p of inCat) await onUpdateProduct(p._id, { cat: DEFAULT_CAT });
+    } else if (!window.confirm(`למחוק את הקטגוריה "${cat}"?`)) {
+      return;
+    }
+    removeCat(cat);
+    setCats(
+      loadCats(
+        (products || []).map((p) =>
+          catOf(p) === cat ? { ...p, cat: DEFAULT_CAT } : p,
+        ),
+      ),
+    );
+    setOpenCats((prev) => {
+      const s = new Set(prev);
+      s.delete(cat);
       return s;
     });
   }
@@ -339,7 +368,37 @@ export default function ProductPicker({
     </div>
   );
 
-  function renderGroup(cat, children, count, pinnedOpen = false, onRename = null) {
+  // headers are <button>s, so inner controls are spans with a button role
+  const gheadAction = (className, title, glyph, fn) => (
+    <span
+      role="button"
+      tabIndex={0}
+      className={className}
+      title={title}
+      onClick={(e) => {
+        e.stopPropagation();
+        fn();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          e.stopPropagation();
+          fn();
+        }
+      }}
+    >
+      {glyph}
+    </span>
+  );
+
+  function renderGroup(
+    cat,
+    children,
+    count,
+    pinnedOpen = false,
+    onRename = null,
+    onDelete = null,
+  ) {
     const open = pinnedOpen || openCats.has(cat);
     return (
       <div className={"picker-group" + (open ? " open" : "")} key={cat}>
@@ -351,28 +410,8 @@ export default function ProductPicker({
         >
           <span className="picker-glabel">{cat}</span>
           <span className="picker-gright">
-            {/* a span, not a button — the whole header is already a button */}
-            {onRename && (
-              <span
-                role="button"
-                tabIndex={0}
-                className="picker-gedit"
-                title="שינוי שם הקטגוריה"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onRename();
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onRename();
-                  }
-                }}
-              >
-                ✎
-              </span>
-            )}
+            {onRename && gheadAction("picker-gedit", "שינוי שם הקטגוריה", "✎", onRename)}
+            {onDelete && gheadAction("picker-gdel", "מחיקת הקטגוריה", "✕", onDelete)}
             <span className="picker-gcount">{count}</span>
             {!pinnedOpen && <span className="chev"></span>}
           </span>
@@ -480,9 +519,12 @@ export default function ProductPicker({
                   ),
                   list.length,
                   false,
-                  // defaults keep their names; custom categories are renameable
+                  // defaults are fixed; custom categories can be renamed/deleted
                   !DEFAULT_CATS.includes(cat) && onUpdateProduct
                     ? () => renameCategory(cat)
+                    : null,
+                  !DEFAULT_CATS.includes(cat) && onUpdateProduct
+                    ? () => deleteCategory(cat)
                     : null,
                 ),
               )}

@@ -167,8 +167,9 @@
   gap: 10px;
   flex: none;
 }
-/* rename pencil in a custom category's header */
-.picker-gedit {
+/* rename pencil / delete ✕ in a custom category's header */
+.picker-gedit,
+.picker-gdel {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -188,6 +189,13 @@
   &:focus-visible {
     outline: none;
     box-shadow: var(--ring);
+  }
+}
+.picker-gdel {
+  font-size: 10px;
+  &:hover {
+    color: var(--red);
+    background: var(--danger-tint);
   }
 }
 .picker-gcount {
