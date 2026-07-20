@@ -98,14 +98,26 @@ export default function Diary() {
   }
 
   // The daily kcal target is never typed in — it's derived from the user's own
-  // data: measured burn (TDEE, from weekly weigh-ins + logged meals) minus the
-  // deficit the monthly loss goal demands. 0 (no coloring / no target line)
-  // until there's enough data to compute the burn.
-  const eb = useMemo(
-    () => energyBalance(days, { lossTarget, today: effectiveToday }),
-    [days, lossTarget, effectiveToday],
+  // data: measured burn (TDEE, from weigh-ins + logged meals) minus the deficit
+  // the monthly loss goal demands. Until there's enough data for the measured
+  // burn, a provisional formula estimate (height / birth year / gender from the
+  // profile + latest weigh-in) stands in; 0 (no coloring / no target line) only
+  // when neither is available.
+  const profile = useMemo(
+    () => ({
+      heightCm: user?.heightCm || 0,
+      birthYear: user?.birthYear || 0,
+      gender: user?.gender || '',
+    }),
+    [user],
   );
-  const kcalTarget = eb.ready ? eb.recommendedIntake : 0;
+  const eb = useMemo(
+    () => energyBalance(days, { lossTarget, today: effectiveToday, profile }),
+    [days, lossTarget, effectiveToday, profile],
+  );
+  const kcalTarget = eb.ready
+    ? eb.recommendedIntake
+    : (eb.provisional?.recommendedIntake ?? 0);
 
   const reload = useCallback(
     (firstLoad = false) =>
@@ -588,6 +600,7 @@ export default function Diary() {
           lossTarget={user?.monthlyLossTarget ?? 2}
           today={effectiveToday}
           ketoMonths={user?.ketoGoalMonths || 0}
+          profile={profile}
         >
           <SmartInsights />
         </Dashboard>

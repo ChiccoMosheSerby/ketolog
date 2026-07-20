@@ -49,6 +49,19 @@ function weightSlope(pts) {
 // The daily deficit a monthly loss goal demands, e.g. 2 kg/month ≈ 513 kcal/day.
 export const goalDeficit = (kgPerMonth) => Math.round((kgPerMonth * KCAL_PER_KG) / 30);
 
+// Provisional burn estimate — Mifflin-St Jeor BMR × a light-activity factor —
+// from profile data (height, birth year, gender) and the latest weigh-in. Far
+// rougher than the measured TDEE, but lets the energy-balance panel work from
+// day one; the measured number replaces it once there's enough weigh-in data.
+const ACTIVITY_FACTOR = 1.4; // sedentary-to-light daily activity, deliberately modest
+export function estimateTdee({ kg, heightCm, birthYear, gender }) {
+  if (!kg || !heightCm || !birthYear || (gender !== 'male' && gender !== 'female')) return null;
+  const age = new Date().getFullYear() - birthYear;
+  if (age < 10 || age > 120) return null;
+  const bmr = 10 * kg + 6.25 * heightCm - 5 * age + (gender === 'male' ? 5 : -161);
+  return Math.round(bmr * ACTIVITY_FACTOR);
+}
+
 // Grade one day's intake against the burn estimate:
 //   'goal'    — deficit big enough for the monthly loss target
 //   'deficit' — eating under the burn, but slower than the target pace
@@ -63,22 +76,29 @@ export function balanceStatus(kcal, tdee, recommendedIntake) {
 
 // The whole picture in one call. Returns { ready:false, progress } until there
 // is enough data (the user's "two weeks of weigh-ins"), then the full estimate.
-// lossTarget = desired kg lost per month.
-export function energyBalance(days, { lossTarget = DEFAULT_LOSS_TARGET, today } = {}) {
+// Before that, if the profile carries height + birth year + gender and there's
+// at least one weigh-in, a formula-based `provisional` estimate is returned so
+// the panel (and today's grading) works from day one.
+// lossTarget = desired kg lost per month; profile = { heightCm, birthYear, gender }.
+export function energyBalance(days, { lossTarget = DEFAULT_LOSS_TARGET, today, profile } = {}) {
   const weights = weightSeries(days);
   const spanDays = weights.length >= 2 ? daysBetween(weights[0].date, weights[weights.length - 1].date) : 0;
 
-  // Food-logged days (with macro detail) inside the weigh-in span.
-  const kcalDays = (days || [])
+  // Food-logged days (with macro detail). Only closed days enter any formula —
+  // the in-progress day (`today`) is still being eaten, so its partial total
+  // would drag the intake average (and the TDEE) down.
+  const allKcalDays = (days || [])
     .map((d) => ({ date: d.date, kcal: dayKcal(d) }))
-    .filter(
-      (p) =>
-        p.kcal != null &&
-        weights.length >= 2 &&
-        p.date >= weights[0].date &&
-        p.date <= weights[weights.length - 1].date
-    )
+    .filter((p) => p.kcal != null && (!today || p.date < today))
     .sort((a, b) => a.date.localeCompare(b.date));
+
+  // The subset inside the weigh-in span — the only days the measured TDEE may use.
+  const kcalDays = allKcalDays.filter(
+    (p) =>
+      weights.length >= 2 &&
+      p.date >= weights[0].date &&
+      p.date <= weights[weights.length - 1].date
+  );
 
   const progress = {
     weighIns: weights.length,
@@ -89,7 +109,48 @@ export function energyBalance(days, { lossTarget = DEFAULT_LOSS_TARGET, today } 
     needKcalDays: MIN_KCAL_DAYS,
   };
   if (weights.length < MIN_WEIGHINS || spanDays < MIN_SPAN_DAYS || kcalDays.length < MIN_KCAL_DAYS) {
-    return { ready: false, progress, weights };
+    // Not enough data for a measured TDEE — fall back to the profile formula,
+    // keyed to the latest weigh-in, so the panel still shows an estimate that
+    // sharpens into the measured number as weigh-ins accumulate.
+    const lastKg = weights.length ? weights[weights.length - 1].kg : null;
+    const estTdee = profile ? estimateTdee({ kg: lastKg, ...profile }) : null;
+    const requiredDeficit = goalDeficit(lossTarget);
+    let provisional = null;
+    if (estTdee) {
+      // Projected pace against the estimate, from the recent closed days —
+      // same read-out the full estimate shows, just on the formula burn.
+      const recent = allKcalDays.slice(-14);
+      const recentBalance = recent.length
+        ? Math.round(recent.reduce((s, p) => s + (p.kcal - estTdee), 0) / recent.length)
+        : null;
+      const projectedKgPerMonth =
+        recentBalance != null ? Math.round(((-recentBalance * 30) / KCAL_PER_KG) * 10) / 10 : null;
+      provisional = {
+        tdee: estTdee,
+        requiredDeficit,
+        recommendedIntake: estTdee - requiredDeficit,
+        recentBalance,
+        recentDays: recent.length,
+        projectedKgPerMonth,
+      };
+    }
+    // The actually-measured weight change so far (first→last weigh-in), scaled
+    // to kg/month once the span is long enough for the extrapolation to mean
+    // anything (a 2-day gap would explode into nonsense).
+    const trend =
+      weights.length >= 2
+        ? {
+            deltaKg: Math.round((weights[weights.length - 1].kg - weights[0].kg) * 10) / 10,
+            spanDays,
+            kgPerMonth:
+              spanDays >= 7
+                ? Math.round(
+                    ((weights[weights.length - 1].kg - weights[0].kg) / spanDays) * 30 * 10
+                  ) / 10
+                : null,
+          }
+        : null;
+    return { ready: false, progress, weights, provisional, trend, lossTarget };
   }
 
   const slope = weightSlope(weights); // kg/day, negative = losing
@@ -103,10 +164,9 @@ export function energyBalance(days, { lossTarget = DEFAULT_LOSS_TARGET, today } 
   const requiredDeficit = goalDeficit(lossTarget);
   const recommendedIntake = tdee - requiredDeficit;
 
-  // Recent pace: average balance over the last 14 food-logged days (today is
-  // excluded — it's still in progress) → projected kg lost per month.
-  const past = today ? kcalDays.filter((p) => p.date < today) : kcalDays;
-  const recent = past.slice(-14);
+  // Recent pace: average balance over the last 14 closed food-logged days
+  // (kcalDays already excludes the in-progress day) → projected kg/month.
+  const recent = kcalDays.slice(-14);
   const recentBalance = recent.length
     ? Math.round(recent.reduce((s, p) => s + (p.kcal - tdee), 0) / recent.length)
     : null;
@@ -127,6 +187,7 @@ export function energyBalance(days, { lossTarget = DEFAULT_LOSS_TARGET, today } 
     spanDays,
     deltaKg: Math.round(deltaKg * 10) / 10,
     slopeKgPerWeek: Math.round(slope * 7 * 100) / 100,
+    slopeKgPerMonth: Math.round(slope * 30 * 10) / 10,
     avgIntake,
     intakeDays: kcalDays.length,
     coverage,

@@ -73,26 +73,105 @@ function NeedRow({ label, have, need }) {
   );
 }
 
+// Today's intake graded against a burn estimate — the colored chip + running
+// text. Shared by the measured state and the provisional (formula) state, so
+// the current day gets its surplus/even/deficit color from day one.
+function TodayChip({ todayKcal, tdee, recommendedIntake }) {
+  if (todayKcal == null) return null;
+  const meta = STATUS_META[balanceStatus(todayKcal, tdee, recommendedIntake)];
+  const left = recommendedIntake - todayKcal;
+  return (
+    <div className="eb-today" style={{ borderColor: meta.color }}>
+      <span className="eb-chip" style={{ background: meta.color }}>
+        היום: {meta.label}
+      </span>
+      <span className="eb-today-txt">
+        נאכלו ~{todayKcal.toLocaleString()} קק"ל ·{' '}
+        {left >= 0
+          ? `נשארו ${Math.round(left).toLocaleString()} קק"ל עד גבול קצב היעד (${recommendedIntake.toLocaleString()})`
+          : todayKcal <= tdee
+            ? `מעל גבול קצב היעד (${recommendedIntake.toLocaleString()}), עדיין מתחת לשריפה (${tdee.toLocaleString()})`
+            : `${Math.round(todayKcal - tdee).toLocaleString()} קק"ל מעל השריפה שלך (${tdee.toLocaleString()})`}
+      </span>
+    </div>
+  );
+}
+
 // Energy balance: the user's measured daily burn (TDEE), derived from weigh-ins
 // vs. logged calories, the calculation itself spelled out, and a
 // surplus / even / deficit grade for today and for recent days — against a
-// monthly weight-loss goal.
-export default function EnergyBalance({ days, today, lossTarget = DEFAULT_LOSS_TARGET }) {
+// monthly weight-loss goal. Only closed days feed the math; the in-progress day
+// is graded live but never enters the formula. Until enough weigh-ins exist, a
+// provisional formula-based estimate (from height / birth year / gender in the
+// profile) stands in, and sharpens into the measured number over time.
+export default function EnergyBalance({ days, today, lossTarget = DEFAULT_LOSS_TARGET, profile }) {
   const eb = useMemo(
-    () => energyBalance(days, { lossTarget, today }),
-    [days, lossTarget, today]
+    () => energyBalance(days, { lossTarget, today, profile }),
+    [days, lossTarget, today, profile]
   );
+
+  const todayDoc = (days || []).find((d) => d.date === today);
+  const todayKcal = todayDoc ? dayKcal(todayDoc) : null;
 
   if (!eb.ready) {
     const p = eb.progress;
+    const pv = eb.provisional;
     return (
       <div className="energy-balance">
-        <div className="d-note" style={{ marginTop: 0 }}>
-          תעד/י משקל בכרטיס <b>"שקילה שבועית"</b> שבלשונית "היום" (פעם בשבוע, באותו בוקר).
-          אחרי כשבועיים — שתיים-שלוש שקילות ותיעוד אוכל רציף — אפשר לחשב מהנתונים שלך את
+        {pv && (
+          <>
+            <div className="kcal-hero">
+              <span className="kcal-num">~{pv.tdee.toLocaleString()}</span>
+              <span className="kcal-lab">
+                קק"ל ליום — הערכה ראשונית של השריפה שלך, לפי גובה, גיל, מין והשקילה
+                האחרונה. ככל שיצטברו שקילות ותיעוד, היא תוחלף בחישוב מדויק מהנתונים שלך.
+              </span>
+            </div>
+            <TodayChip todayKcal={todayKcal} tdee={pv.tdee} recommendedIntake={pv.recommendedIntake} />
+            <div className="eb-goal">
+              יעד: ירידה של <b>{fmt(eb.lossTarget)} ק"ג בחודש</b> ⇐ גרעון יומי של ~
+              <b>{pv.requiredDeficit.toLocaleString()} קק"ל</b> ⇐ לאכול עד ~
+              <b>{pv.recommendedIntake.toLocaleString()} קק"ל ביום</b>
+            </div>
+            {/* pace implied by the food log, against the provisional burn */}
+            {pv.projectedKgPerMonth != null && (
+              <div className={'eb-pace ' + (pv.projectedKgPerMonth >= eb.lossTarget ? 'good' : 'warn')}>
+                לפי התיעוד ({pv.recentDays} ימים אחרונים, {pv.recentBalance <= 0 ? 'גרעון' : 'עודף'} ממוצע
+                של {Math.abs(pv.recentBalance).toLocaleString()} קק"ל/יום מול ההערכה) —{' '}
+                {pv.projectedKgPerMonth > 0
+                  ? `ירידה צפויה של ~${fmt(pv.projectedKgPerMonth)} ק"ג בחודש`
+                  : pv.projectedKgPerMonth < 0
+                    ? `עלייה צפויה של ~${fmt(-pv.projectedKgPerMonth)} ק"ג בחודש`
+                    : 'משקל יציב'}
+                {pv.projectedKgPerMonth >= eb.lossTarget
+                  ? ' · בקצב היעד 🎯'
+                  : ` · מתחת לקצב היעד (${fmt(eb.lossTarget)} ק"ג/חודש)`}
+              </div>
+            )}
+          </>
+        )}
+        {/* the weight change actually measured between the weigh-ins so far */}
+        {eb.trend && (
+          <div className={'eb-pace ' + (eb.trend.deltaKg < 0 ? 'good' : 'warn')}>
+            בפועל, בין השקילות: <b>{eb.trend.deltaKg > 0 ? '+' : ''}{fmt(eb.trend.deltaKg)} ק"ג</b>{' '}
+            ב-{eb.trend.spanDays} ימים
+            {eb.trend.kgPerMonth != null && (
+              <> · בקצב הזה ≈ <b>{eb.trend.kgPerMonth > 0 ? '+' : ''}{fmt(eb.trend.kgPerMonth)} ק"ג בחודש</b></>
+            )}
+          </div>
+        )}
+        <div className="d-note" style={pv ? undefined : { marginTop: 0 }}>
+          תעד/י משקל בכרטיס <b>"שקילה"</b> שבהגדרות (⚙️) — מומלץ פעמיים בשבוע, באותו בוקר.
+          אחרי כשבועיים — שלוש שקילות ותיעוד אוכל רציף — נחשב מהנתונים שלך את
           שריפת הקלוריות היומית האמיתית שלך (TDEE), ומשם לדעת בכל יום אם אתה בחריגה, מאוזן
           או בגרעון.
         </div>
+        {!pv && (
+          <div className="d-note">
+            רוצה הערכה ראשונית כבר עכשיו? הוסף/י בהגדרות <b>גובה</b> ו<b>שנת לידה</b> (ומין)
+            ותעד/י שקילה אחת — ונציג כאן אומדן שריפה לפי נוסחת Mifflin-St Jeor עד שיצטברו נתונים.
+          </div>
+        )}
         <div className="eb-needs">
           <NeedRow label="שקילות שתועדו" have={p.weighIns} need={p.needWeighIns} />
           <NeedRow label="ימים בין השקילה הראשונה לאחרונה" have={p.spanDays} need={p.needSpanDays} />
@@ -102,13 +181,6 @@ export default function EnergyBalance({ days, today, lossTarget = DEFAULT_LOSS_T
       </div>
     );
   }
-
-  const todayDoc = (days || []).find((d) => d.date === today);
-  const todayKcal = todayDoc ? dayKcal(todayDoc) : null;
-  const todayStatus =
-    todayKcal != null ? balanceStatus(todayKcal, eb.tdee, eb.recommendedIntake) : null;
-  const todayMeta = todayStatus ? STATUS_META[todayStatus] : null;
-  const todayLeft = eb.recommendedIntake - (todayKcal || 0);
 
   const onPace = eb.projectedKgPerMonth != null && eb.projectedKgPerMonth >= eb.lossTarget;
   const losing = eb.deltaKg < 0;
@@ -135,7 +207,10 @@ export default function EnergyBalance({ days, today, lossTarget = DEFAULT_LOSS_T
           <b className={losing ? 'good' : 'bad'}>
             {eb.deltaKg > 0 ? '+' : ''}{fmt(eb.deltaKg)} ק"ג
           </b>
-          <small>ב-{eb.spanDays} ימים ({eb.slopeKgPerWeek > 0 ? '+' : ''}{fmt(eb.slopeKgPerWeek)} ק"ג/שבוע)</small>
+          <small>
+            ב-{eb.spanDays} ימים ({eb.slopeKgPerWeek > 0 ? '+' : ''}{fmt(eb.slopeKgPerWeek)} ק"ג/שבוע
+            ≈ {eb.slopeKgPerMonth > 0 ? '+' : ''}{fmt(eb.slopeKgPerMonth)} ק"ג/חודש)
+          </small>
         </div>
         <div className="eb-calc-row">
           <span>אנרגיה בק"ג שומן</span>
@@ -148,21 +223,7 @@ export default function EnergyBalance({ days, today, lossTarget = DEFAULT_LOSS_T
       </div>
 
       {/* today, against the burn */}
-      {todayKcal != null && todayMeta && (
-        <div className="eb-today" style={{ borderColor: todayMeta.color }}>
-          <span className="eb-chip" style={{ background: todayMeta.color }}>
-            היום: {todayMeta.label}
-          </span>
-          <span className="eb-today-txt">
-            נאכלו ~{todayKcal.toLocaleString()} קק"ל ·{' '}
-            {todayLeft >= 0
-              ? `נשארו ${Math.round(todayLeft).toLocaleString()} קק"ל עד גבול קצב היעד (${eb.recommendedIntake.toLocaleString()})`
-              : todayKcal <= eb.tdee
-                ? `מעל גבול קצב היעד (${eb.recommendedIntake.toLocaleString()}), עדיין מתחת לשריפה (${eb.tdee.toLocaleString()})`
-                : `${Math.round(todayKcal - eb.tdee).toLocaleString()} קק"ל מעל השריפה שלך (${eb.tdee.toLocaleString()})`}
-          </span>
-        </div>
-      )}
+      <TodayChip todayKcal={todayKcal} tdee={eb.tdee} recommendedIntake={eb.recommendedIntake} />
 
       {/* the goal and what it demands */}
       <div className="eb-goal">

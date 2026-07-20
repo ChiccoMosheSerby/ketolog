@@ -371,6 +371,7 @@ export default function Dashboard({
   lossTarget = DEFAULT_LOSS_TARGET,
   today,
   ketoMonths,
+  profile,
   children,
 }) {
   const a = useMemo(
@@ -500,7 +501,7 @@ export default function Dashboard({
       {/* energy balance: measured TDEE + surplus/deficit grading */}
       <div className="panel d-panel">
         <h2>מאזן אנרגיה ושריפת קלוריות</h2>
-        <EnergyBalance days={days} today={today} lossTarget={lossTarget} />
+        <EnergyBalance days={days} today={today} lossTarget={lossTarget} profile={profile} />
       </div>
 
       {/* 1 · average macro balance */}

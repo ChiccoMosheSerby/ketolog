@@ -176,13 +176,29 @@ export default function DayCard({
             <span className="day-total" style={{ color: zi.color }}>
               {fmt(total)} <small>ג' נטו</small>
             </span>
-            {kcal != null && (
-              <span
-                className="day-kcal"
-                style={kz ? { color: kz.color } : undefined}
-                title={kz ? kz.cap : 'סה"כ קלוריות ליום (לפי המאקרו שתועד)'}
-              >
-                ~{kcal} <small>קק"ל</small>
+            {(kcal != null || (onCloseDay && !closed && kcalTarget > 0)) && (
+              <span className="day-kcal-row">
+                {kcal != null && (
+                  <span
+                    className="day-kcal"
+                    style={kz ? { color: kz.color } : undefined}
+                    title={kz ? kz.cap : 'סה"כ קלוריות ליום (לפי המאקרו שתועד)'}
+                  >
+                    ~{kcal} <small>קק"ל</small>
+                  </span>
+                )}
+                {/* live kcal budget — inline next to the day's kcal, current
+                    open day only: room left up to the goal-pace bound, or overshoot */}
+                {onCloseDay && !closed && kcalTarget > 0 && (
+                  <span
+                    className={'day-kcal-left ' + ((kcal || 0) <= kcalTarget ? 'good' : 'over')}
+                    title={`גבול קצב היעד: ${kcalTarget.toLocaleString()} קק"ל ליום`}
+                  >
+                    {(kcal || 0) <= kcalTarget
+                      ? `· נותרו ~${Math.round(kcalTarget - (kcal || 0)).toLocaleString()}`
+                      : `· ~${Math.round((kcal || 0) - kcalTarget).toLocaleString()} מעל היעד`}
+                  </span>
+                )}
               </span>
             )}
           </span>

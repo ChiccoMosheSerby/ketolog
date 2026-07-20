@@ -38,6 +38,8 @@ const userPayload = (u) => ({
   gender: u.gender || '',
   dailyCarbTarget: u.dailyCarbTarget,
   monthlyLossTarget: u.monthlyLossTarget ?? 2,
+  heightCm: u.heightCm || 0,
+  birthYear: u.birthYear || 0,
   ketoStartDate: u.ketoStartDate || '',
   ketoGoalMonths: u.ketoGoalMonths || 0,
   whatsappPhone: u.whatsappPhone || '',
@@ -45,7 +47,7 @@ const userPayload = (u) => ({
 });
 
 const PROFILE_FIELDS =
-  'email gender dailyCarbTarget monthlyLossTarget ketoStartDate ketoGoalMonths whatsappPhone';
+  'email gender dailyCarbTarget monthlyLossTarget heightCm birthYear ketoStartDate ketoGoalMonths whatsappPhone';
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 // Base URL for the approval link in the email.
@@ -265,6 +267,23 @@ router.patch('/me', requireAuth, asyncHandler(async (req, res) => {
       return res.status(400).json({ error: 'יעד ירידה חודשי לא תקין (0–10 ק"ג)' });
     }
     update.monthlyLossTarget = Math.round(w * 10) / 10;
+  }
+  if (req.body.heightCm != null) {
+    // 0 clears the field; otherwise a plausible adult height.
+    const h = Number(req.body.heightCm);
+    if (!Number.isFinite(h) || (h !== 0 && (h < 100 || h > 250))) {
+      return res.status(400).json({ error: 'גובה לא תקין (100–250 ס"מ)' });
+    }
+    update.heightCm = Math.round(h);
+  }
+  if (req.body.birthYear != null) {
+    // 0 clears the field; otherwise a year that makes the user 10–120 years old.
+    const y = Number(req.body.birthYear);
+    const nowYear = new Date().getFullYear();
+    if (!Number.isInteger(y) || (y !== 0 && (y < nowYear - 120 || y > nowYear - 10))) {
+      return res.status(400).json({ error: 'שנת לידה לא תקינה' });
+    }
+    update.birthYear = y;
   }
   if (req.body.ketoGoalMonths != null) {
     const m = Number(req.body.ketoGoalMonths);

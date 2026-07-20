@@ -3,21 +3,24 @@ import { weightSeries } from '../lib/energyBalance.js';
 import { fmt, heDate } from '../lib/helpers.js';
 import './WeighIn.scss';
 
-const WEEK = 7;
+const RECOMMEND = 3; // half a week — the twice-weekly recommended cadence
+const OVERDUE = 7; // a full week without a weigh-in — the prominent nudge
 const daysBetween = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
 
-// Weekly weigh-in — the only place weight is entered. Weight moves ±1 kg a day
-// on water alone, so a single consistent weekly reading (same morning, after
-// the bathroom, before coffee) beats noisy daily ones. The card stays quiet
-// while a weigh-in is fresh (just the last value + countdown) and turns into a
-// prominent prompt once 7 days have passed. The value is stored on today's day
-// doc (metrics.weight), so history, exports and the TDEE math read it as-is.
+// Weigh-in card — the only place weight is entered. The user can weigh in any
+// time; the recommended cadence is twice a week (same morning, after the
+// bathroom, before coffee — consistent readings beat noisy daily ones). The
+// card stays quiet while a weigh-in is fresh (just the last value + countdown),
+// reopens the input once half a week has passed, and turns into a prominent
+// prompt after a full week. The value is stored on today's day doc
+// (metrics.weight), so history, exports and the TDEE math read it as-is.
 export default function WeighIn({ days, today, onSave }) {
   const weights = weightSeries(days);
   const last = weights[weights.length - 1] || null;
   const prev = weights[weights.length - 2] || null;
   const daysSince = last ? daysBetween(last.date, today) : null;
-  const due = !last || daysSince >= WEEK;
+  const recommended = !last || daysSince >= RECOMMEND;
+  const due = !last || daysSince >= OVERDUE;
 
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState('');
@@ -25,7 +28,7 @@ export default function WeighIn({ days, today, onSave }) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [editDate, setEditDate] = useState(null); // history row being edited
   const [editVal, setEditVal] = useState('');
-  const open = due || editing;
+  const open = recommended || editing;
 
   async function save() {
     const kg = parseFloat(String(val).replace(',', '.'));
@@ -65,8 +68,8 @@ export default function WeighIn({ days, today, onSave }) {
               <b>שקילה שבועית</b>
               <small>
                 {last
-                  ? `שקילה אחרונה: ${fmt(last.kg)} ק"ג · ${heDate(last.date)}`
-                  : 'משקל בוקר — אחרי שירותים, לפני קפה, פעם בשבוע באותו יום'}
+                  ? `שקילה אחרונה: ${fmt(last.kg)} ק"ג · ${heDate(last.date)} · מומלץ לשקול פעמיים בשבוע`
+                  : 'משקל בוקר — אחרי שירותים, לפני קפה, פעמיים בשבוע (למשל ראשון וחמישי)'}
               </small>
             </span>
             <input
@@ -83,7 +86,7 @@ export default function WeighIn({ days, today, onSave }) {
             <button className="btn mini" onClick={save} disabled={saving || !val}>
               {saving ? 'שומר…' : 'שמור'}
             </button>
-            {!due && (
+            {!recommended && (
               <button className="btn ghost mini" onClick={() => setEditing(false)}>
                 ביטול
               </button>
@@ -102,7 +105,7 @@ export default function WeighIn({ days, today, onSave }) {
               </b>
               <small>
                 נשקל {daysSince === 0 ? 'היום' : daysSince === 1 ? 'אתמול' : `לפני ${daysSince} ימים`} ·
-                השקילה הבאה בעוד {WEEK - daysSince} ימים
+                השקילה הבאה מומלצת {RECOMMEND - daysSince === 1 ? 'מחר' : `בעוד ${RECOMMEND - daysSince} ימים`}
               </small>
             </span>
             <button className="btn ghost mini" onClick={() => setEditing(true)}>

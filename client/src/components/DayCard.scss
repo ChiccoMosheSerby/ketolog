@@ -218,6 +218,25 @@
   padding: 6px 20px 2px;
 }
 
+/* day-kcal + live "kcal left today" on one line, current open day only */
+.day-kcal-row {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+.day-kcal-left {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  &.good {
+    color: var(--accent-ink);
+  }
+  &.over {
+    color: var(--red);
+  }
+}
+
 /* "close the day" row — only on the current day's card */
 .day-close {
   display: flex;

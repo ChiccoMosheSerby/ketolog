@@ -28,6 +28,8 @@ export default function SettingsModal({
   const [gender, setGender] = useState('');
   const [target, setTarget] = useState('20');
   const [loss, setLoss] = useState('2');
+  const [height, setHeight] = useState('');
+  const [birthYear, setBirthYear] = useState('');
   const [keto, setKeto] = useState('0');
   const [wa, setWa] = useState('');
   const [saving, setSaving] = useState(false);
@@ -42,6 +44,8 @@ export default function SettingsModal({
     setGender(user?.gender || '');
     setTarget(String(user?.dailyCarbTarget ?? 20));
     setLoss(String(user?.monthlyLossTarget ?? 2));
+    setHeight(user?.heightCm ? String(user.heightCm) : '');
+    setBirthYear(user?.birthYear ? String(user.birthYear) : '');
     setKeto(String(user?.ketoGoalMonths || 0));
     setWa(user?.whatsappPhone || '');
     setXFrom(firstDate || todayISO());
@@ -62,6 +66,12 @@ export default function SettingsModal({
     if (!Number.isFinite(t) || t < 5 || t > 200) return toast('יעד יומי לא תקין (5–200 גרם)');
     const w = Number(loss);
     if (!Number.isFinite(w) || w < 0 || w > 10) return toast('יעד ירידה חודשי לא תקין (0–10 ק"ג)');
+    const h = height === '' ? 0 : Number(height);
+    if (!Number.isFinite(h) || (h !== 0 && (h < 100 || h > 250))) return toast('גובה לא תקין (100–250 ס"מ)');
+    const nowYear = new Date().getFullYear();
+    const by = birthYear === '' ? 0 : Number(birthYear);
+    if (!Number.isInteger(by) || (by !== 0 && (by < nowYear - 120 || by > nowYear - 10)))
+      return toast('שנת לידה לא תקינה');
     const m = Number(keto);
     if (!Number.isInteger(m) || m < 0 || m > 60) return toast('יעד קיטו לא תקין (0–60 חודשים)');
     const digits = wa.replace(/\D/g, '');
@@ -72,6 +82,8 @@ export default function SettingsModal({
         gender,
         dailyCarbTarget: t,
         monthlyLossTarget: w,
+        heightCm: Math.round(h),
+        birthYear: by,
         ketoGoalMonths: m,
         whatsappPhone: digits,
       });
@@ -128,6 +140,20 @@ export default function SettingsModal({
           שיעד הירידה דורש — אין צורך להזין אותו.
         </div>
 
+        <label className="settings-field">
+          <span className="settings-lab">גובה (ס"מ)</span>
+          <input type="number" min="100" max="250" placeholder="למשל 172" value={height} onChange={(e) => setHeight(e.target.value)} />
+        </label>
+
+        <label className="settings-field">
+          <span className="settings-lab">שנת לידה</span>
+          <input type="number" min="1900" max="2020" placeholder="למשל 1980" value={birthYear} onChange={(e) => setBirthYear(e.target.value)} />
+        </label>
+        <div className="export-hint">
+          גובה ושנת לידה (יחד עם המין והמשקל) משמשים להערכה ראשונית של שריפת הקלוריות —
+          עד שיצטברו מספיק שקילות לחישוב מדויק מהנתונים שלך.
+        </div>
+
         <label className="settings-field" data-tour="set-keto">
           <span className="settings-lab">יעד קיטו (חודשים · 0 = ללא)</span>
           <input type="number" min="0" max="60" value={keto} onChange={(e) => setKeto(e.target.value)} />
@@ -146,10 +172,11 @@ export default function SettingsModal({
           <>
             <div className="settings-divider" />
             <div className="settings-weigh">
-              <div className="settings-lab">שקילה שבועית</div>
+              <div className="settings-lab">שקילה</div>
               <WeighIn days={days} today={todayISO()} onSave={onSaveWeight} />
               <div className="export-hint">
-                נשמר מיידית על היום הנוכחי ומזין את חישוב שריפת הקלוריות בלשונית "תובנות".
+                אפשר לשקול בכל עת; מומלץ פעמיים בשבוע, באותו בוקר. נשמר מיידית על היום
+                הנוכחי ומזין את חישוב שריפת הקלוריות בלשונית "תובנות".
               </div>
             </div>
           </>

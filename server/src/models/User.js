@@ -14,6 +14,11 @@ const userSchema = new mongoose.Schema(
     // budget from it (measured TDEE − kg × 7700 / 30) — there is no manual kcal
     // target; it also drives the surplus/deficit grading of each day.
     monthlyLossTarget: { type: Number, default: 2, min: 0, max: 10 },
+    // Height (cm) + birth year, both optional (0 = unset). Together with gender
+    // and the latest weigh-in they let the client show a provisional TDEE
+    // estimate (Mifflin-St Jeor) before enough weigh-ins exist to measure one.
+    heightCm: { type: Number, default: 0, min: 0, max: 250 },
+    birthYear: { type: Number, default: 0 },
     // Keto-period goal: when the run started (YYYY-MM-DD) + its length in months.
     // months = 0 means no goal set; drives the progress chart on the dashboard.
     ketoStartDate: { type: String, default: '' },
