@@ -399,6 +399,10 @@ export default function DayCard({
                     <div className="meal-more">
                       {items.length > 0 && (
                         <ul className="meal-items">
+                          <li className="mi-head">
+                            <span>קק״ל</span>
+                            <span>ג׳ פחמימות</span>
+                          </li>
                           {items.map((it, i) => {
                             const ikcal = macroKcal(it, it.qty || 1);
                             return (
@@ -430,17 +434,16 @@ export default function DayCard({
                                     </button>
                                   )}
                                 </span>
-                                {ikcal != null && (
-                                  <span
-                                    className="mi-kcal"
-                                    title="קלוריות לפריט (לפי המאקרו שלו)"
-                                  >
-                                    ~{ikcal} קק"ל
-                                  </span>
-                                )}
+                                {/* always rendered — each row must fill its
+                                    grid column even when kcal is unknown */}
+                                <span
+                                  className="mi-kcal"
+                                  title={ikcal != null ? "קלוריות לפריט (לפי המאקרו שלו)" : undefined}
+                                >
+                                  {ikcal != null && <>~{ikcal}</>}
+                                </span>
                                 <span className="mi-carb">
-                                  {fmt((Number(it.carbs) || 0) * (it.qty || 1))}{" "}
-                                  ג'
+                                  {fmt((Number(it.carbs) || 0) * (it.qty || 1))}
                                 </span>
                               </li>
                             );

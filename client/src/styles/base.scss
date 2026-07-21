@@ -7,10 +7,7 @@
    ============================================================ */
 
 :root {
-  /* accent + macro hues — shared across themes (kept names for inline JSX) */
-  --olive: #149a5e; /* primary green — "under the line" */
-  --olive-soft: #6fc298;
-  --olive-dark: #0f7d4b; /* used as button background / hover */
+  /* macro hues — shared across themes (kept names for inline JSX) */
   --protein: #d4b54a; /* protein — matte yellow */
   --amber: #e08a2b; /* carb caution */
   --red: #d6493b;
@@ -21,33 +18,42 @@
   --r-sm: 10px;
 
   /* ---------- Dark theme — the default ---------- */
-  /* surfaces */
-  --paper: #060807; /* near-black green ground */
-  --card: #121613;
-  --tint: #1f2723; /* neutral fill (inputs, tracks) */
-  --green-tint: #16291f; /* accent wash */
+  /* accent greens — mint on dark, classic olive on light */
+  --olive: #1fb572; /* primary green — "under the line" */
+  --olive-soft: #5fd9a0;
+  --olive-dark: #178f59; /* used as button background / hover */
+
+  /* surfaces — neutral graphite, no green cast */
+  --paper: #0a0b0b;
+  --card: #151617;
+  --tint: #202223; /* neutral fill (inputs, tracks) */
+  --green-tint: #12241c; /* accent wash */
 
   /* ink */
-  --ink: #e8ece9;
-  --ink-soft: #97a09a;
-  --line: #28302b;
+  --ink: #eceeed;
+  --ink-soft: #9aa19d;
+  --line: #2a2d2c;
 
   /* derived accents that change with the theme */
-  --accent-ink: #5ad29a; /* accent-colored TEXT (bright on dark) */
-  --accent-line: #2c4a3a; /* border around accent washes */
-  --danger-tint: #381f1c;
+  --accent-ink: #4ee6a1; /* accent-colored TEXT (bright on dark) */
+  --accent-line: #24503c; /* border around accent washes */
+  --danger-tint: #2e1c1a;
   --danger-line: #5c2e29;
-  --toast-bg: #2a322d;
+  --toast-bg: #26292a;
 
   /* depth */
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35), 0 6px 16px -8px rgba(0, 0, 0, 0.55);
   --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.4), 0 16px 36px -14px rgba(0, 0, 0, 0.65);
-  --ring: 0 0 0 3px rgba(20, 154, 94, 0.35);
+  --ring: 0 0 0 3px rgba(31, 181, 114, 0.35);
 }
 
 /* ---------- Light theme — opt-in via the header toggle ---------- */
 :root[data-theme='light'] {
+  --olive: #149a5e;
+  --olive-soft: #6fc298;
+  --olive-dark: #0f7d4b;
+
   --paper: #f6f8f5; /* cool near-white ground */
   --card: #ffffff;
   --tint: #f0f3ef;

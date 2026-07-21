@@ -478,20 +478,38 @@
     list-style: none;
     margin: 6px 0 0;
     padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
+    /* item table: the longest name sizes the first column, so the kcal and
+       carb values line up in columns right after it (li rows are dissolved
+       into the grid via display: contents) */
+    display: grid;
+    grid-template-columns: minmax(0, max-content) max-content max-content;
+    align-items: center;
+    row-gap: 3px;
+    column-gap: 12px;
+    font-size: 12px;
+    color: var(--ink-soft);
     li {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 2px 0;
-      font-size: 12px;
-      color: var(--ink-soft);
+      display: contents;
     }
     .mi-name {
-      flex: 1;
       min-width: 0;
+    }
+    /* header row — carries the units so the value cells stay bare numbers.
+       No cell above the name column: the labels are pinned to the value
+       columns and auto-placement resumes on the next row. */
+    .mi-head span {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      color: var(--ink-soft);
+      opacity: 0.85;
+      white-space: nowrap;
+      &:nth-child(1) {
+        grid-column: 2;
+      }
+      &:nth-child(2) {
+        grid-column: 3;
+      }
     }
     /* fuller item description (e.g. from a Claude meal link) — same light
        weight the products catalog uses for its "תיאור מלא" */

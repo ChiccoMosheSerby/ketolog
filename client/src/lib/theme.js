@@ -5,7 +5,7 @@ import { useState } from 'react';
 // that sets it before first paint to avoid a flash).
 const KEY = 'ketolog:theme';
 // Mobile browser-chrome colour per theme — matches --paper.
-const META = { dark: '#0e1311', light: '#149a5e' };
+const META = { dark: '#0a0b0b', light: '#149a5e' };
 
 export function currentTheme() {
   if (typeof document === 'undefined') return 'dark';
