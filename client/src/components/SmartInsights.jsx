@@ -32,6 +32,26 @@ const PERIOD_LABEL = { weekly: 'שבועי', monthly: 'חודשי' };
 const POLL_MS = 20000;
 const POLL_MAX = 5;
 
+// When the next report is due: a weekly report lands on Sunday (once the
+// Sun–Sat week completes) and a monthly one on the 1st of the month — mirrors
+// the server's lastCompletedWeek/lastCompletedMonth windows.
+function nextReportDue() {
+  const t = new Date();
+  const iso = (dt) =>
+    dt.getFullYear() +
+    '-' +
+    String(dt.getMonth() + 1).padStart(2, '0') +
+    '-' +
+    String(dt.getDate()).padStart(2, '0');
+  const sunday = new Date(t.getFullYear(), t.getMonth(), t.getDate() + (7 - t.getDay() || 7));
+  const firstOfNext = new Date(t.getFullYear(), t.getMonth() + 1, 1);
+  if (firstOfNext.getTime() < sunday.getTime()) return { date: iso(firstOfNext), period: 'monthly' };
+  if (firstOfNext.getTime() === sunday.getTime()) return { date: iso(sunday), period: 'both' };
+  return { date: iso(sunday), period: 'weekly' };
+}
+
+const NEXT_LABEL = { weekly: 'השבועי', monthly: 'החודשי', both: 'השבועי והחודשי' };
+
 // The report cache lives in ../lib/insightsStore.js so the תובנות nav-tab badge
 // can read the same data without a second fetch.
 
@@ -329,7 +349,9 @@ export default function SmartInsights() {
         ) : isGenerating ? (
           <div className="si-loading">מכין/ה את הדוח הראשון שלך… זה עשוי לקחת עד דקה, והוא יופיע כאן אוטומטית.</div>
         ) : (
-          <div className="si-note">הדוח הראשון ייווצר אוטומטית בתום השבוע/החודש הקרוב.</div>
+          <div className="si-note">
+            הדוח הראשון ייווצר אוטומטית בתום השבוע/החודש הקרוב — ב{heDate(nextReportDue().date)}.
+          </div>
         )}
       </div>
     );
@@ -367,11 +389,21 @@ export default function SmartInsights() {
 
       <Report ins={selected.result || {}} collapsible />
 
-      {selected.generatedAt && (
-        <div className="si-foot">
-          דוח {PERIOD_LABEL[selected.period]} · {selected.label} · נוצר ב־{heDate(String(selected.generatedAt).slice(0, 10))}
-        </div>
-      )}
+      <div className="si-foot">
+        {selected.generatedAt && (
+          <div>
+            דוח {PERIOD_LABEL[selected.period]} · {selected.label} · נוצר ב־{heDate(String(selected.generatedAt).slice(0, 10))}
+          </div>
+        )}
+        {(() => {
+          const next = nextReportDue();
+          return (
+            <div className="si-next">
+              הדוח {NEXT_LABEL[next.period]} הבא: {heDate(next.date)}
+            </div>
+          );
+        })()}
+      </div>
     </div>
   );
 }
