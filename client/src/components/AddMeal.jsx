@@ -421,8 +421,16 @@ export default function AddMeal({
         <button
           className="btn composer-submit"
           data-tour="meal-submit"
-          disabled={busy}
-          title={busy ? "מחשב…" : carb !== "" ? "הוסף ארוחה" : "חשב והוסף ארוחה"}
+          disabled={busy || (!desc.trim() && carb === "")}
+          title={
+            busy
+              ? "מחשב…"
+              : !desc.trim() && carb === ""
+                ? "כתבו קודם מה אכלתם"
+                : carb !== ""
+                  ? "הוסף ארוחה"
+                  : "חשב והוסף ארוחה"
+          }
           onClick={onAddClick}
         >
           {busy ? "…" : "✓"}
