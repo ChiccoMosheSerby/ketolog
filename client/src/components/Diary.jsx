@@ -23,7 +23,10 @@ import RecordBanner from "./RecordBanner.jsx";
 import SmartInsights from "./SmartInsights.jsx";
 import Header from "./Header.jsx";
 import TabShell from "./TabShell.jsx";
+import NameDialog from "./NameDialog.jsx";
+import { SkeletonCard } from "./Skeleton.jsx";
 import { useInsightsBadge } from "../lib/insightsStore.js";
+import { useFocusTrap } from "../lib/useFocusTrap.js";
 import "./Diary.scss";
 
 // strip subdoc id / extras → a clean meal payload for the API
@@ -75,17 +78,31 @@ export default function Diary() {
 
   // "Close the day": the user declares today finished, so every stat that
   // waits for midnight (dashboard analytics, averages, energy balance) counts
-  // today as a completed day right away. Persisted per-date in localStorage —
-  // a value from an older date is simply ignored, so the flag auto-expires
-  // when a real new day starts. While closed, "effective today" is tomorrow,
-  // which flips every `date < today` comparison to include today.
+  // today as a completed day right away. Persisted on today's day document so
+  // it syncs across devices; localStorage only gives the instant first paint
+  // (a value from an older date is ignored, so it auto-expires when a real new
+  // day starts). While closed, "effective today" is tomorrow, which flips
+  // every `date < today` comparison to include today.
   const [dayClosed, setDayClosed] = useState(
     () => localStorage.getItem("ketolog:closedDay") === todayISO(),
   );
   const effectiveToday = dayClosed ? nextISO(todayISO()) : todayISO();
 
-  function closeDay(closed) {
-    if (closed) localStorage.setItem("ketolog:closedDay", todayISO());
+  // once the days load, the server value wins — covers a close/reopen made on
+  // another device (a `closed` flag on a past date is simply never looked at)
+  useEffect(() => {
+    const todayDoc = days.find((d) => d.date === todayISO());
+    if (todayDoc && typeof todayDoc.closed === "boolean") {
+      setDayClosed(todayDoc.closed);
+      if (todayDoc.closed) localStorage.setItem("ketolog:closedDay", todayISO());
+      else localStorage.removeItem("ketolog:closedDay");
+    }
+  }, [days]);
+
+  async function closeDay(closed) {
+    const t = todayISO();
+    // optimistic: flip locally right away, then persist to the day doc
+    if (closed) localStorage.setItem("ketolog:closedDay", t);
     else localStorage.removeItem("ketolog:closedDay");
     setDayClosed(closed);
     if (closed) {
@@ -94,6 +111,11 @@ export default function Diary() {
       window.dispatchEvent(
         new CustomEvent("ketolog:gotoTab", { detail: "insights" }),
       );
+    }
+    try {
+      mergeDay(await api.upsertDay(t, { closed }));
+    } catch (e) {
+      toast(e.message);
     }
   }
 
@@ -245,60 +267,81 @@ export default function Diary() {
       toast("אין ארוחות מאתמול לשכפול");
       return;
     }
-    await applyMeals(activeDate, yday.meals);
-    toast("הארוחות מאתמול שוכפלו");
+    try {
+      await applyMeals(activeDate, yday.meals);
+      toast("הארוחות מאתמול שוכפלו");
+    } catch (e) {
+      toast(e.message || "השכפול נכשל — נסו שוב");
+    }
   }
 
   async function copyMealToActive(meal) {
-    await applyMeals(activeDate, [meal]);
-    toast("הארוחה שוכפלה ליום הנבחר");
+    try {
+      await applyMeals(activeDate, [meal]);
+      toast("הארוחה שוכפלה ליום הנבחר");
+    } catch (e) {
+      toast(e.message || "השכפול נכשל — נסו שוב");
+    }
   }
 
-  async function saveMealAsTemplate(meal) {
-    const def = (meal.desc || meal.cat || "תבנית").slice(0, 30);
-    const name = window.prompt("שם לתבנית:", def);
-    if (name == null || !name.trim()) return;
-    const created = await api.addTemplate({
-      name: name.trim(),
-      ...cleanMeal(meal),
+  // "Name this" dialog (in-app replacement for window.prompt) — set by the
+  // save-as-template/product actions below: { title, def, submit(name) }.
+  const [namePrompt, setNamePrompt] = useState(null);
+
+  function saveMealAsTemplate(meal) {
+    setNamePrompt({
+      title: "שמירה כתבנית",
+      label: "שם לתבנית",
+      def: (meal.desc || meal.cat || "תבנית").slice(0, 30),
+      submit: async (name) => {
+        const created = await api.addTemplate({ name, ...cleanMeal(meal) });
+        setTemplates((prev) => [...prev, created]);
+        toast("התבנית נשמרה");
+      },
     });
-    setTemplates((prev) => [...prev, created]);
-    toast("התבנית נשמרה");
   }
 
   // Turn a logged meal into a reusable personal product (name + description +
   // macros), the same way "copy to day" / "save as template" work per row.
-  async function saveMealAsProduct(meal) {
-    const def = (meal.desc || meal.cat || "מוצר").slice(0, 30);
-    const name = window.prompt("שם קצר למוצר חדש:", def);
-    if (name == null || !name.trim()) return;
-    await addProduct({
-      key: name.trim(),
-      label: (meal.desc || meal.cat || name).trim(),
-      unit: "מנה",
-      carbs: Number(meal.carbs) || 0,
-      fat: Number(meal.fat) || 0,
-      protein: Number(meal.protein) || 0,
+  function saveMealAsProduct(meal) {
+    setNamePrompt({
+      title: "הוספה כמוצר",
+      label: "שם קצר למוצר חדש",
+      def: (meal.desc || meal.cat || "מוצר").slice(0, 30),
+      submit: async (name) => {
+        await addProduct({
+          key: name,
+          label: (meal.desc || meal.cat || name).trim(),
+          unit: "מנה",
+          carbs: Number(meal.carbs) || 0,
+          fat: Number(meal.fat) || 0,
+          protein: Number(meal.protein) || 0,
+        });
+        toast("המוצר נוסף לרשימה שלך");
+      },
     });
-    toast("המוצר נוסף לרשימה שלך");
   }
 
   // Turn a single part of a meal into a reusable product. Its macros are already
   // per-unit, so the product maps onto it 1:1 (the unit becomes the product unit,
   // e.g. one "נקניקיה"), ready to one-click add to future meals.
-  async function saveItemAsProduct(item) {
-    const def = (item.name || "מוצר").slice(0, 30);
-    const name = window.prompt("שם קצר למוצר חדש:", def);
-    if (name == null || !name.trim()) return;
-    await addProduct({
-      key: name.trim(),
-      label: (item.desc || item.name || name).trim(),
-      unit: (item.unit || "").trim() || "מנה",
-      carbs: Number(item.carbs) || 0,
-      fat: Number(item.fat) || 0,
-      protein: Number(item.protein) || 0,
+  function saveItemAsProduct(item) {
+    setNamePrompt({
+      title: "הוספה כמוצר",
+      label: "שם קצר למוצר חדש",
+      def: (item.name || "מוצר").slice(0, 30),
+      submit: async (name) => {
+        await addProduct({
+          key: name,
+          label: (item.desc || item.name || name).trim(),
+          unit: (item.unit || "").trim() || "מנה",
+          carbs: Number(item.carbs) || 0,
+          fat: Number(item.fat) || 0,
+          protein: Number(item.protein) || 0,
+        });
+        toast("המוצר נוסף לרשימה שלך");
+      },
     });
-    toast("המוצר נוסף לרשימה שלך");
   }
 
   async function deleteTemplate(id) {
@@ -420,6 +463,7 @@ export default function Diary() {
         metrics: {},
       }
     : null;
+  const dayviewTrapRef = useFocusTrap(!!modalDay);
 
   const viewToggle = (
     <div
@@ -535,6 +579,11 @@ export default function Diary() {
         ketoMonths={user?.ketoGoalMonths || 0}
         avg={avg}
       />
+      {/* until the first load lands, a skeleton in the day card's slot — an
+          empty "אין ארוחות" card would read as data */}
+      {!loaded ? (
+        <SkeletonCard />
+      ) : (
       <DayCard
         iso={activeDate}
         day={activeDay}
@@ -552,6 +601,7 @@ export default function Diary() {
         target={target}
         kcalTarget={kcalTarget}
       />
+      )}
 
       {/* small reference lines — below the day so the top stays clean */}
       <div className="today-hints">
@@ -656,7 +706,10 @@ export default function Diary() {
           <div
             className="dayview-modal"
             role="dialog"
+            aria-modal="true"
             aria-label={dayTitle(modalDate)}
+            ref={dayviewTrapRef}
+            tabIndex={-1}
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -684,6 +737,16 @@ export default function Diary() {
             />
           </div>
         </div>
+      )}
+
+      {namePrompt && (
+        <NameDialog
+          title={namePrompt.title}
+          label={namePrompt.label}
+          defaultValue={namePrompt.def}
+          onSubmit={namePrompt.submit}
+          onClose={() => setNamePrompt(null)}
+        />
       )}
 
       <div className="foot">

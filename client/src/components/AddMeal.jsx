@@ -4,6 +4,7 @@ import { useToast } from "../lib/toast.jsx";
 import { useSpeech, speechErrorMessage } from "../lib/useSpeech.js";
 import {
   fmt,
+  heDate,
   macroPct,
   nowHM,
   todayISO,
@@ -252,7 +253,14 @@ export default function AddMeal({
       items: mealItems ?? items,
       source: src,
     };
-    await onLogged(date, meal);
+    // On failure keep everything the user composed so they can just retry —
+    // silently losing a meal is the worst outcome for a logging app.
+    try {
+      await onLogged(date, meal);
+    } catch (e) {
+      toast(e.message || "שמירת הארוחה נכשלה — נסו שוב");
+      return;
+    }
     setDesc("");
     setCarb("");
     setPicked([]);
@@ -366,8 +374,25 @@ export default function AddMeal({
     clearNote();
   };
 
+  const isToday = date === todayISO();
+
   return (
     <div className="panel addmeal" data-tour="add-meal">
+      {/* the day this composer logs to — the picker itself lives up in the tab
+          bar, so without this line a meal can silently land on a past day */}
+      {!isToday && (
+        <div className="compose-for" role="status">
+          <span className="compose-for-warn">⚠️</span>
+          הארוחה תירשם ליום אחר: <b>{heDate(date)}</b>
+          <button
+            type="button"
+            className="compose-today"
+            onClick={() => onDateChange(todayISO())}
+          >
+            חזרה להיום
+          </button>
+        </div>
+      )}
       {/* one top row: CTAs · the text box · submit. Every entry point feeds
           the same text box. The calendar lives up in the tab bar (TabShell). */}
       <div className="composer">

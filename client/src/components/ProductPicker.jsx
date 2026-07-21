@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { fmt } from "../lib/helpers.js";
+import { useFocusTrap } from "../lib/useFocusTrap.js";
 import {
   DEFAULT_CAT,
   DEFAULT_CATS,
@@ -89,6 +90,8 @@ export default function ProductPicker({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  const trapRef = useFocusTrap();
 
   const uses = (name) => usage?.get((name || "").trim()) || 0;
 
@@ -426,7 +429,10 @@ export default function ProductPicker({
       <div
         className="picker-modal"
         role="dialog"
+        aria-modal="true"
         aria-label="המוצרים והארוחות שלי"
+        ref={trapRef}
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="picker-head">

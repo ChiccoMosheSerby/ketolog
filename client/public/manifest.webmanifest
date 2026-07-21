@@ -1,0 +1,17 @@
+{
+  "name": "KetoLog",
+  "short_name": "KetoLog",
+  "description": "יומן קיטו — רישום ארוחות ומעקב פחמימות",
+  "lang": "he",
+  "dir": "rtl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0a0b0b",
+  "theme_color": "#0a0b0b",
+  "icons": [
+    { "src": "/favicon-64.png", "sizes": "64x64", "type": "image/png" },
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

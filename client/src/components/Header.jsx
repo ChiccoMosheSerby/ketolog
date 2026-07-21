@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { kcalZone } from '../lib/helpers.js';
 import { useAuth } from '../lib/auth.jsx';
 import { useMediaQuery, MOBILE_QUERY } from '../lib/useMediaQuery.js';
+import { useFocusTrap } from '../lib/useFocusTrap.js';
 import CarbRing from './CarbRing.jsx';
 import SettingsModal from './SettingsModal.jsx';
 import AdminUsage from './AdminUsage.jsx';
@@ -103,11 +104,21 @@ export default function Header({ stats, onExport, onExportExcel, firstDate, days
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
+  // the drawer stays mounted (it slides), so the trap keys off drawerOpen
+  const drawerRef = useFocusTrap(drawerOpen);
 
   // Close the drawer if we grow back to desktop.
   useEffect(() => {
     if (!isMobile) setDrawerOpen(false);
   }, [isMobile]);
+
+  // Escape closes the drawer, like every other popup.
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const onKey = (e) => e.key === 'Escape' && setDrawerOpen(false);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [drawerOpen]);
 
   // Lock body scroll while the drawer is open.
   useEffect(() => {
@@ -167,7 +178,15 @@ export default function Header({ stats, onExport, onExportExcel, firstDate, days
       </div>
 
       <div className={'drawer-scrim' + (drawerOpen ? ' show' : '')} onClick={() => setDrawerOpen(false)} />
-      <aside className={'drawer' + (drawerOpen ? ' open' : '')} aria-hidden={!drawerOpen}>
+      <aside
+        className={'drawer' + (drawerOpen ? ' open' : '')}
+        aria-hidden={!drawerOpen}
+        role="dialog"
+        aria-modal="true"
+        aria-label="תפריט"
+        ref={drawerRef}
+        tabIndex={-1}
+      >
         <button className="drawer-close" aria-label="סגור" onClick={() => setDrawerOpen(false)}>
           ✕
         </button>

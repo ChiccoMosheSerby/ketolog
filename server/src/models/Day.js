@@ -52,6 +52,9 @@ const daySchema = new mongoose.Schema(
     label: { type: String, default: '' },
     meals: { type: [mealSchema], default: [] },
     metrics: { type: metricsSchema, default: () => ({}) },
+    // the user declared this day finished ("סגירת היום") — insights count it
+    // as a completed day without waiting for midnight. Synced across devices.
+    closed: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

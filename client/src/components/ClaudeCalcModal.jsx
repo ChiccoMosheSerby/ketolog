@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { openClaudeCalc, copyText } from "../lib/claudeCalc.js";
 import { useToast } from "../lib/toast.jsx";
+import { useFocusTrap } from "../lib/useFocusTrap.js";
 import "./ClaudeCalcModal.scss";
 
 // "Calc with Claude" popup, opened from the composer's 🤖 CTA. A meal/product
@@ -23,6 +24,7 @@ export default function ClaudeCalcModal({
   const [text, setText] = useState(initialText);
   const [sent, setSent] = useState(false);
   const lastPrompt = useRef("");
+  const trapRef = useFocusTrap();
 
   useEffect(() => {
     const onKey = (e) => e.key === "Escape" && onClose();
@@ -60,7 +62,10 @@ export default function ClaudeCalcModal({
       <div
         className="ccm-modal"
         role="dialog"
+        aria-modal="true"
         aria-label="חישוב עם קלוד"
+        ref={trapRef}
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="ccm-head">

@@ -12,12 +12,13 @@ router.get('/', asyncHandler(async (req, res) => {
   res.json(days);
 }));
 
-// PUT /api/days/:date  -> upsert day-level fields (label / metrics)
+// PUT /api/days/:date  -> upsert day-level fields (label / metrics / closed)
 router.put('/:date', asyncHandler(async (req, res) => {
   const { date } = req.params;
   const update = {};
   if (typeof req.body.label === 'string') update.label = req.body.label;
   if (req.body.metrics && typeof req.body.metrics === 'object') update.metrics = req.body.metrics;
+  if (typeof req.body.closed === 'boolean') update.closed = req.body.closed;
   const day = await Day.findOneAndUpdate(
     { user: req.userId, date },
     { $set: update, $setOnInsert: { user: req.userId, date } },

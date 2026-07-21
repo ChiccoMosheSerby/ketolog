@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../lib/auth.jsx';
 import { useToast } from '../lib/toast.jsx';
 import { useTheme } from '../lib/theme.js';
+import { useFocusTrap } from '../lib/useFocusTrap.js';
 import { todayISO } from '../lib/helpers.js';
 import WeighIn from './WeighIn.jsx';
 import './SettingsModal.scss';
@@ -59,6 +60,9 @@ export default function SettingsModal({
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
+  // the component only renders while open, so the trap is simply always active
+  const trapRef = useFocusTrap(open);
+
   if (!open) return null;
 
   async function save() {
@@ -112,7 +116,14 @@ export default function SettingsModal({
 
   return (
     <div className="settings-scrim" onClick={onClose}>
-      <div className="settings-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="settings-modal"
+        role="dialog"
+        aria-modal="true"
+        ref={trapRef}
+        tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="settings-head">
           <h2>הגדרות</h2>
           <button className="settings-close" aria-label="סגור" onClick={onClose}>✕</button>
