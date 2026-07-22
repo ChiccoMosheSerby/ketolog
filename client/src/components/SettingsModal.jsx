@@ -113,7 +113,7 @@ export default function SettingsModal({
     setResetting(true);
     try {
       await api.resetAccount(resetText.trim());
-      toast('היומן אופס — מתחילים מחדש מיום 1');
+      toast('היומן אופס — מתחילים מיום 1. המוצרים והתבניות שלך נשמרו.');
       // full reload: day list, insights cache, badges — everything restarts clean
       setTimeout(() => window.location.reload(), 700);
     } catch (e) {
@@ -511,8 +511,11 @@ export default function SettingsModal({
             <div className="settings-group">
               <div className="export-hint" style={{ color: '#dc2626' }} role="alert">
                 ⚠️ פעולה בלתי הפיכה: כל הימים, הארוחות, השקילות ודוחות התובנות יימחקו
-                לצמיתות, והיומן יתחיל מחדש מיום 1. המוצרים, התבניות וההגדרות שלך יישמרו.
-                מומלץ לייצא דוח / Excel לפני.
+                לצמיתות, והיומן יתחיל מחדש מיום 1. מומלץ לייצא דוח / Excel לפני.
+              </div>
+              <div className="export-hint">
+                מה לא נמחק: רשימת המוצרים שלך, התבניות, ההגדרות ומפתח ה-API — הכל נשאר
+                כמו שהוא, מוכן ליומן החדש.
               </div>
               <div className="export-hint">
                 לאישור, הקלידו בדיוק: <b dir="ltr">{resetPhrase}</b>
