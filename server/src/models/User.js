@@ -40,6 +40,9 @@ const userSchema = new mongoose.Schema(
     // Why the key stopped working ('auth' | 'no_credit' | ''), recorded when an
     // AI call fails so the UI can explain instead of failing silently.
     aiKeyError: { type: String, default: '' },
+    // Optional self-set monthly AI spend budget (USD, 0 = none). Compared
+    // against the recorded usage to warn the user before they run out.
+    aiMonthlyBudgetUsd: { type: Number, default: 0, min: 0, max: 10000 },
   },
   { timestamps: true }
 );

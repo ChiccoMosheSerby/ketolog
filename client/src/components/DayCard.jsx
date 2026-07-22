@@ -139,7 +139,9 @@ export default function DayCard({
 
   // Per-meal fold: rows show only time · title · carbs; tapping a row reveals
   // the item breakdown, macro split and the row actions.
-  const [openMeals, setOpenMeals] = useState(() => new Set());
+  // 'tour-demo' pre-opens the guided tour's stand-in meal (see Diary.jsx) so
+  // its breakdown and action buttons are visible for the tour to spotlight.
+  const [openMeals, setOpenMeals] = useState(() => new Set(['tour-demo']));
   const toggleMeal = (id) =>
     setOpenMeals((prev) => {
       const s = new Set(prev);
@@ -358,6 +360,7 @@ export default function DayCard({
                           <button
                             type="button"
                             className="mini-act"
+                            data-tour="meal-to-product"
                             title="הוסף כמוצר"
                             aria-label="הוסף כמוצר"
                             onClick={(e) => {
@@ -423,6 +426,7 @@ export default function DayCard({
                                     <button
                                       type="button"
                                       className="mini-act"
+                                      data-tour="item-to-product"
                                       title="הוסף כמוצר"
                                       aria-label="הוסף כמוצר"
                                       onClick={(e) => {
@@ -478,7 +482,7 @@ export default function DayCard({
                           </span>
                         </div>
                       )}
-                    <div className="meal-acts">
+                    <div className="meal-acts" data-tour="meal-actions">
                       {onSaveTemplate && (
                         <button
                           className="mact"

@@ -27,7 +27,82 @@ import NameDialog from "./NameDialog.jsx";
 import { SkeletonCard } from "./Skeleton.jsx";
 import { useInsightsBadge } from "../lib/insightsStore.js";
 import { useFocusTrap } from "../lib/useFocusTrap.js";
+import { DEMO_PRODUCTS, PRODUCT_TYPES } from "../data/demoProducts.js";
 import "./Diary.scss";
+
+// One budget alert per session: own-key users with a monthly AI budget get a
+// toast on load when their recorded spend crosses 80% of it (see SettingsModal
+// for the detailed numbers).
+let budgetAlerted = false;
+
+// While the guided tour runs over an empty day, this stand-in meal is shown so
+// the meal-related steps (edit time, save as product, meal actions) have real
+// buttons to spotlight. It is never persisted — it exists only in the render
+// and disappears the moment the tour ends. DayCard auto-expands it by its id.
+export const TOUR_DEMO_MEAL_ID = 'tour-demo';
+const TOUR_DEMO_MEAL = {
+  _id: TOUR_DEMO_MEAL_ID,
+  time: '09:30',
+  cat: '',
+  desc: 'חביתה מ-2 ביצים בחמאה, חצי אבוקדו וקפה עם שמנת (דוגמה להדרכה)',
+  carbs: 3.6,
+  fat: 29,
+  protein: 14,
+  source: 'local',
+  items: [
+    { name: 'חביתה', desc: 'חביתה מ-2 ביצים בחמאה', qty: 1, unit: 'מנה', carbs: 0.8, fat: 19, protein: 12.5 },
+    { name: 'אבוקדו', desc: 'חצי אבוקדו בינוני', qty: 1, unit: 'חצי', carbs: 1.8, fat: 7.5, protein: 1 },
+    { name: 'קפה עם שמנת', desc: 'קפה שחור עם כף שמנת מתוקה', qty: 1, unit: 'כוס', carbs: 1, fat: 2.5, protein: 0.5 },
+  ],
+};
+
+// A small demo catalog for the tour when the user has no saved products yet —
+// two per category out of the curated demo DB, mapped to the real Product
+// shape so the picker and the products panel render them exactly like real
+// ones. Render-only, never persisted.
+const TOUR_DEMO_PRODUCTS = (() => {
+  const label = new Map(PRODUCT_TYPES.map((t) => [t.id, t.label]));
+  const byType = {};
+  for (const p of DEMO_PRODUCTS) (byType[p.type] ||= []).push(p);
+  return Object.values(byType)
+    .flatMap((arr) => arr.slice(0, 2))
+    .map((p) => ({
+      _id: 'tour-demo-' + p.id,
+      key: p.name,
+      label: p.desc,
+      unit: p.unit,
+      cat: label.get(p.type) || 'נשנוש / ביניים',
+      carbs: p.carbs,
+      fat: p.fat,
+      protein: p.protein,
+    }));
+})();
+
+// Two weeks of plausible demo days so the dashboard (averages, streaks, energy
+// balance, weight trend) looks alive during the tour on a fresh account.
+// Deterministic, ends yesterday, weight drifts down — render-only.
+function buildTourDays(today) {
+  const days = [];
+  let date = today;
+  for (let i = 1; i <= 14; i++) {
+    date = prevISO(date);
+    const total = 14 + ((i * 7) % 11); // 14–24 g, varied but repeatable
+    const part = (f) => Math.round(total * f * 10) / 10;
+    days.push({
+      _id: 'tour-day-' + i,
+      date,
+      label: '',
+      closed: true,
+      metrics: i % 3 === 1 ? { weight: String(Math.round((87.5 + i * 0.12) * 10) / 10) } : {},
+      meals: [
+        { _id: `tour-b-${i}`, time: '09:00', cat: '', desc: 'חביתה מ-2 ביצים וקפה עם שמנת', carbs: part(0.2), fat: 21, protein: 13, items: [], source: 'local' },
+        { _id: `tour-l-${i}`, time: '13:30', cat: '', desc: 'חזה עוף בגריל עם סלט ירוק ושמן זית', carbs: part(0.45), fat: 18, protein: 35, items: [], source: 'local' },
+        { _id: `tour-d-${i}`, time: '19:30', cat: '', desc: 'סלמון בתנור עם ברוקולי בחמאה', carbs: part(0.35), fat: 24, protein: 28, items: [], source: 'local' },
+      ],
+    });
+  }
+  return days;
+}
 
 // strip subdoc id / extras → a clean meal payload for the API
 const cleanMeal = (m) => ({
@@ -52,7 +127,7 @@ const cleanMeal = (m) => ({
 
 export default function Diary() {
   const toast = useToast();
-  const { user } = useAuth();
+  const { user, needsOnboarding } = useAuth();
   // Red dot on the תובנות tab while an unseen report exists; it clears only
   // after the user actually views the report there (not on mere tab entry).
   const insightsBadge = useInsightsBadge(user?.email || "");
@@ -158,6 +233,24 @@ export default function Diary() {
     reload(true).finally(() => setLoaded(true));
   }, [reload]);
 
+  // Low-AI-budget warning on load (own-key accounts with a budget set).
+  useEffect(() => {
+    const budget = user?.ai?.monthlyBudgetUsd || 0;
+    if (budgetAlerted || !user?.ai?.hasOwnKey || !budget) return;
+    budgetAlerted = true;
+    api
+      .getMyAiUsage()
+      .then(({ monthUsd }) => {
+        const ratio = monthUsd / budget;
+        if (ratio >= 1) {
+          toast(`⚠️ עברתם את תקציב ה-AI החודשי שהגדרתם ($${budget}) — פרטים בהגדרות`);
+        } else if (ratio >= 0.8) {
+          toast(`⚠️ ניצלתם ${Math.round(ratio * 100)}% מתקציב ה-AI החודשי — פרטים בהגדרות`);
+        }
+      })
+      .catch(() => {});
+  }, [user, toast]);
+
   // the assistant commits meals/products straight to the DB — refresh when it does
   useEffect(() => {
     const onChange = () => reload();
@@ -169,6 +262,15 @@ export default function Diary() {
   useEffect(() => {
     setExpanded((s) => (s.has(activeDate) ? s : new Set(s).add(activeDate)));
   }, [activeDate]);
+
+  // While the tour runs, force the active day's card open — the demo meal's
+  // buttons are tour anchors and must be in the DOM. Depends on `days` because
+  // the first data load replaces the expanded set (newest logged day only),
+  // which would otherwise fold today's card mid-tour.
+  useEffect(() => {
+    if (!needsOnboarding) return;
+    setExpanded((s) => (s.has(activeDate) ? s : new Set(s).add(activeDate)));
+  }, [needsOnboarding, activeDate, days]);
 
   function mergeDay(day) {
     setDays((prev) => {
@@ -426,6 +528,19 @@ export default function Diary() {
     meals: [],
     metrics: {},
   };
+  // While the tour runs, EVERYTHING it shows is demo data — same rich view for
+  // every account, whatever their real data looks like: a demo meal on the
+  // active day, the demo catalog, and two demo weeks for the dashboard. All of
+  // it is render-only (the tour overlay blocks interaction) and the real data
+  // returns untouched the moment the tour ends.
+  const tourActiveDay = needsOnboarding
+    ? { ...activeDay, meals: [TOUR_DEMO_MEAL] }
+    : activeDay;
+  const tourProducts = needsOnboarding ? TOUR_DEMO_PRODUCTS : products;
+  const tourDays = useMemo(
+    () => (needsOnboarding ? buildTourDays(todayISO()) : days),
+    [needsOnboarding, days],
+  );
   // The folded journal lists past days; the current day already has its own card
   // above it, so drop it from the "all" view to avoid showing it twice.
   const shown = viewDate
@@ -439,7 +554,7 @@ export default function Diary() {
   // ---- tab contents ----
   const productsPanel = (
     <Products
-      products={products}
+      products={tourProducts}
       onAdd={addProduct}
       onRename={renameProduct}
       onUpdate={updateProduct}
@@ -567,7 +682,7 @@ export default function Diary() {
         onLogged={addMeal}
         date={activeDate}
         onDateChange={setActiveDate}
-        products={products}
+        products={tourProducts}
         templates={templates}
         onUpdateProduct={updateProduct}
         onDeleteProduct={deleteProduct}
@@ -586,7 +701,7 @@ export default function Diary() {
       ) : (
       <DayCard
         iso={activeDate}
-        day={activeDay}
+        day={tourActiveDay}
         title={dayTitle(activeDate)}
         open={expanded.has(activeDate)}
         onCloseDay={activeDate === t ? closeDay : null}
@@ -644,7 +759,7 @@ export default function Diary() {
       badge: insightsBadge,
       content: (
         <Dashboard
-          days={days}
+          days={tourDays}
           target={target}
           kcalTarget={kcalTarget}
           lossTarget={user?.monthlyLossTarget ?? 2}
@@ -652,7 +767,7 @@ export default function Diary() {
           ketoMonths={user?.ketoGoalMonths || 0}
           profile={profile}
         >
-          <SmartInsights />
+          <SmartInsights demo={needsOnboarding} />
         </Dashboard>
       ),
     },

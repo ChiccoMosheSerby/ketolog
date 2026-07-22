@@ -33,6 +33,8 @@ export const api = {
   forgotPassword: (email) => request('POST', '/auth/forgot-password', { email }),
   me: () => request('GET', '/auth/me'),
   updateProfile: (fields) => request('PATCH', '/auth/me', fields),
+  // wipe the journal (days + insights) after typed confirmation — fresh day 1
+  resetAccount: (confirm) => request('POST', '/auth/reset-account', { confirm }),
 
   // days + meals
   getDays: () => request('GET', '/days'),
@@ -75,6 +77,9 @@ export const api = {
   saveAiKey: (key) => request('POST', '/ai/key', { key }),
   deleteAiKey: () => request('DELETE', '/ai/key'),
   setAiOptOut: (off) => request('POST', '/ai/opt-out', { off }),
+  // own AI spend (this month + all-time) and the self-set monthly budget
+  getMyAiUsage: () => request('GET', '/ai/usage'),
+  setAiBudget: (usd) => request('POST', '/ai/budget', { usd }),
 
   // admin — per-user AI cost breakdown (admin accounts only)
   getAdminUsage: () => request('GET', '/admin/usage'),

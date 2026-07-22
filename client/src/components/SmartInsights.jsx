@@ -52,6 +52,48 @@ function nextReportDue() {
 
 const NEXT_LABEL = { weekly: 'השבועי', monthly: 'החודשי', both: 'השבועי והחודשי' };
 
+// A canned weekly report shown during the guided tour — the panel demonstrates
+// what a real report looks like on every account. Render-only; the user's own
+// reports come back the moment the tour ends.
+const DEMO_REPORT = {
+  highlight:
+    "**שבוע חזק:** ממוצע של 16.2 גרם פחמ' נטו — ירידה מ-19.4 בשבוע שעבר, וכל שבעת הימים מתחת ליעד.",
+  summary:
+    'התחלת את השבוע סביב 20 גרם וסיימת אותו סביב 13 — ירידה עקבית לאורך השבוע. הקפה עם השמנת נשאר הרגל הבוקר הקבוע, וארוחות הערב נעשו קלות יותר משבוע לשבוע.',
+  trends: [
+    {
+      title: 'פחמימות בירידה',
+      body: "ממוצע יומי של 16.2 גרם לעומת 19.4 בשבוע הקודם — בעיקר בזכות ארוחות ערב קלות יותר.",
+      direction: 'down',
+      metric: "פחמ' נטו ליום",
+    },
+    {
+      title: 'חלבון יציב',
+      body: 'כ-95 גרם ביום לאורך כל השבוע — טווח בריא לשמירה על מסת שריר בקיטו.',
+      direction: 'flat',
+      metric: 'חלבון ליום',
+    },
+  ],
+  forecast: {
+    body: 'אם הקצב נשמר, הממוצע החודשי צפוי להתייצב סביב 15–16 גרם — מרווח בטוח מתחת ליעד.',
+    outlook: 'positive',
+  },
+  recommendations: [
+    {
+      title: 'לגוון ירקות ירוקים',
+      body: 'רוב הסיבים השבוע הגיעו ממלפפונים — שילוב ברוקולי או קישוא יוסיף נפח וגיוון בלי פחמימות.',
+      priority: 'med',
+    },
+  ],
+  pointsToWatch: [
+    {
+      title: 'נשנושי לילה',
+      body: 'פעמיים השבוע נרשם נשנוש אחרי 22:00 — שווה לשים לב שזה לא הופך להרגל.',
+    },
+  ],
+  anomalies: [],
+};
+
 // The report cache lives in ../lib/insightsStore.js so the תובנות nav-tab badge
 // can read the same data without a second fetch.
 
@@ -194,7 +236,9 @@ function Report({ ins, collapsible }) {
   );
 }
 
-export default function SmartInsights() {
+// `demo` (the guided tour): render the canned demo report instead of the real
+// panel for the duration of the tour.
+export default function SmartInsights({ demo = false }) {
   const { user } = useAuth();
   const key = user?.email || '';
   const seed = getCache();
@@ -315,6 +359,25 @@ export default function SmartInsights() {
     }, 3000);
     return () => clearTimeout(t);
   }, [selectedId, reports, key, visible]);
+
+  // Tour mode: always show the demo report — every account gets the same rich
+  // example, and the user's real reports return the moment the tour ends.
+  if (demo) {
+    return (
+      <div className="panel si-panel">
+        <div className="si-top">
+          <h2 className="si-title">
+            תובנות חכמות
+            <span className="si-new-dot" title="דוח לדוגמה">דוגמה</span>
+          </h2>
+        </div>
+        <div className="si-note">
+          כך נראה דוח אמיתי — הדוחות שלך ייכתבו אוטומטית מהנתונים שתתעד/י, מדי שבוע וחודש.
+        </div>
+        <Report ins={DEMO_REPORT} collapsible />
+      </div>
+    );
+  }
 
   if (status === 'loading') {
     return (

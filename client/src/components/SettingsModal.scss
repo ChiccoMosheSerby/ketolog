@@ -27,6 +27,14 @@
   gap: 14px;
 }
 
+/* a wrapper around related fields + their hint, so the tour can spotlight the
+   group as one unit; mirrors the modal's own column layout */
+.settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
 .settings-head {
   display: flex;
   align-items: center;

@@ -254,8 +254,8 @@ function withCacheBreakpoint(messages) {
   return out;
 }
 
-export async function runChatTurn(messages, userId) {
-  const client = getClient();
+export async function runChatTurn(messages, userId, apiKey = null) {
+  const client = getClient(apiKey); // per-user key (env for owner, BYO otherwise)
   const target = await getCarbTarget(userId);
   const system = buildSystem(target);
   const actions = [];

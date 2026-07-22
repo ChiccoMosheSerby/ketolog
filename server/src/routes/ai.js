@@ -1,9 +1,10 @@
 import { Router } from 'express';
+import mongoose from 'mongoose';
 import Product from '../models/Product.js';
 import Day from '../models/Day.js';
-// Chat is disabled (see the commented-out chat section below).
-// import Conversation from '../models/Conversation.js';
+import Conversation from '../models/Conversation.js';
 import User from '../models/User.js';
+import Usage from '../models/Usage.js';
 import { requireAuth } from '../middleware/auth.js';
 import { estimateImage, interpretBarcode, getClient } from '../lib/anthropic.js';
 import {
@@ -17,8 +18,8 @@ import {
 } from '../lib/aiAccess.js';
 import { estimateMealCached } from '../lib/estimateCache.js';
 import { fetchProductByBarcode, rawKeto } from '../lib/openfoodfacts.js';
-// import { runChatTurn } from '../lib/chatAgent.js';
-// import { israelTimeHM } from '../lib/logMeal.js';
+import { runChatTurn } from '../lib/chatAgent.js';
+import { israelTimeHM } from '../lib/logMeal.js';
 import { ensureDueReports, listReports, markSeen } from '../lib/insightsAgent.js';
 import { transcribeAudio, transcribeConfigured, TRANSCRIBE_MODEL } from '../lib/transcribe.js';
 import { recordOpenAIUsage } from '../lib/usage.js';
@@ -201,13 +202,9 @@ router.post('/barcode', async (req, res) => {
 });
 
 // ----------------------------------------------------------------------------
-// Keto assistant chat — DISABLED. The in-app chat widget is hidden on the
-// client, and these routes are commented out with it so the feature has no
-// live (paid) endpoint while it's off. Uncomment this whole section, the
-// Conversation / runChatTurn / israelTimeHM imports above, and <ChatWidget />
-// in client/src/App.jsx to bring it back.
+// Keto assistant chat — available only when AI is on for the account (the
+// owner's env key, or the user's own saved key), and it runs on that key.
 // ----------------------------------------------------------------------------
-/*
 const HE_DAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
 const weekday = (iso) => {
   const [y, m, d] = iso.split('-');
@@ -261,7 +258,7 @@ router.get('/chat', asyncHandler(async (req, res) => {
 
 // POST /api/ai/chat { conversationId?, text, image?: { data, mediaType } }
 router.post('/chat', async (req, res) => {
-  if (!aiConfigured()) return res.status(503).json({ error: 'מפתח ה-AI לא הוגדר בשרת' });
+  if (!req.ai.enabled) return res.status(503).json(AI_OFF);
   const { conversationId, image } = req.body;
   const text = (req.body.text || '').trim();
   if (!text && !image) return res.status(400).json({ error: 'אין הודעה לשליחה' });
@@ -290,14 +287,22 @@ router.post('/chat', async (req, res) => {
     if (text) content.push({ type: 'text', text });
     convo.messages.push({ role: 'user', content: content.length === 1 && !image ? text : content });
 
-    const { text: reply, actions } = await runChatTurn(convo.messages, req.userId);
+    const { text: reply, actions } = await runChatTurn(convo.messages, req.userId, req.ai.apiKey);
 
     convo.markModified('messages');
     await convo.save();
 
+    noteAiSuccess(req);
     res.json({ conversationId: convo._id, reply, actions });
   } catch (err) {
     console.error('chat failed:', err.status || '', err.message);
+    // key problems (invalid / out of credit) get the specific explanation and
+    // are flagged on the user so the rest of the UI can explain too
+    const code = keyErrorCode(err);
+    if (code) {
+      flagKeyError(req.userId, code);
+      return res.status(402).json({ error: KEY_ERROR_MSG[code], code });
+    }
     res.status(502).json(chatError(err));
   }
 });
@@ -411,7 +416,6 @@ router.post('/chat/:id/actions/:actionId', asyncHandler(async (req, res) => {
     return res.status(502).json({ error: 'השמירה נכשלה' });
   }
 }));
-*/
 
 // ----------------------------------------------------------------------------
 // AI insights — narrative summaries / trends / recommendations over the log
@@ -511,6 +515,46 @@ router.delete('/key', asyncHandler(async (req, res) => {
 router.post('/opt-out', asyncHandler(async (req, res) => {
   if (!usesEnvKey(req.user)) return res.status(403).json({ error: 'לא זמין בחשבון זה' });
   await User.updateOne({ _id: req.userId }, { aiOptOut: req.body.off === true });
+  res.json({ ok: true });
+}));
+
+// GET /api/ai/usage -> the requesting account's own AI spend (all recorded
+// providers): this calendar month + all-time. Own-key users read this in the
+// settings AI section, and the client warns when the month approaches the
+// self-set budget. (The Anthropic API exposes no balance endpoint for a key,
+// so the app's own accounting is the best available signal.)
+router.get('/usage', asyncHandler(async (req, res) => {
+  const monthStart = new Date();
+  monthStart.setUTCDate(1);
+  monthStart.setUTCHours(0, 0, 0, 0);
+  const [agg] = await Usage.aggregate([
+    { $match: { user: new mongoose.Types.ObjectId(req.userId) } },
+    {
+      $group: {
+        _id: null,
+        totalUsd: { $sum: '$costUsd' },
+        calls: { $sum: 1 },
+        monthUsd: { $sum: { $cond: [{ $gte: ['$createdAt', monthStart] }, '$costUsd', 0] } },
+        monthCalls: { $sum: { $cond: [{ $gte: ['$createdAt', monthStart] }, 1, 0] } },
+      },
+    },
+  ]);
+  res.json({
+    monthUsd: agg?.monthUsd || 0,
+    monthCalls: agg?.monthCalls || 0,
+    totalUsd: agg?.totalUsd || 0,
+    calls: agg?.calls || 0,
+    budgetUsd: req.user.aiMonthlyBudgetUsd || 0,
+  });
+}));
+
+// POST /api/ai/budget { usd } -> set/clear the monthly AI spend budget (USD).
+router.post('/budget', asyncHandler(async (req, res) => {
+  const usd = Number(req.body.usd);
+  if (!Number.isFinite(usd) || usd < 0 || usd > 10000) {
+    return res.status(400).json({ error: 'תקציב לא תקין (0–10,000 דולר)' });
+  }
+  await User.updateOne({ _id: req.userId }, { aiMonthlyBudgetUsd: usd });
   res.json({ ok: true });
 }));
 

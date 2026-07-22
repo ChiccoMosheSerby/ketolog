@@ -36,10 +36,22 @@ function closeSettings() {
   document.querySelector('.settings-modal .settings-close')?.click();
 }
 
+// Open/close the products-picker popup (המוצרים והארוחות שלי) by clicking its
+// real 🧺 button / close button, for the step that tours the picker itself.
+function openPicker() {
+  if (document.querySelector('.picker-modal')) return;
+  document.querySelector('[data-tour="shortcuts"]')?.click();
+}
+function closePicker() {
+  document.querySelector('.picker-modal .picker-close')?.click();
+}
+
 export default function Onboarding() {
-  const { dismissOnboarding } = useAuth();
+  const { user, dismissOnboarding } = useAuth();
   const isMobile = useMediaQuery(MOBILE_QUERY);
-  const steps = buildSteps(isMobile);
+  // The copy adapts to whether AI features are on for this account (own API
+  // key / the owner) — the flows differ, so the tour teaches the right one.
+  const steps = buildSteps(isMobile, !!user?.ai?.enabled);
 
   const [i, setI] = useState(0);
   const [rect, setRect] = useState(null); // target rect in viewport coords; null = no spotlight
@@ -50,6 +62,7 @@ export default function Onboarding() {
 
   const finish = useCallback(() => {
     closeSettings(); // don't leave the settings modal open behind the tour
+    closePicker(); // nor the products-picker popup
     selectTab('today'); // leave the user on the main tab
     setLeaving(true);
     setTimeout(() => dismissOnboarding(), 200);
@@ -77,10 +90,12 @@ export default function Onboarding() {
     };
 
     if (step.tab) selectTab(step.tab);
-    // Open the settings modal for steps that live inside it; close it otherwise
-    // (e.g. when the user steps back out to an earlier, non-modal step).
+    // Open the modal a step lives inside (settings / products picker); close
+    // the others (e.g. when the user steps back out to a non-modal step).
     if (step.modal === 'settings') openSettings();
     else closeSettings();
+    if (step.modal === 'picker') openPicker();
+    else closePicker();
     setRect(null); // hide the old spotlight while the tab/carousel/modal transitions
 
     // Wait out the tab switch / carousel scroll / modal render before measuring,
@@ -116,11 +131,20 @@ export default function Onboarding() {
     height: rect.height + PAD * 2,
   };
 
+  // The card normally docks bottom-center and stays put (so Next never moves).
+  // Only inside the products-picker steps it may flip to the top edge, when the
+  // spotlighted element (the picker's footer buttons) sits under the card.
+  const CARD_ZONE = 340; // ≈ tallest card + its margin
+  const dockTop =
+    step.modal === 'picker' &&
+    !!rect &&
+    rect.top + rect.height > window.innerHeight - CARD_ZONE;
+
   return (
     <div className={'tour-root' + (leaving ? ' leaving' : '')} role="dialog" aria-modal="true">
       {rect ? <div className="tour-spot" style={spotStyle} /> : <div className="tour-veil" />}
 
-      <div className="tour-tip dock-bottom">
+      <div className={'tour-tip ' + (dockTop ? 'dock-top' : 'dock-bottom')}>
         <button className="tour-skip" onClick={finish} aria-label="דלג">
           דלג/י
         </button>
@@ -165,8 +189,14 @@ export default function Onboarding() {
 }
 
 // Each step points at a real element (anchor) and, if needed, the tab it lives
-// in. The welcome step is anchorless (centered). Copy adapts to the device.
-function buildSteps(isMobile) {
+// in. Anchorless steps show centered over a veil (welcome / concepts that have
+// no single element). Copy adapts to the device AND to whether AI features are
+// on for this account (`aiOn`) — no-key users learn the free Claude-link flow,
+// key users learn the in-app one. Ordered along the real usage flow:
+// budget → nav → composing a meal (all entry points) → editing / reusing logged
+// meals → journal → insights → the products catalog → settings (incl. what an
+// API key adds and how to set it up).
+function buildSteps(isMobile, aiOn) {
   const navHint = isMobile
     ? 'החלקה שמאלה/ימינה מחליפה ביניהן.'
     : 'לחיצה על לשונית מחליפה את התצוגה.';
@@ -174,7 +204,7 @@ function buildSteps(isMobile) {
     {
       emoji: '🥑',
       title: 'ברוכים הבאים ליומן קטו',
-      text: 'בואו נכיר את כל הפיצ׳רים — איפה כל דבר נמצא ואיך משתמשים בו. ייקח פחות מדקה, וכל שלב מדגיש לך את האזור באפליקציה.',
+      text: 'בואו נכיר את כל הפיצ׳רים — איפה כל דבר נמצא ואיך משתמשים בו, צעד אחרי צעד לפי סדר העבודה האמיתי. ייקח כשתי דקות, וכל שלב מדגיש לך את האזור באפליקציה.',
     },
     {
       anchor: 'carb-ring',
@@ -193,29 +223,109 @@ function buildSteps(isMobile) {
       anchor: 'add-meal',
       tab: 'today',
       emoji: '🍳',
-      title: 'הוספת ארוחה',
-      text: 'כאן מוסיפים ארוחה ליומן. בשלבים הבאים נראה בדיוק איך — מה כותבים ואיזה כפתור לוחצים.',
-    },
-    {
-      anchor: 'meal-desc',
-      tab: 'today',
-      emoji: '⌨️',
-      title: 'כותבים מה אכלת',
-      text: 'בשדה הזה כותבים תיאור חופשי, למשל: "חביתה מ-3 ביצים, פרוסת גאודה ומלפפון". לא צריך להזין ערכים — ה-AI מפרק לפריטים ומעריך פחמימות, שומן וחלבון. יש גם 🎤 הקלטה קולית במקום להקליד.',
+      title: 'הוספת ארוחה — הלב של היומן',
+      text: 'כאן מוסיפים ארוחה ליומן, ויש כמה דרכים לעשות את זה: מוצרים שמורים בקליק, תיאור חופשי בטקסט, או שכפול מארוחות קודמות. בשלבים הבאים נעבור על כולן.',
     },
     {
       anchor: 'shortcuts',
       tab: 'today',
       emoji: '⚡',
-      title: 'הוספה מהירה מהמוצרים שלך',
-      text: 'הכפתור פותח את כל המוצרים והארוחות השמורות שלך, מסודרים לפי קטגוריות. קליק מוסיף ישר לפירוט הארוחה — וגם שכפול הארוחות של אתמול נמצא שם.',
+      title: 'הדרך המהירה: המוצרים השמורים שלך',
+      text: 'הכפתור פותח את המוצרים והתבניות שלך לפי קטגוריות. קליק מוסיף לפירוט הארוחה, והסכום מחושב מקומית מהערכים המדויקים שלך — מיידי, בלי AI ובלי עלות. בואו נציץ פנימה.',
+    },
+    {
+      anchor: 'picker',
+      tab: 'today',
+      modal: 'picker',
+      emoji: '🧺',
+      title: 'המוצרים והארוחות שלי — מבפנים',
+      text: 'כך נראית הרשימה (כאן עם נתוני דוגמה): המוצרים שלך מקובצים בקטגוריות, עם חיפוש ומיון לפי שימוש / פחמימות / א״ב. בואו נעבור על מה שעושים כאן.',
+    },
+    {
+      anchor: 'picker-add',
+      tab: 'today',
+      modal: 'picker',
+      emoji: '➕',
+      title: 'מוסיפים מוצר בקליק',
+      text: 'לחיצה על ➕ (או על שורת המוצר) מוסיפה אותו לפירוט הארוחה; עוד לחיצה מגדילה כמות. ★ מצמיד מוצר אהוב לראש הרשימה, ולחיצה על שם המוצר פותחת את חלון הפרטים שלו.',
+    },
+    {
+      anchor: 'picker-cat',
+      tab: 'today',
+      modal: 'picker',
+      emoji: '🗂️',
+      title: 'קטגוריות',
+      text: 'לחיצה על כותרת פותחת/סוגרת קטגוריה. קטגוריות שיצרתם ניתנות לשינוי שם (✎) ולמחיקה (✕). כדי להעביר מוצר לקטגוריה אחרת — פותחים את חלון הפרטים שלו (לחיצה על השורה) ובוחרים שם קטגוריה.',
+    },
+    {
+      anchor: 'picker-new-cat',
+      tab: 'today',
+      modal: 'picker',
+      emoji: '🆕',
+      title: 'קטגוריה חדשה',
+      text: 'הכפתור יוצר קטגוריה חדשה משלכם — היא מופיעה מיד ברשימה, ומעבירים אליה מוצרים דרך חלון הפרטים של כל מוצר. גם קלוד בוחר מהקטגוריות האלה כשמוסיפים מוצר חדש.',
+    },
+    {
+      anchor: 'picker-done',
+      tab: 'today',
+      modal: 'picker',
+      emoji: '✅',
+      title: 'ובסוף — מאשרים',
+      text: 'מה שבחרתם מצטבר בשורת הפירוט שלמטה. לחיצה על "סיום" סוגרת את הרשימה וחוזרת לטופס עם הפירוט מוכן — נשאר רק ללחוץ ✓ כדי לחשב ולרשום את הארוחה. יש כאן גם שכפול של כל ארוחות אתמול בלחיצה.',
+    },
+    {
+      anchor: 'meal-desc',
+      tab: 'today',
+      emoji: '⌨️',
+      title: 'או: כותבים מה אכלת',
+      text: aiOn
+        ? 'בשדה הזה כותבים תיאור חופשי, למשל: "חביתה מ-3 ביצים, פרוסת גאודה ומלפפון". לא צריך להזין ערכים — ה-AI מפרק לפריטים ומעריך פחמימות, שומן וחלבון בלחיצה אחת.'
+        : 'בשדה הזה כותבים תיאור חופשי, למשל: "חביתה מ-3 ביצים, פרוסת גאודה ומלפפון". לא צריך להזין ערכים — החישוב נעשה בצ׳אט קלוד שלך (בחינם), ומיד נראה איך.',
     },
     {
       anchor: 'meal-submit',
       tab: 'today',
       emoji: '✅',
-      title: 'חשב והוסף ארוחה',
-      text: 'לוחצים על "חשב והוסף ארוחה" — המערכת מחשבת את המאקרו ושומרת את הארוחה ליומן. רוצים רק לבדוק בלי לשמור? "חשב פחמימות בלבד" מציג את ההערכה מבלי לרשום.',
+      title: 'הכפתור הראשי — חשב ורשום',
+      text: aiOn
+        ? 'לחיצה על ✓ מחשבת את המאקרו ורושמת את הארוחה ביומן בלחיצה אחת. אם הערכים כבר מולאו (ממוצרים שמורים או מקישור של קלוד) — הוא פשוט רושם.'
+        : 'ארוחה שמורכבת רק ממוצרים שמורים — ✓ מחשב ורושם מיד. כתבתם טקסט חופשי? ✓ יפתח את קלוד עם כל הנתונים; קלוד יחזיר קישור שממלא את הטופס כאן — ואז ✓ רושם.',
+    },
+    ...(aiOn
+      ? [
+          {
+            anchor: 'claude-submit',
+            tab: 'today',
+            emoji: '🤖',
+            title: 'אותו חישוב — בקלוד שלך',
+            text: 'רוצים לחשב בצ׳אט קלוד האישי במקום בתוך האפליקציה (ללא עלות API)? הכפתור פותח את קלוד עם כל הנתונים, וקלוד מחזיר קישור שממלא את הטופס כאן.',
+          },
+        ]
+      : []),
+    {
+      anchor: 'product-submit',
+      tab: 'today',
+      emoji: '📦',
+      title: 'מוצר חדש — מאותה תיבת טקסט',
+      text: 'כותבים את פרטי המוצר (למשל: "יוגורט יווני 5%, גביע 150 גרם") ולוחצים 📦. קלוד מחשב ערכים, בוחר קטגוריה מהרשימה שלך, ומחזיר קישור שפותח כאן אישור — בודקים, מתקנים ומאשרים.',
+    },
+    ...(aiOn
+      ? [
+          {
+            anchor: 'calc-only',
+            tab: 'today',
+            emoji: '🧮',
+            title: 'חישוב בלבד — בלי לרשום',
+            text: 'מחשב את המאקרו של מה שכתבתם ומציג את הפירוט — בלי לשמור ליומן. שימושי כשרוצים רק לבדוק כמה פחמימות יש במשהו לפני שמחליטים.',
+          },
+        ]
+      : []),
+    {
+      anchor: 'reset-form',
+      tab: 'today',
+      emoji: '↺',
+      title: 'איפוס הטופס',
+      text: 'מנקה את תיבת הטקסט והערכים ומחזיר את התאריך להיום — התחלה נקייה לארוחה הבאה.',
     },
     {
       anchor: 'meal-time',
@@ -225,12 +335,37 @@ function buildSteps(isMobile) {
       text: 'לכל ארוחה שנשמרה יש שעה. הקש/י על השעה כדי לתקן אותה — מקלידים ספרות בלבד (למשל 0930) והיא נשמרת כ-09:30, והארוחה מסתדרת מחדש לפי הסדר הכרונולוגי.',
     },
     {
-      anchor: 'chat',
+      anchor: 'meal-to-product',
       tab: 'today',
-      emoji: '💬',
-      title: 'קֶטוֹ — העוזר/ת החכם/ה',
-      text: 'מהבועה הזו שואלים אם מוצר מתאים לקיטו, מבקשים חלופה, שולחים תמונה — ואפילו מבקשים להוסיף ארוחה ליומן. קֶטוֹ רואה את היומן שלך ועונה לפי הנתונים האמיתיים.',
+      emoji: '📦',
+      title: 'מארוחה שנרשמה — למוצר שמור',
+      text: 'ליד כל ארוחה ביומן יש כפתור 📦 — לחיצה שומרת את הארוחה כולה כמוצר ברשימה שלך: נותנים שם קצר ומאשרים. ככה הקטלוג נבנה מהאוכל האמיתי שלך.',
     },
+    {
+      anchor: 'item-to-product',
+      tab: 'today',
+      emoji: '🧩',
+      title: 'וגם פריט בודד מתוך הארוחה',
+      text: 'בפירוט הארוחה, לכל מרכיב יש 📦 משלו — שומר רק אותו כמוצר, עם הערכים ליחידה שלו (ביצה, פרוסה, כוס…). מושלם למרכיבים שחוזרים בהרבה ארוחות: פעם אחת שומרים, ומאז מוסיפים בקליק.',
+    },
+    {
+      anchor: 'meal-actions',
+      tab: 'today',
+      emoji: '⭐',
+      title: 'עוד פעולות על ארוחה',
+      text: 'בתוך ארוחה פתוחה: ★ שומר אותה כתבנית לשימוש חוזר, ⧉ משכפל אותה ליום הנבחר, ו-✕ מוחק. יש גם ➕ שמוסיף את הטקסט שלה לתיבת ההוספה — בסיס לארוחה דומה.',
+    },
+    ...(aiOn
+      ? [
+          {
+            anchor: 'chat',
+            tab: 'today',
+            emoji: '💬',
+            title: 'קֶטוֹ — העוזר/ת החכם/ה',
+            text: 'מהבועה הזו שואלים אם מוצר מתאים לקיטו, מבקשים חלופה, שולחים תמונה — ואפילו מבקשים להוסיף ארוחה ליומן. קֶטוֹ רואה את היומן שלך ועונה לפי הנתונים האמיתיים.',
+          },
+        ]
+      : []),
     {
       anchor: 'journal',
       tab: 'today',
@@ -242,22 +377,26 @@ function buildSteps(isMobile) {
       anchor: 'insights',
       tab: 'insights',
       emoji: '📈',
-      title: 'תובנות חכמות',
-      text: 'כאן חיים לוח המחוונים והדוחות: ממוצעים ורצפים, התקדמות תקופת הקיטו, ודוחות AI שבועיים/חודשיים שנכתבים אוטומטית ומזהים מגמות והמלצות — בלי שתצטרך/י לבקש.',
+      title: 'תובנות',
+      text: aiOn
+        ? 'לוח המחוונים המלא: ממוצעים ורצפים, התקדמות תקופת הקיטו, מאזן אנרגיה, מגמת משקל ושיאים — וגם דוחות AI שבועיים/חודשיים שנכתבים אוטומטית ומזהים מגמות והמלצות.'
+        : 'לוח המחוונים המלא — ממוצעים ורצפים, התקדמות תקופת הקיטו, מאזן אנרגיה, מגמת משקל ושיאים — עובד תמיד, בלי AI. דוחות התובנות האוטומטיים (שבועי/חודשי) נוספים למי שמגדיר מפתח API — עוד רגע נראה איפה.',
     },
     {
       anchor: 'products',
       tab: 'products',
-      emoji: '📦',
+      emoji: '🧺',
       title: 'המוצרים שלי',
-      text: 'שומרים כאן מוצרים קבועים שאת/ה אוכל/ת הרבה, עם הערכים התזונתיים שלהם. הם קופצים כתגיות מהירות בהוספת ארוחה — וה-AI משתמש בערכים המדויקים שלך.',
+      text: 'הקטלוג האישי שלך: מוצרים קבועים עם הערכים המדויקים שלהם, מסודרים בקטגוריות. מוסיפים בכמה דרכים — ידנית מהאריזה, דרך 📦 בהוספת ארוחה, מתוך ארוחות שנרשמו, או בסריקת ברקוד. ככל שהקטלוג גדל, יותר ארוחות נרשמות בקליק ובחינם.',
     },
     {
       anchor: 'barcode',
       tab: 'products',
       emoji: '📷',
       title: 'סריקת ברקוד',
-      text: 'הכפתור פותח את סורק הברקוד במצלמה — מכוונים לברקוד המוצר וכל הערכים התזונתיים נמשכים אוטומטית. אפשר גם לזהות מוצר מתמונה או להקליד ברקוד ידנית.',
+      text: aiOn
+        ? 'מכוונים את המצלמה לברקוד המוצר והערכים נמשכים ממסד מזון עולמי, עם דיוק משופר של ה-AI (סיבים, תוויות). אפשר גם לזהות מוצר מצילום האריזה — 📷 צילום או 🖼️ תמונה.'
+        : 'מכוונים את המצלמה לברקוד המוצר והערכים התזונתיים נמשכים ממסד מזון עולמי — עובד גם בלי מפתח AI (חישוב גולמי). עם מפתח API הדיוק משתפר ומתווסף גם זיהוי מוצר מצילום.',
     },
     {
       anchor: isMobile ? 'menu' : 'settings',
@@ -275,11 +414,41 @@ function buildSteps(isMobile) {
       text: 'זה תקציב הפחמימות נטו (בגרמים) שאת/ה מכוון/ת אליו בכל יום — בדרך כלל 20–30 גרם בקיטו. הטבעת בראש המסך נמדדת מול היעד הזה. אפשר לשנות בכל עת.',
     },
     {
+      anchor: 'set-loss',
+      modal: 'settings',
+      emoji: '📉',
+      title: 'יעד ירידה במשקל',
+      text: 'כמה ק"ג לחודש את/ה רוצה לרדת (0 = שימור). מהיעד הזה נגזר אוטומטית תקציב הקלוריות היומי: השריפה המחושבת שלך פחות הגרעון שהיעד דורש — אין צורך להזין יעד קלוריות ידני.',
+    },
+    {
+      anchor: 'set-body',
+      modal: 'settings',
+      emoji: '📏',
+      title: 'גובה ושנת לידה',
+      text: 'יחד עם המין והמשקל, הנתונים האלה נותנים הערכה ראשונית של שריפת הקלוריות שלך (נוסחת Mifflin-St Jeor) — עד שיצטברו מספיק שקילות ואז החישוב עובר לנתונים האמיתיים שלך.',
+    },
+    {
       anchor: 'set-keto',
       modal: 'settings',
       emoji: '📅',
       title: 'יעד קיטו',
       text: 'כמה חודשים את/ה מתכנן/ת להיות בקיטו. זה מזין את מד ההתקדמות של תקופת הקיטו בתובנות. אפס = בלי יעד תקופה.',
+    },
+    {
+      anchor: 'set-weight',
+      modal: 'settings',
+      emoji: '⚖️',
+      title: 'שקילה',
+      text: 'כאן מזינים את המשקל — מומלץ פעמיים בשבוע, באותו בוקר. השקילות מזינות את מגמת המשקל בתובנות ואת חישוב שריפת הקלוריות האמיתית שלך, והשמירה מיידית.',
+    },
+    {
+      anchor: 'set-ai',
+      modal: 'settings',
+      emoji: '🤖',
+      title: 'תכונות AI — אופציונלי',
+      text: aiOn
+        ? 'ה-AI פעיל בחשבון שלך. כאן רואים את הסטטוס, את השימוש החודשי בדולרים, ומגדירים תקציב חודשי — תקבל/י התראה כשמתקרבים אליו, עוד לפני שהקרדיט נגמר.'
+        : 'בלי מפתח — הכל עובד דרך קלוד בחינם. מי שמדביק כאן מפתח API של Anthropic (מ-console.anthropic.com) מקבל: חישוב ארוחה בלחיצה אחת בתוך האפליקציה, את הצ׳אט קֶטוֹ, דוחות תובנות אוטומטיים, זיהוי מוצר מתמונה וברקוד מדויק יותר. המפתח נבדק, נשמר מוצפן ורץ על חשבונך — ואפשר להגדיר תקציב חודשי עם התראה.',
     },
     // WhatsApp service disabled for all users — restore this step with it.
     // {

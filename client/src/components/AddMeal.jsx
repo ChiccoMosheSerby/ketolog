@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-// import { api } from "../lib/api.js"; // was only used by the retired in-app AI calc
+import { api } from "../lib/api.js";
 import { useAuth } from "../lib/auth.jsx";
 import { useToast } from "../lib/toast.jsx";
 import { useSpeech, speechErrorMessage } from "../lib/useSpeech.js";
@@ -35,9 +35,12 @@ export default function AddMeal({
 }) {
   const toast = useToast();
   // Voice dictation transcribes server-side (a paid AI call), so the mic shows
-  // only for accounts whose /me payload says voice is available.
-  const { user } = useAuth();
+  // only for accounts whose /me payload says voice is available. `aiOn` gates
+  // the in-app AI meal calc — accounts with a working key calc without leaving
+  // the app; everyone else goes through the Claude-link flow.
+  const { user, needsOnboarding } = useAuth();
   const voiceOn = !!user?.ai?.voice;
+  const aiOn = !!user?.ai?.enabled;
   const [carb, setCarb] = useState("");
   const [desc, setDesc] = useState("");
   const [pendingMacro, setPendingMacro] = useState({
@@ -335,47 +338,59 @@ export default function AddMeal({
     if (thenLog) await doAdd(t.carbs, { fat: t.fat, protein: t.protein }, t.items, "local");
   }
 
-  // In-app AI estimation (api.estimateMeal) is retired — kept here commented
-  // out in case it ever comes back:
-  //
-  // setBusy(true);
-  // setNote({ loading: true });
-  // try {
-  //   const r = await api.estimateMeal(d);
-  //   const n = Number(r.net_carbs);
-  //   const fat = Number(r.fat);
-  //   const prot = Number(r.protein);
-  //   const mealItems = Array.isArray(r.items) ? r.items : [];
-  //   // 'local' = the server matched the user's own saved products (above all)
-  //   const src = r.source === "local" ? "local" : "ai";
-  //   setCalcSource(src);
-  //   const carbsValue = isNaN(n) ? "" : fmt(n);
-  //   const macro = { fat: isNaN(fat) ? null : fat, protein: isNaN(prot) ? null : prot };
-  //   setCarb(carbsValue);
-  //   setPendingMacro(macro);
-  //   setItems(mealItems);
-  //   const mp = !isNaN(fat) && !isNaN(prot)
-  //     ? macroPct({ carb: isNaN(n) ? 0 : n, fat, protein: prot })
-  //     : null;
-  //   setNote({
-  //     carbs: isNaN(n) ? "?" : fmt(n),
-  //     fat: isNaN(fat) ? "?" : fmt(fat),
-  //     protein: isNaN(prot) ? "?" : fmt(prot),
-  //     mp, items: mealItems, local: src === "local", ai: src === "ai",
-  //   });
-  //   if (thenLog && !isNaN(n)) await doAdd(carbsValue, macro, mealItems, src);
-  // } catch {
-  //   setNote({ error: "לא הצלחתי לחשב אוטומטית כרגע — נסו שוב בעוד רגע." });
-  // } finally {
-  //   setBusy(false);
-  // }
+  // In-app AI estimation — available only when the account has a working AI
+  // key (the server bills that key). Everyone else gets the Claude-link flow.
+  async function runAiCalc(thenLog) {
+    setBusy(true);
+    setNote({ loading: true });
+    try {
+      const r = await api.estimateMeal(desc.trim());
+      const n = Number(r.net_carbs);
+      const fat = Number(r.fat);
+      const prot = Number(r.protein);
+      const mealItems = Array.isArray(r.items) ? r.items : [];
+      // 'local' = the server matched the user's own saved products (above all)
+      const src = r.source === "local" ? "local" : "ai";
+      setCalcSource(src);
+      const carbsValue = isNaN(n) ? "" : fmt(n);
+      const macro = { fat: isNaN(fat) ? null : fat, protein: isNaN(prot) ? null : prot };
+      setCarb(carbsValue);
+      setPendingMacro(macro);
+      setItems(mealItems);
+      const mp = !isNaN(fat) && !isNaN(prot)
+        ? macroPct({ carb: isNaN(n) ? 0 : n, fat, protein: prot })
+        : null;
+      setNote({
+        carbs: isNaN(n) ? "?" : fmt(n),
+        fat: isNaN(fat) ? "?" : fmt(fat),
+        protein: isNaN(prot) ? "?" : fmt(prot),
+        mp, items: mealItems, local: src === "local", ai: src === "ai",
+      });
+      if (thenLog && !isNaN(n)) await doAdd(carbsValue, macro, mealItems, src);
+    } catch (e) {
+      // key problems (no credit / invalid) arrive with a specific message
+      const msg = e?.message && e.message !== "שגיאה" ? e.message : "";
+      setNote({ error: msg || "לא הצלחתי לחשב אוטומטית כרגע — נסו שוב בעוד רגע." });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // One dispatcher for "calculate this meal": saved-products sum (free) →
+  // in-app AI (key accounts) → Claude link (everyone else).
+  function runCalc(thenLog) {
+    if (!desc.trim()) {
+      toast("כתוב/י קודם מה אכלת");
+      return;
+    }
+    if (canSumLocally()) return runLocalCalc(thenLog);
+    if (aiOn) return runAiCalc(thenLog);
+    return sendToClaude("meal");
+  }
 
   function onAddClick() {
-    if (desc.trim() && carb === "") {
-      // pure saved-products list → sum locally and log; free text → Claude
-      if (canSumLocally()) runLocalCalc(true);
-      else sendToClaude("meal");
-    } else doAdd(carb, pendingMacro, items);
+    if (desc.trim() && carb === "") runCalc(true);
+    else doAdd(carb, pendingMacro, items);
   }
 
   // Clear the meal being composed: description / picked products / carbs /
@@ -441,7 +456,11 @@ export default function AddMeal({
           <textarea
             data-tour="meal-desc"
             rows={1}
-            placeholder="מה אכלת? תיאור חופשי — החישוב ייפתח בקלוד"
+            placeholder={
+              aiOn
+                ? "מה אכלת? תיאור חופשי — המערכת תחשב לבד"
+                : "מה אכלת? תיאור חופשי — החישוב ייפתח בקלוד"
+            }
             value={desc}
             onChange={onDescChange}
           />
@@ -464,9 +483,11 @@ export default function AddMeal({
           )}
         </div>
 
-        {/* the two Claude senders sit side by side and share the text box above:
-            the main submit calculates a MEAL (or logs directly when the values
-            are already known), and 📦 sends the same text as a new PRODUCT */}
+        {/* the senders sit side by side and share the text box above: the main
+            submit calculates a MEAL — in-app for AI-key accounts, via a Claude
+            link otherwise (or logs directly when the values are already known);
+            🤖 (key accounts only) forces the Claude-link flow instead; 📦 sends
+            the same text as a new PRODUCT */}
         <div className="composer-submits">
           <button
             className="btn composer-submit"
@@ -481,19 +502,38 @@ export default function AddMeal({
                     ? "הוסף ארוחה"
                     : canSumLocally()
                       ? "חשב מהמוצרים השמורים והוסף ארוחה"
-                      : "חשב ארוחה בקלוד — ייפתח צ'אט שיחזיר קישור למילוי הטופס"
+                      : aiOn
+                        ? "חשב והוסף ארוחה"
+                        : "חשב ארוחה בקלוד — ייפתח צ'אט שיחזיר קישור למילוי הטופס"
             }
             onClick={onAddClick}
           >
             {busy
               ? "…"
-              : desc.trim() && carb === "" && !canSumLocally()
+              : desc.trim() && carb === "" && !canSumLocally() && !aiOn
                 ? "🤖"
                 : "✓"}
           </button>
+          {aiOn && (
+            <button
+              type="button"
+              className="btn ghost composer-submit composer-product"
+              data-tour="claude-submit"
+              disabled={busy || !desc.trim()}
+              title={
+                desc.trim()
+                  ? "חשב ארוחה בקלוד (בצ'אט שלכם, ללא עלות) — יחזיר קישור למילוי הטופס"
+                  : "כתבו קודם מה אכלתם"
+              }
+              onClick={() => sendToClaude("meal")}
+            >
+              🤖
+            </button>
+          )}
           <button
             type="button"
             className="btn ghost composer-submit composer-product"
+            data-tour="product-submit"
             disabled={busy || !desc.trim()}
             title={
               desc.trim()
@@ -507,20 +547,24 @@ export default function AddMeal({
         </div>
 
         <div className="composer-tools">
-          {/* In-app "calc only" is retired — free-text calc goes through Claude now.
+          {/* calc without logging — meaningful only when the calc happens
+              in-app (AI-key accounts / saved-products sums) */}
+          {aiOn && (
+            <button
+              type="button"
+              className="mini-tool"
+              data-tour="calc-only"
+              title="חשב פחמימות בלבד — בלי לרשום"
+              disabled={busy}
+              onClick={() => runCalc(false)}
+            >
+              🧮
+            </button>
+          )}
           <button
             type="button"
             className="mini-tool"
-            title="חשב פחמימות בלבד — בלי לרשום"
-            disabled={busy}
-            onClick={() => runCalc(false)}
-          >
-            🧮
-          </button>
-          */}
-          <button
-            type="button"
-            className="mini-tool"
+            data-tour="reset-form"
             title="איפוס: היום, ניקוי שדות"
             disabled={busy}
             onClick={resetForm}
@@ -612,6 +656,7 @@ export default function AddMeal({
           onRepeatYesterday={onRepeatYesterday}
           canRepeat={canRepeat}
           onClose={() => setModal("")}
+          tourOpen={needsOnboarding}
         />
       )}
 

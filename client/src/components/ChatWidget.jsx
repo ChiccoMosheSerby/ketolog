@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
+import { useAuth } from '../lib/auth.jsx';
 import { useToast } from '../lib/toast.jsx';
 import { useSpeech, speechErrorMessage } from '../lib/useSpeech.js';
 import { fmt } from '../lib/helpers.js';
@@ -9,6 +10,17 @@ import './ChatWidget.scss';
 
 const GREETING =
   'היי! אני קֶטוֹ, העוזר/ת הקטוגני/ת שלך 🥑\nאפשר לשאול אותי אם מוצר מתאים לקיטו, לבקש חלופה טובה יותר, לשלוח תמונה של מוצר או תווית, או לבקש ממני להוסיף ארוחה / מוצר ליומן.';
+
+// The floating bubble can be hidden (per device) from the settings modal; the
+// chat then opens only from there, via the ketolog:openChat event.
+export const CHAT_HIDDEN_KEY = 'ketolog:hideChat';
+export const isChatHidden = () => {
+  try {
+    return localStorage.getItem(CHAT_HIDDEN_KEY) === '1';
+  } catch {
+    return false;
+  }
+};
 
 // Pull the displayable fields out of an action whether it came from POST
 // (payload) or from a reloaded thread view (raw tool input).
@@ -29,6 +41,10 @@ function actionView(a) {
 
 export default function ChatWidget() {
   const toast = useToast();
+  // Voice runs on the app's transcription key — currently off for everyone
+  // (user.ai.voice), so the mic hides even where SpeechRecognition exists.
+  const { user } = useAuth();
+  const voiceOn = !!user?.ai?.voice;
   const [open, setOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [conversationId, setConversationId] = useState(null);
@@ -48,6 +64,20 @@ export default function ChatWidget() {
     },
     onError: (err) => toast(speechErrorMessage(err)),
   });
+
+  // Bubble visibility preference (toggled in settings) + the settings modal's
+  // "open the chat" button, which works whether or not the bubble is hidden.
+  const [fabHidden, setFabHidden] = useState(isChatHidden);
+  useEffect(() => {
+    const onPref = () => setFabHidden(isChatHidden());
+    const onOpen = () => setOpen(true);
+    window.addEventListener('ketolog:chatHiddenChanged', onPref);
+    window.addEventListener('ketolog:openChat', onOpen);
+    return () => {
+      window.removeEventListener('ketolog:chatHiddenChanged', onPref);
+      window.removeEventListener('ketolog:openChat', onOpen);
+    };
+  }, []);
 
   // load the most recent thread the first time the panel opens
   useEffect(() => {
@@ -183,7 +213,7 @@ export default function ChatWidget() {
   return (
     <>
       <button
-        className={'chat-fab' + (open ? ' hidden' : '')}
+        className={'chat-fab' + (open || fabHidden ? ' hidden' : '')}
         data-tour="chat"
         onClick={() => setOpen(true)}
         aria-label="פתח/י את העוזר הקטוגני"
@@ -260,7 +290,7 @@ export default function ChatWidget() {
               📎
             </button>
             <input ref={fileRef} type="file" accept="image/*" hidden onChange={pickImage} />
-            {speech.supported && (
+            {voiceOn && speech.supported && (
               <button
                 className={'icon-btn' + (speech.listening ? ' rec' : '')}
                 onClick={toggleMic}

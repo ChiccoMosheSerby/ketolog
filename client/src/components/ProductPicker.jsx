@@ -46,6 +46,8 @@ export default function ProductPicker({
   onRepeatYesterday,
   canRepeat,
   onClose,
+  // guided tour: render every category open so the rows (tour anchors) exist
+  tourOpen = false,
 }) {
   const [sort, setSort] = useState(
     () => localStorage.getItem(SORT_KEY) || "usage",
@@ -301,6 +303,7 @@ export default function ProductPicker({
       <button
         type="button"
         className="pi-add"
+        data-tour="picker-add"
         title="הוסף לפירוט הארוחה"
         onClick={() => onApplyProduct(p)}
       >
@@ -402,12 +405,15 @@ export default function ProductPicker({
     onRename = null,
     onDelete = null,
   ) {
-    const open = pinnedOpen || openCats.has(cat);
+    // during the guided tour every group is open, so the product rows (tour
+    // anchors) are actually in the DOM
+    const open = pinnedOpen || tourOpen || openCats.has(cat);
     return (
       <div className={"picker-group" + (open ? " open" : "")} key={cat}>
         <button
           type="button"
           className="picker-ghead"
+          data-tour={pinnedOpen ? undefined : "picker-cat"}
           onClick={() => !pinnedOpen && toggleCat(cat)}
           aria-expanded={open}
         >
@@ -428,6 +434,7 @@ export default function ProductPicker({
     <div className="picker-scrim" onClick={onClose}>
       <div
         className="picker-modal"
+        data-tour="picker"
         role="dialog"
         aria-modal="true"
         aria-label="המוצרים והארוחות שלי"
@@ -552,6 +559,7 @@ export default function ProductPicker({
           <div className="picker-actions">
             <button
               className="btn ghost mini"
+              data-tour="picker-new-cat"
               onClick={createCat}
               title="הוספת קטגוריה חדשה לרשימה"
             >
@@ -575,7 +583,7 @@ export default function ProductPicker({
                 ✕ נקה
               </button>
             )}
-            <button className="btn mini" onClick={onClose}>
+            <button className="btn mini" data-tour="picker-done" onClick={onClose}>
               סיום
             </button>
           </div>

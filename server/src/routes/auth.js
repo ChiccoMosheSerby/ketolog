@@ -2,6 +2,8 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
+import Day from '../models/Day.js';
+import Insight from '../models/Insight.js';
 import { requireAuth } from '../middleware/auth.js';
 import {
   AUTO_APPROVED_EMAILS,
@@ -56,6 +58,7 @@ const userPayload = (u) => {
       optOut: Boolean(u.aiOptOut), // owner preview toggle state
       canToggle: usesEnvKey(u), // who sees that toggle
       keyError: u.aiKeyError || '', // 'auth' | 'no_credit' | ''
+      monthlyBudgetUsd: u.aiMonthlyBudgetUsd || 0, // self-set spend budget (0 = none)
       // Voice dictation is disabled for everyone for now (it bills the app's
       // OpenAI key). To bring it back, restore:
       // voice: ai.enabled && ai.source === 'env' && transcribeConfigured(),
@@ -65,7 +68,7 @@ const userPayload = (u) => {
 };
 
 const PROFILE_FIELDS =
-  'email gender dailyCarbTarget monthlyLossTarget heightCm birthYear ketoStartDate ketoGoalMonths whatsappPhone anthropicApiKey aiOptOut aiKeyError';
+  'email gender dailyCarbTarget monthlyLossTarget heightCm birthYear ketoStartDate ketoGoalMonths whatsappPhone anthropicApiKey aiOptOut aiKeyError aiMonthlyBudgetUsd';
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 // Base URL for the approval link in the email.
@@ -252,6 +255,25 @@ router.post('/reset-password', resetLimiter, asyncHandler(async (req, res) => {
         '<p><a href="/">חזרה ל-KetoLog</a></p>'
     )
   );
+}));
+
+// POST /reset-account { confirm } — wipe the journal so the account starts
+// over from day 1: every day document (meals + weigh-ins) and every insight
+// report is deleted permanently. Products, templates, profile and the AI key
+// survive. The client requires typing "reset <email>" and so do we — the
+// typed phrase is re-validated here, so a stray API call can't wipe a journal.
+router.post('/reset-account', requireAuth, asyncHandler(async (req, res) => {
+  const expected = `reset ${req.user.email}`;
+  const typed = String(req.body.confirm || '').trim().toLowerCase();
+  if (typed !== expected) {
+    return res.status(400).json({ error: `לאישור האיפוס יש להקליד בדיוק: ${expected}` });
+  }
+  const [days, insights] = await Promise.all([
+    Day.deleteMany({ user: req.userId }),
+    Insight.deleteMany({ user: req.userId }),
+  ]);
+  console.log(`[reset] ${req.user.email}: ${days.deletedCount} days, ${insights.deletedCount} insights deleted`);
+  res.json({ ok: true, daysDeleted: days.deletedCount, insightsDeleted: insights.deletedCount });
 }));
 
 router.get('/me', requireAuth, asyncHandler(async (req, res) => {

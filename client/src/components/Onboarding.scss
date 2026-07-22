@@ -6,7 +6,9 @@
 .tour-root {
   position: fixed;
   inset: 0;
-  z-index: 1000;
+  /* above every app modal, including portaled ones appended later to <body>
+     (products picker / settings / product-confirm are 1000–1100) */
+  z-index: 1300;
   pointer-events: auto; /* block interaction with the app behind */
   animation: tour-fade 0.2s ease both;
 
