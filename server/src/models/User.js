@@ -31,6 +31,15 @@ const userSchema = new mongoose.Schema(
     // = not linked. Uniqueness is enforced by the partial index below (an empty
     // string never participates, so many un-linked users can coexist).
     whatsappPhone: { type: String, default: '' },
+    // The user's own Anthropic API key, encrypted at rest (see lib/aiAccess.js).
+    // Non-owner accounts get AI features only when this holds a working key.
+    anthropicApiKey: { type: String, default: '' },
+    // Owner preview toggle: force all AI features off for this account (to see
+    // how the app looks/behaves without them).
+    aiOptOut: { type: Boolean, default: false },
+    // Why the key stopped working ('auth' | 'no_credit' | ''), recorded when an
+    // AI call fails so the UI can explain instead of failing silently.
+    aiKeyError: { type: String, default: '' },
   },
   { timestamps: true }
 );

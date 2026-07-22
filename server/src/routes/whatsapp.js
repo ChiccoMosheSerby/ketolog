@@ -8,6 +8,7 @@ import {
   formatMealReceipt,
 } from '../lib/whatsapp.js';
 import { logMealFromDesc } from '../lib/logMeal.js';
+import { resolveAi } from '../lib/aiAccess.js';
 import { recordTwilioUsage } from '../lib/usage.js';
 
 const router = Router();
@@ -92,7 +93,18 @@ router.post('/inbound', async (req, res) => {
       return;
     }
 
-    const logged = await logMealFromDesc({ userId, desc: text });
+    // Meal estimation runs on the sender's resolved AI key (the app's env key
+    // for the owner, their own saved key otherwise) — same rule as in-app.
+    const ai = resolveAi(user);
+    if (!ai.enabled) {
+      await sendWhatsApp(
+        from,
+        'תכונות ה-AI כבויות בחשבון שלך, ולכן אי אפשר לחשב ארוחה מהודעה. הוסף/י מפתח API בהגדרות האפליקציה, או רשום/רשמי את הארוחה ישירות באפליקציה.',
+        { userId }
+      );
+      return;
+    }
+    const logged = await logMealFromDesc({ userId, desc: text, apiKey: ai.apiKey });
     await sendWhatsApp(from, formatMealReceipt(logged), { userId });
   } catch (err) {
     // Surface Twilio's real error code/status/moreInfo — 'Authenticate' alone

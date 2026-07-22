@@ -1,7 +1,8 @@
 import { useAuth } from './lib/auth.jsx';
 import Login from './components/Login.jsx';
 import Diary from './components/Diary.jsx';
-import ChatWidget from './components/ChatWidget.jsx';
+// Keto chat is disabled for now — kept commented out for a possible return.
+// import ChatWidget from './components/ChatWidget.jsx';
 import Onboarding from './components/Onboarding.jsx';
 import AppLinkConfirm from './components/AppLinkConfirm.jsx';
 import { AppSkeleton } from './components/Skeleton.jsx';
@@ -14,7 +15,7 @@ export default function App() {
   return (
     <>
       <Diary />
-      <ChatWidget />
+      {/* <ChatWidget /> */}
       <AppLinkConfirm />
       {needsOnboarding && <Onboarding />}
     </>

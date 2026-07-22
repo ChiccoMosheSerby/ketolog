@@ -7,6 +7,7 @@
 // the next time the panel loads. Reuses the shared keto "brain" (ketoRules) and
 // the resilient JSON parser from anthropic.js.
 import { getClient, CHAT_MODEL, ketoRules, parseJsonReply } from './anthropic.js';
+import { keyErrorCode, flagKeyError, clearKeyError } from './aiAccess.js';
 import { recordAnthropicUsage } from './usage.js';
 import {
   buildDigest,
@@ -132,9 +133,10 @@ function genderInstruction(gender) {
 
 // One Claude call for a single period's report. `prior` is the condensed history
 // of earlier same-period reports (newest first), used for trend continuity.
-// `gender` ('male'|'female'|'') controls Hebrew grammatical address.
-export async function generateReport(digest, focus, prior = [], gender = '', userId = null) {
-  const client = getClient();
+// `gender` ('male'|'female'|'') controls Hebrew grammatical address. `apiKey`
+// is the per-user resolved key (env for the owner, the user's own otherwise).
+export async function generateReport(digest, focus, prior = [], gender = '', userId = null, apiKey = null) {
+  const client = getClient(apiKey);
   const periodName = focus.period === 'weekly' ? 'השבועי' : 'החודשי';
   const priorBlock = prior.length
     ? `\n\nהדוחות הקודמים שלך (priorInsights, מהחדש לישן) — התבסס/י עליהם לתיאור המגמה:\n${JSON.stringify(prior)}`
@@ -170,7 +172,7 @@ async function runGeneration(userId, days, opts, focus) {
   const gender = opts.gender || '';
   const digest = buildDigest(days, opts);
   const prior = await getPriorContext(userId, focus.period, focus.end);
-  const result = await generateReport(digest, focus, prior, gender, userId);
+  const result = await generateReport(digest, focus, prior, gender, userId, opts.apiKey);
   await Insight.findOneAndUpdate(
     { user: userId, period: focus.period, periodKey: focus.key },
     {
@@ -247,10 +249,15 @@ export async function ensureDueReports(userId, days, opts) {
     (async () => {
       try {
         await runGeneration(userId, days, opts, focus);
+        // a successful run proves the key works again — clear a stale flag
+        clearKeyError(userId);
       } catch (err) {
         if (!err || err.code !== 11000) {
           console.error('insight generation failed:', focus.period, focus.key, err?.message);
         }
+        // Generation runs in the background, so a dead/over-budget key can't
+        // surface as a request error — record why so the UI can explain it.
+        flagKeyError(userId, keyErrorCode(err));
       } finally {
         inFlight.delete(flightKey);
       }

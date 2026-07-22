@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 import { useToast } from '../lib/toast.jsx';
 import { useTheme } from '../lib/theme.js';
@@ -22,7 +23,7 @@ export default function SettingsModal({
   days,
   onSaveWeight,
 }) {
-  const { user, updateProfile, startOnboarding } = useAuth();
+  const { user, updateProfile, startOnboarding, refreshUser } = useAuth();
   const { theme, toggle } = useTheme();
   const toast = useToast();
 
@@ -37,6 +38,56 @@ export default function SettingsModal({
   const [xFrom, setXFrom] = useState('');
   const [xTo, setXTo] = useState('');
   const [exporting, setExporting] = useState(false);
+
+  // ---- AI features (bring-your-own Anthropic key / owner preview toggle) ----
+  const ai = user?.ai || {};
+  const [aiKey, setAiKey] = useState('');
+  const [aiBusy, setAiBusy] = useState(false);
+
+  async function saveAiKey() {
+    const k = aiKey.trim();
+    if (!k) return toast('הדביקו מפתח API של Anthropic');
+    setAiBusy(true);
+    try {
+      // the server validates the key with a real (minimal) call before saving,
+      // so a bad key or an empty-credit account is caught right here
+      await api.saveAiKey(k);
+      await refreshUser();
+      setAiKey('');
+      toast('המפתח אומת ונשמר — תכונות ה-AI הופעלו 🎉');
+    } catch (e) {
+      toast(e.message || 'שמירת המפתח נכשלה');
+    } finally {
+      setAiBusy(false);
+    }
+  }
+
+  async function removeAiKey() {
+    setAiBusy(true);
+    try {
+      await api.deleteAiKey();
+      await refreshUser();
+      toast('המפתח הוסר — תכונות ה-AI כבויות');
+    } catch (e) {
+      toast(e.message || 'ההסרה נכשלה');
+    } finally {
+      setAiBusy(false);
+    }
+  }
+
+  // Owner-only: preview the app with all AI features off.
+  async function toggleAi() {
+    setAiBusy(true);
+    try {
+      await api.setAiOptOut(!ai.optOut);
+      await refreshUser();
+      toast(ai.optOut ? 'תכונות ה-AI הופעלו מחדש' : 'תכונות ה-AI כובו (תצוגה מקדימה)');
+    } catch (e) {
+      toast(e.message || 'הפעולה נכשלה');
+    } finally {
+      setAiBusy(false);
+    }
+  }
 
   // (Re)seed the form from the current profile whenever the modal opens. The
   // Excel range defaults to the whole log: first logged day → today.
@@ -78,8 +129,10 @@ export default function SettingsModal({
       return toast('שנת לידה לא תקינה');
     const m = Number(keto);
     if (!Number.isInteger(m) || m < 0 || m > 60) return toast('יעד קיטו לא תקין (0–60 חודשים)');
-    const digits = wa.replace(/\D/g, '');
-    if (digits && (digits.length < 8 || digits.length > 15)) return toast('מספר WhatsApp לא תקין');
+    // WhatsApp service disabled — the field is hidden and the number isn't
+    // sent (existing linked numbers stay stored on the user doc, untouched).
+    // const digits = wa.replace(/\D/g, '');
+    // if (digits && (digits.length < 8 || digits.length > 15)) return toast('מספר WhatsApp לא תקין');
     setSaving(true);
     try {
       await updateProfile({
@@ -89,7 +142,7 @@ export default function SettingsModal({
         heightCm: Math.round(h),
         birthYear: by,
         ketoGoalMonths: m,
-        whatsappPhone: digits,
+        // whatsappPhone: digits,
       });
       toast('ההגדרות נשמרו');
       onClose();
@@ -170,14 +223,80 @@ export default function SettingsModal({
           <input type="number" min="0" max="60" value={keto} onChange={(e) => setKeto(e.target.value)} />
         </label>
 
+        {/* WhatsApp service disabled for all users — kept for a possible return.
         <label className="settings-field" data-tour="set-wa">
           <span className="settings-lab">WhatsApp</span>
           <input type="tel" dir="ltr" placeholder="972501234567" value={wa} onChange={(e) => setWa(e.target.value)} />
         </label>
+        */}
 
         <button className="settings-save" onClick={save} disabled={saving}>
           {saving ? 'שומר…' : 'שמור'}
         </button>
+
+        <div className="settings-divider" />
+
+        {/* AI features: status + BYO Anthropic key (or the owner's preview toggle) */}
+        <div className="settings-ai">
+          <div className="settings-lab">
+            תכונות AI{' '}
+            <span style={{ fontWeight: 400 }}>
+              {ai.enabled
+                ? ai.source === 'env'
+                  ? '· 🟢 פעילות (מפתח האפליקציה)'
+                  : '· 🟢 פעילות (המפתח שלך)'
+                : ai.optOut
+                  ? '· ⚪ כבויות (לבחירתך)'
+                  : '· ⚪ כבויות — אין מפתח API'}
+            </span>
+          </div>
+
+          {ai.keyError && (
+            <div className="export-hint" style={{ color: '#dc2626' }} role="alert">
+              {ai.keyError === 'no_credit'
+                ? '⚠️ נגמר הקרדיט במפתח ה-API שלך — תכונות ה-AI לא יפעלו עד שיתווסף קרדיט בחשבון Anthropic (console.anthropic.com).'
+                : '⚠️ מפתח ה-API אינו תקין או בוטל — הדביקו מפתח חדש כאן.'}
+            </div>
+          )}
+
+          {ai.canToggle ? (
+            /* the owner rides on the app's key; the only control is the
+               "how does the app look without AI" preview toggle */
+            <button className="btn ghost mini" onClick={toggleAi} disabled={aiBusy}>
+              {aiBusy ? 'רגע…' : ai.optOut ? '🟢 הפעל תכונות AI' : '⚪ כבה תכונות AI (תצוגה מקדימה)'}
+            </button>
+          ) : (
+            <>
+              {ai.hasOwnKey && (
+                <div className="export-hint">
+                  מפתח API שמור ✓{' '}
+                  <button className="btn ghost mini" onClick={removeAiKey} disabled={aiBusy}>
+                    הסר מפתח
+                  </button>
+                </div>
+              )}
+              <label className="settings-field">
+                <span className="settings-lab">{ai.hasOwnKey ? 'החלפת מפתח' : 'מפתח Anthropic API'}</span>
+                <input
+                  type="password"
+                  dir="ltr"
+                  autoComplete="off"
+                  placeholder="sk-ant-…"
+                  value={aiKey}
+                  onChange={(e) => setAiKey(e.target.value)}
+                />
+              </label>
+              <button className="btn ghost mini" onClick={saveAiKey} disabled={aiBusy || !aiKey.trim()}>
+                {aiBusy ? 'בודק את המפתח…' : 'אמת ושמור'}
+              </button>
+              <div className="export-hint">
+                תכונות ה-AI (דוחות תובנות, זיהוי מוצר מתמונה, השלמת ערכים בסריקת ברקוד) פועלות
+                על מפתח משלך וירוצו על חשבונך. מנפיקים מפתח ב-console.anthropic.com; הוא נבדק
+                מול Anthropic ונשמר מוצפן. בלי מפתח — כל שאר האפליקציה עובדת כרגיל.
+              </div>
+            </>
+          )}
+        </div>
 
         {onSaveWeight && (
           <>

@@ -45,10 +45,10 @@ function weekday(iso) {
 // the in-app description box drives (estimate → POST /days/:date/meals), factored
 // out so the WhatsApp webhook logs meals identically. Returns the AI estimate,
 // the meal document as stored, and the updated day.
-export async function logMealFromDesc({ userId, desc, date, time }) {
+export async function logMealFromDesc({ userId, desc, date, time, apiKey }) {
   const day0 = date || israelDateISO();
   const products = await Product.find({ user: userId }).lean();
-  const { result } = await estimateMealCached(userId, desc, products);
+  const { result } = await estimateMealCached(userId, desc, products, { apiKey });
 
   const meal = {
     time: time || israelTimeHM(),

@@ -2,19 +2,23 @@ import Anthropic from '@anthropic-ai/sdk';
 import { recordAnthropicUsage } from './usage.js';
 import { KETO_CORE_RULES } from '../../../shared/ketoCore.js';
 
-let client = null;
-export function getClient() {
-  if (!process.env.ANTHROPIC_API_KEY) {
+// One client per API key: the app's env key (owner accounts) and each user's
+// own key (BYO-key accounts, see lib/aiAccess.js) all get their own cached SDK
+// instance. Callers pass the resolved key; omitting it falls back to the env key.
+const clients = new Map();
+export function getClient(apiKey) {
+  const key = apiKey || process.env.ANTHROPIC_API_KEY;
+  if (!key) {
     throw new Error('ANTHROPIC_API_KEY is not set');
   }
-  if (!client) {
+  if (!clients.has(key)) {
     // The SDK retries transient failures (429 rate-limit, 408/409, and 5xx
     // including 529 "overloaded") with exponential backoff + jitter, honoring
     // any retry-after header. Bumping past the default of 2 makes brief API
     // overloads self-heal instead of surfacing as a hard error mid-chat.
-    client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, maxRetries: 4 });
+    clients.set(key, new Anthropic({ apiKey: key, maxRetries: 4 }));
   }
-  return client;
+  return clients.get(key);
 }
 // Estimators (meal/image/barcode → JSON) run on the strongest model. Note this
 // model rejects the `temperature` param entirely (it's deprecated there), so we
@@ -204,7 +208,7 @@ const normalizeBarcode = (r) => ({
 });
 
 export async function estimateMeal(desc, products = [], ctx = {}) {
-  const message = await getClient().messages.create({
+  const message = await getClient(ctx.apiKey).messages.create({
     model: MODEL(),
     max_tokens: 5000,
     system: ketoRules(products) + MEAL_FORMAT,
@@ -215,7 +219,7 @@ export async function estimateMeal(desc, products = [], ctx = {}) {
 }
 
 export async function estimateImage(b64, mediaType, unit, products = [], ctx = {}) {
-  const message = await getClient().messages.create({
+  const message = await getClient(ctx.apiKey).messages.create({
     model: MODEL(),
     max_tokens: 5000,
     system: ketoRules(products) + imageFormat(unit),
@@ -260,7 +264,7 @@ export async function interpretBarcode(off, unit, products = [], ctx = {}) {
     off.per100.fiber == null
       ? ' שים לב: ערך הסיבים חסר במסד הנתונים — הערך אותו לפי סוג המוצר הידוע, וציין בפירוט שהסיבים הוערכו.'
       : '';
-  const message = await getClient().messages.create({
+  const message = await getClient(ctx.apiKey).messages.create({
     model: MODEL(),
     max_tokens: 5000,
     system: ketoRules(products) + barcodeFormat(unit, fiberNote),

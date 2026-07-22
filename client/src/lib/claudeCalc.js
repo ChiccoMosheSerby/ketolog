@@ -32,8 +32,10 @@ export function ketoDayNumber(days) {
 // along so the web chat computes net carbs the same way the app does. Claude
 // is asked to reply with a ketolog deep link (see lib/appLink.js) followed by
 // a readable breakdown of the values. `mode` chooses which link Claude
-// returns: a new saved product, or a meal to write to the log.
-export function buildPrompt({ text, days, target, ketoMonths, avg, origin, mode }) {
+// returns: a new saved product, or a meal to write to the log. For a product,
+// `cats` (the user's own category list) is sent so Claude also picks the
+// category — shown editable in the confirm dialog when the user returns.
+export function buildPrompt({ text, days, target, ketoMonths, avg, origin, mode, cats = [] }) {
   const context = [
     // claude.ai titles a chat from its first message; there's no URL param or
     // in-chat way to set it. Leading with "ketolog" as the headline biases the
@@ -54,7 +56,7 @@ export function buildPrompt({ text, days, target, ketoMonths, avg, origin, mode 
   const encodeNote =
     mode === "meal"
       ? "ומקודד (URL-encode) את הטקסט בעברית שבשדה desc וגם את כל ערך items (שהוא JSON עם עברית):"
-      : "ומקודד (URL-encode) את הטקסט בעברית שבשדות name/desc/unit:";
+      : "ומקודד (URL-encode) את הטקסט בעברית שבשדות name/desc/unit/cat:";
 
   const mealExtra =
     mode === "meal"
@@ -64,7 +66,12 @@ export function buildPrompt({ text, days, target, ketoMonths, avg, origin, mode 
           "לכל פריט תן name קצר וגם desc עם התיאור המלא (כמות, גודל, אופן הכנה).",
           "ודא שסכום כל מדד בפריטים (carbs, fat, protein) שווה לערך הכללי המתאים.",
         ]
-      : [];
+      : cats.length
+        ? [
+            "",
+            `בשדה cat בחר את הקטגוריה המתאימה ביותר למוצר — אך ורק אחת מהרשימה הבאה, בדיוק כפי שהיא כתובה: ${cats.join(" | ")}.`,
+          ]
+        : [];
 
   const request = [
     'חשב לי מדדים: פחמימות נטו, חלבון, שומן (גם קק"ל)',
@@ -97,7 +104,7 @@ export async function copyText(str) {
 
 // Build the prompt, copy it (login-redirect fallback) and open claude.ai.
 // Returns { prompt, copied } so callers can toast + offer a re-copy.
-export async function openClaudeCalc({ text, days, target, ketoMonths, avg, mode }) {
+export async function openClaudeCalc({ text, days, target, ketoMonths, avg, mode, cats }) {
   const prompt = buildPrompt({
     text: text.trim(),
     days,
@@ -106,6 +113,7 @@ export async function openClaudeCalc({ text, days, target, ketoMonths, avg, mode
     avg,
     origin: window.location.origin,
     mode,
+    cats,
   });
   // Copy the prompt up front: if the user isn't logged into claude.ai, the new
   // tab lands on Claude's login page and the prefilled ?q= text can be dropped

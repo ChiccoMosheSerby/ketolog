@@ -14,6 +14,8 @@ import {
   passwordFingerprint,
 } from '../lib/approval.js';
 import { sendApprovalRequest, sendPasswordReset } from '../lib/mailer.js';
+import { resolveAi, usesEnvKey } from '../lib/aiAccess.js';
+// import { transcribeConfigured } from '../lib/transcribe.js'; // voice disabled for now
 import { rateLimit } from '../middleware/rateLimit.js';
 import { asyncHandler, escapeHtml, isValidEmail } from '../lib/http.js';
 
@@ -32,22 +34,38 @@ function signToken(user) {
   return jwt.sign({ sub: user._id.toString() }, process.env.JWT_SECRET, { expiresIn: '30d' });
 }
 
-const userPayload = (u) => ({
-  id: u._id,
-  email: u.email,
-  gender: u.gender || '',
-  dailyCarbTarget: u.dailyCarbTarget,
-  monthlyLossTarget: u.monthlyLossTarget ?? 2,
-  heightCm: u.heightCm || 0,
-  birthYear: u.birthYear || 0,
-  ketoStartDate: u.ketoStartDate || '',
-  ketoGoalMonths: u.ketoGoalMonths || 0,
-  whatsappPhone: u.whatsappPhone || '',
-  isAdmin: isAdmin(u),
-});
+const userPayload = (u) => {
+  const ai = resolveAi(u);
+  return {
+    id: u._id,
+    email: u.email,
+    gender: u.gender || '',
+    dailyCarbTarget: u.dailyCarbTarget,
+    monthlyLossTarget: u.monthlyLossTarget ?? 2,
+    heightCm: u.heightCm || 0,
+    birthYear: u.birthYear || 0,
+    ketoStartDate: u.ketoStartDate || '',
+    ketoGoalMonths: u.ketoGoalMonths || 0,
+    whatsappPhone: u.whatsappPhone || '',
+    isAdmin: isAdmin(u),
+    // The client gates every AI-facing control on this block (never the key itself).
+    ai: {
+      enabled: ai.enabled,
+      source: ai.source, // 'env' (app key) | 'own' (user's key) | null
+      hasOwnKey: Boolean(u.anthropicApiKey),
+      optOut: Boolean(u.aiOptOut), // owner preview toggle state
+      canToggle: usesEnvKey(u), // who sees that toggle
+      keyError: u.aiKeyError || '', // 'auth' | 'no_credit' | ''
+      // Voice dictation is disabled for everyone for now (it bills the app's
+      // OpenAI key). To bring it back, restore:
+      // voice: ai.enabled && ai.source === 'env' && transcribeConfigured(),
+      voice: false,
+    },
+  };
+};
 
 const PROFILE_FIELDS =
-  'email gender dailyCarbTarget monthlyLossTarget heightCm birthYear ketoStartDate ketoGoalMonths whatsappPhone';
+  'email gender dailyCarbTarget monthlyLossTarget heightCm birthYear ketoStartDate ketoGoalMonths whatsappPhone anthropicApiKey aiOptOut aiKeyError';
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 // Base URL for the approval link in the email.

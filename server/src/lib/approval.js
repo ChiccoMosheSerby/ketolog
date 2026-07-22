@@ -18,10 +18,12 @@ export function isApproved(user) {
   return AUTO_APPROVED_EMAILS.has((user.email || '').toLowerCase());
 }
 
-// Admins get the in-app usage/cost dashboard and the /api/admin routes. The
-// owner's accounts (the auto-approve list) are the admins for now.
+// Admins get the in-app usage/cost dashboard and the /api/admin routes.
+// Deliberately narrower than the auto-approve list: only the owner's personal
+// account sees usage/costs.
+const USAGE_ADMIN_EMAILS = new Set(['chiccomoshe@gmail.com']);
 export function isAdmin(user) {
-  return Boolean(user) && AUTO_APPROVED_EMAILS.has((user.email || '').toLowerCase());
+  return Boolean(user) && USAGE_ADMIN_EMAILS.has((user.email || '').toLowerCase());
 }
 
 // Signed, single-purpose, time-limited token embedded in the approval link.

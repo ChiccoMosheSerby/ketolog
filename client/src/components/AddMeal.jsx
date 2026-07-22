@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { api } from "../lib/api.js";
+// import { api } from "../lib/api.js"; // was only used by the retired in-app AI calc
+import { useAuth } from "../lib/auth.jsx";
 import { useToast } from "../lib/toast.jsx";
 import { useSpeech, speechErrorMessage } from "../lib/useSpeech.js";
 import {
@@ -10,8 +11,9 @@ import {
   todayISO,
 } from "../lib/helpers.js";
 import { parseAppLink, clearAppLink } from "../lib/appLink.js";
+import { openClaudeCalc } from "../lib/claudeCalc.js";
+import { loadCats } from "../lib/categories.js";
 import ProductPicker from "./ProductPicker.jsx";
-import ClaudeCalcModal from "./ClaudeCalcModal.jsx";
 import "./AddMeal.scss";
 
 export default function AddMeal({
@@ -32,6 +34,10 @@ export default function AddMeal({
   avg = 0,
 }) {
   const toast = useToast();
+  // Voice dictation transcribes server-side (a paid AI call), so the mic shows
+  // only for accounts whose /me payload says voice is available.
+  const { user } = useAuth();
+  const voiceOn = !!user?.ai?.voice;
   const [carb, setCarb] = useState("");
   const [desc, setDesc] = useState("");
   const [pendingMacro, setPendingMacro] = useState({
@@ -42,7 +48,7 @@ export default function AddMeal({
   const [note, setNote] = useState(null); // { html } via structured fields
   const [calcSource, setCalcSource] = useState(""); // 'local' | 'ai' | '' — where the last calc came from
   const [busy, setBusy] = useState(false);
-  // which popup is open: '' | 'products' | 'claude'
+  // which popup is open: '' | 'products'
   const [modal, setModal] = useState("");
   // Structured list of saved products the user tapped in, kept alongside the free
   // text. `descIsPure` stays true only while the description was built *solely*
@@ -275,78 +281,101 @@ export default function AddMeal({
     );
   }
 
-  async function runCalc(thenLog) {
-    const d = desc.trim();
-    if (!d) {
-      toast("כתוב/י קודם מה אכלת");
+  // Free-text calc is no longer done in-app (no server AI call): both submit
+  // buttons open claude.ai with the full prompt built from the SAME text box.
+  // Claude's reply carries a deep link back — for a meal it prefills this form
+  // (confirm with the same ✓), for a product it opens the add-product dialog.
+  async function sendToClaude(mode) {
+    const clean = desc.trim();
+    if (!clean) {
+      toast(mode === "product" ? "כתבו קודם את פרטי המוצר בתיבת הטקסט" : "כתוב/י קודם מה אכלת");
       return;
     }
-    // Pure saved-products meal → total it locally, no AI call, no cost.
-    if (canSumLocally()) {
-      const t = sumPicked(picked);
-      setCarb(fmt(t.carbs));
-      setPendingMacro({ fat: t.fat, protein: t.protein });
-      setItems(t.items);
-      setCalcSource("local");
-      setNote({
-        carbs: fmt(t.carbs),
-        fat: t.fat == null ? "?" : fmt(t.fat),
-        protein: t.protein == null ? "?" : fmt(t.protein),
-        mp:
-          t.fat != null && t.protein != null
-            ? macroPct({ carb: t.carbs, fat: t.fat, protein: t.protein })
-            : null,
-        items: t.items,
-        local: true,
-      });
-      if (thenLog) await doAdd(t.carbs, { fat: t.fat, protein: t.protein }, t.items, "local");
-      return;
-    }
-    setBusy(true);
-    setNote({ loading: true });
-    try {
-      const r = await api.estimateMeal(d);
-      const n = Number(r.net_carbs);
-      const fat = Number(r.fat);
-      const prot = Number(r.protein);
-      const mealItems = Array.isArray(r.items) ? r.items : [];
-      // 'local' = the server matched the user's own saved products (above all)
-      const src = r.source === "local" ? "local" : "ai";
-      setCalcSource(src);
-      const carbsValue = isNaN(n) ? "" : fmt(n);
-      const macro = {
-        fat: isNaN(fat) ? null : fat,
-        protein: isNaN(prot) ? null : prot,
-      };
-      setCarb(carbsValue);
-      setPendingMacro(macro);
-      setItems(mealItems);
-      const mp =
-        !isNaN(fat) && !isNaN(prot)
-          ? macroPct({ carb: isNaN(n) ? 0 : n, fat, protein: prot })
-          : null;
-      setNote({
-        carbs: isNaN(n) ? "?" : fmt(n),
-        fat: isNaN(fat) ? "?" : fmt(fat),
-        protein: isNaN(prot) ? "?" : fmt(prot),
-        mp,
-        items: mealItems,
-        local: src === "local",
-        ai: src === "ai",
-      });
-      if (thenLog && !isNaN(n)) await doAdd(carbsValue, macro, mealItems, src);
-    } catch {
-      setNote({
-        error: "לא הצלחתי לחשב אוטומטית כרגע — נסו שוב בעוד רגע.",
-      });
-    } finally {
-      setBusy(false);
-    }
+    const { copied } = await openClaudeCalc({
+      text: clean,
+      days,
+      target,
+      ketoMonths,
+      avg,
+      mode,
+      // for a product, Claude also picks a category out of the user's own list
+      cats: mode === "product" ? loadCats(products) : [],
+    });
+    setNote({
+      info:
+        (mode === "product" ? "📦" : "🤖") +
+        " נפתח קלוד בטאב חדש" +
+        (copied ? " והפרומפט הועתק ללוח" : "") +
+        (mode === "product"
+          ? ". בסיום החישוב לחצו על הקישור שקלוד יחזיר — ייפתח אישור הוספת המוצר לרשימה שלכם."
+          : ". בסיום החישוב לחצו על הקישור שקלוד יחזיר — הטופס כאן יתמלא אוטומטית, ותצטרכו רק לאשר ולרשום."),
+    });
+    toast(copied ? "נפתח קלוד · הפרומפט הועתק ללוח" : "נפתח קלוד בטאב חדש");
   }
 
+  // Total a pure saved-products meal locally — no AI, no cost. The only
+  // in-app calculation left; anything free-text goes through Claude above.
+  async function runLocalCalc(thenLog) {
+    const t = sumPicked(picked);
+    setCarb(fmt(t.carbs));
+    setPendingMacro({ fat: t.fat, protein: t.protein });
+    setItems(t.items);
+    setCalcSource("local");
+    setNote({
+      carbs: fmt(t.carbs),
+      fat: t.fat == null ? "?" : fmt(t.fat),
+      protein: t.protein == null ? "?" : fmt(t.protein),
+      mp:
+        t.fat != null && t.protein != null
+          ? macroPct({ carb: t.carbs, fat: t.fat, protein: t.protein })
+          : null,
+      items: t.items,
+      local: true,
+    });
+    if (thenLog) await doAdd(t.carbs, { fat: t.fat, protein: t.protein }, t.items, "local");
+  }
+
+  // In-app AI estimation (api.estimateMeal) is retired — kept here commented
+  // out in case it ever comes back:
+  //
+  // setBusy(true);
+  // setNote({ loading: true });
+  // try {
+  //   const r = await api.estimateMeal(d);
+  //   const n = Number(r.net_carbs);
+  //   const fat = Number(r.fat);
+  //   const prot = Number(r.protein);
+  //   const mealItems = Array.isArray(r.items) ? r.items : [];
+  //   // 'local' = the server matched the user's own saved products (above all)
+  //   const src = r.source === "local" ? "local" : "ai";
+  //   setCalcSource(src);
+  //   const carbsValue = isNaN(n) ? "" : fmt(n);
+  //   const macro = { fat: isNaN(fat) ? null : fat, protein: isNaN(prot) ? null : prot };
+  //   setCarb(carbsValue);
+  //   setPendingMacro(macro);
+  //   setItems(mealItems);
+  //   const mp = !isNaN(fat) && !isNaN(prot)
+  //     ? macroPct({ carb: isNaN(n) ? 0 : n, fat, protein: prot })
+  //     : null;
+  //   setNote({
+  //     carbs: isNaN(n) ? "?" : fmt(n),
+  //     fat: isNaN(fat) ? "?" : fmt(fat),
+  //     protein: isNaN(prot) ? "?" : fmt(prot),
+  //     mp, items: mealItems, local: src === "local", ai: src === "ai",
+  //   });
+  //   if (thenLog && !isNaN(n)) await doAdd(carbsValue, macro, mealItems, src);
+  // } catch {
+  //   setNote({ error: "לא הצלחתי לחשב אוטומטית כרגע — נסו שוב בעוד רגע." });
+  // } finally {
+  //   setBusy(false);
+  // }
+
   function onAddClick() {
-    if (desc.trim() && carb === "") runCalc(true);
-    else doAdd(carb, pendingMacro, items);
+    if (desc.trim() && carb === "") {
+      // pure saved-products list → sum locally and log; free text → Claude
+      if (canSumLocally()) runLocalCalc(true);
+      else sendToClaude("meal");
+    } else doAdd(carb, pendingMacro, items);
   }
 
   // Clear the meal being composed: description / picked products / carbs /
@@ -406,25 +435,17 @@ export default function AddMeal({
           >
             <span className="cta-ico">🧺</span>
           </button>
-          <button
-            type="button"
-            className="cta"
-            title="חשב עם קלוד — ארוחה או מוצר"
-            onClick={() => setModal("claude")}
-          >
-            <span className="cta-ico">🤖</span>
-          </button>
         </div>
 
         <div className="desc-wrap">
           <textarea
             data-tour="meal-desc"
             rows={1}
-            placeholder="מה אכלת? תיאור חופשי — המערכת תחשב לבד"
+            placeholder="מה אכלת? תיאור חופשי — החישוב ייפתח בקלוד"
             value={desc}
             onChange={onDescChange}
           />
-          {speech.supported && (
+          {voiceOn && speech.supported && (
             <button
               type="button"
               className={"mic-mini" + (speech.listening ? " rec" : "")}
@@ -443,25 +464,50 @@ export default function AddMeal({
           )}
         </div>
 
-        <button
-          className="btn composer-submit"
-          data-tour="meal-submit"
-          disabled={busy || (!desc.trim() && carb === "")}
-          title={
-            busy
-              ? "מחשב…"
-              : !desc.trim() && carb === ""
-                ? "כתבו קודם מה אכלתם"
-                : carb !== ""
-                  ? "הוסף ארוחה"
-                  : "חשב והוסף ארוחה"
-          }
-          onClick={onAddClick}
-        >
-          {busy ? "…" : "✓"}
-        </button>
+        {/* the two Claude senders sit side by side and share the text box above:
+            the main submit calculates a MEAL (or logs directly when the values
+            are already known), and 📦 sends the same text as a new PRODUCT */}
+        <div className="composer-submits">
+          <button
+            className="btn composer-submit"
+            data-tour="meal-submit"
+            disabled={busy || (!desc.trim() && carb === "")}
+            title={
+              busy
+                ? "מחשב…"
+                : !desc.trim() && carb === ""
+                  ? "כתבו קודם מה אכלתם"
+                  : carb !== ""
+                    ? "הוסף ארוחה"
+                    : canSumLocally()
+                      ? "חשב מהמוצרים השמורים והוסף ארוחה"
+                      : "חשב ארוחה בקלוד — ייפתח צ'אט שיחזיר קישור למילוי הטופס"
+            }
+            onClick={onAddClick}
+          >
+            {busy
+              ? "…"
+              : desc.trim() && carb === "" && !canSumLocally()
+                ? "🤖"
+                : "✓"}
+          </button>
+          <button
+            type="button"
+            className="btn ghost composer-submit composer-product"
+            disabled={busy || !desc.trim()}
+            title={
+              desc.trim()
+                ? "הוסף כמוצר חדש — קלוד יחשב את הערכים מהטקסט שכתבתם ויחזיר קישור לאישור"
+                : "כתבו קודם את פרטי המוצר בתיבת הטקסט"
+            }
+            onClick={() => sendToClaude("product")}
+          >
+            📦
+          </button>
+        </div>
 
         <div className="composer-tools">
+          {/* In-app "calc only" is retired — free-text calc goes through Claude now.
           <button
             type="button"
             className="mini-tool"
@@ -471,6 +517,7 @@ export default function AddMeal({
           >
             🧮
           </button>
+          */}
           <button
             type="button"
             className="mini-tool"
@@ -486,6 +533,7 @@ export default function AddMeal({
       {note && (
         <div className="calc-note">
           {note.loading && "מחשב מאקרו (פחמימות, שומן, חלבון)…"}
+          {note.info}
           {note.error}
           {note.carbs && (
             <>
@@ -567,16 +615,6 @@ export default function AddMeal({
         />
       )}
 
-      {modal === "claude" && (
-        <ClaudeCalcModal
-          initialText={desc}
-          days={days}
-          target={target}
-          ketoMonths={ketoMonths}
-          avg={avg}
-          onClose={() => setModal("")}
-        />
-      )}
     </div>
   );
 }

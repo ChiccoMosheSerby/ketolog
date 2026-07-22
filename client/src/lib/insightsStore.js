@@ -9,7 +9,7 @@ import { todayISO } from './helpers.js';
 
 export const FRESH_MS = 5 * 60 * 1000; // reuse cached data for 5 min before revalidating
 
-let cache = null; // { key, reports, generating, aiOff, enoughData, at }
+let cache = null; // { key, reports, generating, aiOff, keyError, enoughData, at }
 let inflight = null; // coalesce concurrent loads (panel + badge on cold start)
 
 const subs = new Set();
@@ -40,6 +40,9 @@ export function setFromResponse(key, res) {
     reports: enoughData ? res.reports || [] : [],
     generating: enoughData ? res.generating || [] : [],
     aiOff: res?.aiConfigured === false,
+    // why background generation is failing ('auth' | 'no_credit' | '') — lets
+    // the panel explain a dead/over-budget API key instead of going quiet
+    keyError: res?.aiKeyError || '',
     enoughData,
     at: Date.now(),
   };

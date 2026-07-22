@@ -71,6 +71,11 @@ export const api = {
   getInsights: (today) => request('GET', `/ai/insights${today ? `?today=${today}` : ''}`),
   markInsightSeen: (id) => request('POST', `/ai/insights/${id}/seen`),
 
+  // bring-your-own AI key + owner's AI on/off preview toggle
+  saveAiKey: (key) => request('POST', '/ai/key', { key }),
+  deleteAiKey: () => request('DELETE', '/ai/key'),
+  setAiOptOut: (off) => request('POST', '/ai/opt-out', { off }),
+
   // admin — per-user AI cost breakdown (admin accounts only)
   getAdminUsage: () => request('GET', '/admin/usage'),
 };

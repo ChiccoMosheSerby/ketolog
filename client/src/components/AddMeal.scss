@@ -53,7 +53,7 @@
   flex-wrap: wrap;
 }
 
-/* the main CTAs (products / Claude meal / Claude product) — icon-only squares,
+/* the main CTA (the saved-products picker) — icon-only square,
    the title attribute carries the label */
 .composer-ctas {
   display: flex;
@@ -152,7 +152,14 @@
   }
 }
 
-/* the log button — a compact ✓; the title attribute says calc-and-add vs add */
+/* the two senders, side by side: meal submit (✓/🤖) + add-product (📦), both
+   reading the same text box */
+.composer-submits {
+  display: flex;
+  gap: 4px;
+  flex: none;
+  align-items: stretch;
+}
 .composer-submit {
   flex: none;
   align-self: stretch;
@@ -160,6 +167,11 @@
   padding: 0 12px;
   font-size: 15px;
   line-height: 1;
+}
+.composer-product {
+  min-width: 36px;
+  padding: 0 9px;
+  font-size: 14px;
 }
 
 /* tiny in-bar tools: calc-only 🧮 and reset ↺ */
@@ -238,12 +250,19 @@
     gap: 3px;
     justify-content: flex-end;
   }
-  .composer-submit {
+  .composer-submits {
     grid-area: submit;
+    gap: 4px;
+  }
+  .composer-submit {
     align-self: stretch;
     min-width: 44px;
     padding: 0 10px;
     min-height: 34px;
+  }
+  .composer-product {
+    min-width: 38px;
+    padding: 0 8px;
   }
   .mini-tool {
     width: 24px;

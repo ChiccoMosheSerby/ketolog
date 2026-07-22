@@ -1,14 +1,24 @@
 import { Router } from 'express';
 import Product from '../models/Product.js';
 import Day from '../models/Day.js';
-import Conversation from '../models/Conversation.js';
+// Chat is disabled (see the commented-out chat section below).
+// import Conversation from '../models/Conversation.js';
 import User from '../models/User.js';
 import { requireAuth } from '../middleware/auth.js';
-import { estimateImage, interpretBarcode, aiConfigured } from '../lib/anthropic.js';
+import { estimateImage, interpretBarcode, getClient } from '../lib/anthropic.js';
+import {
+  resolveAi,
+  usesEnvKey,
+  encryptKey,
+  keyErrorCode,
+  KEY_ERROR_MSG,
+  flagKeyError,
+  clearKeyError,
+} from '../lib/aiAccess.js';
 import { estimateMealCached } from '../lib/estimateCache.js';
 import { fetchProductByBarcode, rawKeto } from '../lib/openfoodfacts.js';
-import { runChatTurn } from '../lib/chatAgent.js';
-import { israelTimeHM } from '../lib/logMeal.js';
+// import { runChatTurn } from '../lib/chatAgent.js';
+// import { israelTimeHM } from '../lib/logMeal.js';
 import { ensureDueReports, listReports, markSeen } from '../lib/insightsAgent.js';
 import { transcribeAudio, transcribeConfigured, TRANSCRIBE_MODEL } from '../lib/transcribe.js';
 import { recordOpenAIUsage } from '../lib/usage.js';
@@ -17,9 +27,45 @@ import { asyncHandler } from '../lib/http.js';
 const router = Router();
 router.use(requireAuth);
 
+// Resolve which key (if any) powers AI for this request: the app's env key for
+// the owner accounts, the user's own saved key otherwise (see lib/aiAccess.js).
+router.use((req, res, next) => {
+  req.ai = resolveAi(req.user);
+  next();
+});
+
+const AI_OFF = {
+  error: 'תכונות ה-AI כבויות בחשבון זה — אפשר להוסיף מפתח API של Anthropic בהגדרות',
+  code: 'ai_off',
+};
+
+// Map a failed Anthropic call to a response: key problems (invalid / out of
+// credit) are recorded on the user and explained specifically; anything else
+// gets the caller's generic message.
+function aiFailure(req, err, fallbackMsg) {
+  const code = keyErrorCode(err);
+  if (code) {
+    flagKeyError(req.userId, code);
+    return { status: 402, body: { error: KEY_ERROR_MSG[code], code } };
+  }
+  return { status: 502, body: { error: fallbackMsg } };
+}
+
+// A successful AI call proves the key works — clear a stale failure flag.
+const noteAiSuccess = (req) => {
+  if (req.user.aiKeyError) clearKeyError(req.userId);
+};
+
 // POST /api/ai/transcribe { audio (base64), mimeType } -> { text }
 // Server-side speech-to-text for the voice-input mic (mobile-reliable).
+// Whisper runs on the app's OpenAI key (a user's Anthropic key can't pay for
+// it) — currently DISABLED for everyone, including the owner (the client hides
+// the mic via user.ai.voice=false; this guard stops direct calls from billing).
+// To re-enable: flip VOICE_DISABLED and restore the `voice` field in auth.js.
+const VOICE_DISABLED = true;
 router.post('/transcribe', async (req, res) => {
+  if (VOICE_DISABLED) return res.status(503).json({ error: 'תמלול קולי כבוי כרגע' });
+  if (!(req.ai.enabled && req.ai.source === 'env')) return res.status(503).json(AI_OFF);
   if (!transcribeConfigured()) return res.status(503).json({ error: 'תמלול קולי לא הוגדר בשרת' });
   const { audio, mimeType } = req.body || {};
   if (!audio) return res.status(400).json({ error: 'חסר אודיו' });
@@ -41,34 +87,45 @@ router.post('/transcribe', async (req, res) => {
 });
 
 // POST /api/ai/estimate-meal { desc } -> { net_carbs, fat, protein, items[] }
+// (No in-app caller since the composer moved to the Claude-link flow; still
+// serves the WhatsApp bot path and any future client.)
 router.post('/estimate-meal', async (req, res) => {
-  if (!aiConfigured()) return res.status(503).json({ error: 'מפתח ה-AI לא הוגדר בשרת' });
+  if (!req.ai.enabled) return res.status(503).json(AI_OFF);
   const desc = (req.body.desc || '').trim();
   if (!desc) return res.status(400).json({ error: 'חסר תיאור הארוחה' });
   try {
     const products = await Product.find({ user: req.userId }).lean();
     // Reuse a previously computed estimate for the same description + product
     // context instead of re-calling the AI; only misses hit Claude.
-    const { result } = await estimateMealCached(req.userId, desc, products);
+    const { result } = await estimateMealCached(req.userId, desc, products, {
+      apiKey: req.ai.apiKey,
+    });
+    noteAiSuccess(req);
     res.json(result);
   } catch (err) {
     console.error('estimate-meal failed:', err.message);
-    res.status(502).json({ error: 'החישוב האוטומטי נכשל כרגע' });
+    const { status, body } = aiFailure(req, err, 'החישוב האוטומטי נכשל כרגע');
+    res.status(status).json(body);
   }
 });
 
 // POST /api/ai/estimate-image { image (base64), mediaType, unit } -> product fields
 router.post('/estimate-image', async (req, res) => {
-  if (!aiConfigured()) return res.status(503).json({ error: 'מפתח ה-AI לא הוגדר בשרת' });
+  if (!req.ai.enabled) return res.status(503).json(AI_OFF);
   const { image, mediaType, unit } = req.body;
   if (!image || !mediaType) return res.status(400).json({ error: 'חסרים נתוני תמונה' });
   try {
     const products = await Product.find({ user: req.userId }).lean();
-    const result = await estimateImage(image, mediaType, unit, products, { userId: req.userId });
+    const result = await estimateImage(image, mediaType, unit, products, {
+      userId: req.userId,
+      apiKey: req.ai.apiKey,
+    });
+    noteAiSuccess(req);
     res.json(result);
   } catch (err) {
     console.error('estimate-image failed:', err.message);
-    res.status(502).json({ error: 'זיהוי התמונה נכשל כרגע' });
+    const { status, body } = aiFailure(req, err, 'זיהוי התמונה נכשל כרגע');
+    res.status(status).json(body);
   }
 });
 
@@ -98,10 +155,12 @@ router.post('/barcode', async (req, res) => {
   const hadFiber = off.per100.fiber != null;
   const baseLabel = [off.name, off.brands].filter(Boolean).join(' · ');
 
-  // No AI key: return the coarse raw computation so the scan still works.
-  if (!aiConfigured()) {
+  // The coarse no-AI computation straight from the database numbers — used both
+  // when AI is off for this user and as a fallback when their key fails, so the
+  // barcode scan keeps working either way.
+  const rawResponse = () => {
     const raw = rawKeto(off);
-    return res.json({
+    return {
       found: true,
       barcode,
       source: 'off',
@@ -114,12 +173,18 @@ router.post('/barcode', async (req, res) => {
       breakdown: hadFiber
         ? 'חישוב גולמי ממסד הנתונים (פחמ\' פחות סיבים).'
         : 'חישוב גולמי — ערך הסיבים חסר, ייתכן שהפחמימות גבוהות מהאמת.',
-    });
-  }
+    };
+  };
+
+  if (!req.ai.enabled) return res.json(rawResponse());
 
   try {
     const products = await Product.find({ user: req.userId }).lean();
-    const result = await interpretBarcode(off, unit, products, { userId: req.userId });
+    const result = await interpretBarcode(off, unit, products, {
+      userId: req.userId,
+      apiKey: req.ai.apiKey,
+    });
+    noteAiSuccess(req);
     res.json({
       ...result,
       found: true,
@@ -128,14 +193,21 @@ router.post('/barcode', async (req, res) => {
     });
   } catch (err) {
     console.error('barcode interpret failed:', err.message);
-    res.status(502).json({ error: 'עיבוד נתוני הברקוד נכשל כרגע' });
+    // A key problem (invalid / no credit) is recorded so the UI can explain it,
+    // but the scan itself still succeeds with the raw computation.
+    flagKeyError(req.userId, keyErrorCode(err));
+    res.json(rawResponse());
   }
 });
 
 // ----------------------------------------------------------------------------
-// Keto assistant chat
+// Keto assistant chat — DISABLED. The in-app chat widget is hidden on the
+// client, and these routes are commented out with it so the feature has no
+// live (paid) endpoint while it's off. Uncomment this whole section, the
+// Conversation / runChatTurn / israelTimeHM imports above, and <ChatWidget />
+// in client/src/App.jsx to bring it back.
 // ----------------------------------------------------------------------------
-
+/*
 const HE_DAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
 const weekday = (iso) => {
   const [y, m, d] = iso.split('-');
@@ -339,6 +411,7 @@ router.post('/chat/:id/actions/:actionId', asyncHandler(async (req, res) => {
     return res.status(502).json({ error: 'השמירה נכשלה' });
   }
 }));
+*/
 
 // ----------------------------------------------------------------------------
 // AI insights — narrative summaries / trends / recommendations over the log
@@ -362,10 +435,11 @@ router.get('/insights', asyncHandler(async (req, res) => {
     ketoGoalMonths: user?.ketoGoalMonths ?? 0,
     gender: user?.gender ?? '',
     today,
+    apiKey: req.ai.apiKey, // per-user key; generation is skipped when AI is off
   };
 
   let due = { enoughData: days.some((d) => (d.meals || []).length > 0), generating: [] };
-  if (aiConfigured()) {
+  if (req.ai.enabled) {
     try {
       due = await ensureDueReports(req.userId, days, opts);
     } catch (err) {
@@ -373,18 +447,70 @@ router.get('/insights', asyncHandler(async (req, res) => {
     }
   }
 
+  // Existing reports stay readable even when AI is off — only generation stops.
   const reports = await listReports(req.userId);
   res.json({
     enoughData: due.enoughData,
     reports,
     generating: due.generating || [],
-    aiConfigured: aiConfigured(),
+    aiConfigured: req.ai.enabled,
+    // why generation may be silently failing ('auth' | 'no_credit' | '') — set
+    // by background runs so the panel can explain instead of just going quiet
+    aiKeyError: req.user.aiKeyError || '',
   });
 }));
 
 // POST /api/ai/insights/:id/seen -> clear a report's "new" highlight once viewed.
 router.post('/insights/:id/seen', asyncHandler(async (req, res) => {
   await markSeen(req.userId, req.params.id);
+  res.json({ ok: true });
+}));
+
+// ----------------------------------------------------------------------------
+// Bring-your-own API key — how non-owner accounts turn the AI features on
+// ----------------------------------------------------------------------------
+
+// POST /api/ai/key { key } -> validate the user's Anthropic API key with a
+// minimal real call (surfaces both bad-key and out-of-credit up front), then
+// store it encrypted. From here on every AI feature runs on this key.
+router.post('/key', asyncHandler(async (req, res) => {
+  const key = String(req.body.key || '').trim();
+  if (!key.startsWith('sk-ant-') || key.length < 20) {
+    return res.status(400).json({ error: 'זה לא נראה כמו מפתח Anthropic (מתחיל ב-sk-ant-)' });
+  }
+  try {
+    // Cheapest possible real request (~a fraction of a cent) — a free endpoint
+    // wouldn't catch an account with no credit.
+    await getClient(key).messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 1,
+      messages: [{ role: 'user', content: 'hi' }],
+    });
+  } catch (err) {
+    const code = keyErrorCode(err);
+    if (code) return res.status(400).json({ error: KEY_ERROR_MSG[code], code });
+    console.error('key validation failed:', err.status || '', err.message);
+    return res.status(502).json({ error: 'אימות המפתח נכשל כרגע — נסו שוב בעוד רגע' });
+  }
+  await User.updateOne(
+    { _id: req.userId },
+    { anthropicApiKey: encryptKey(key), aiKeyError: '' }
+  );
+  res.json({ ok: true });
+}));
+
+// DELETE /api/ai/key -> remove the stored key (AI features turn off unless the
+// account rides on the app's env key).
+router.delete('/key', asyncHandler(async (req, res) => {
+  await User.updateOne({ _id: req.userId }, { anthropicApiKey: '', aiKeyError: '' });
+  res.json({ ok: true });
+}));
+
+// POST /api/ai/opt-out { off } -> owner-only preview toggle: force all AI
+// features off for this account to see how the app behaves without them.
+router.post('/opt-out', asyncHandler(async (req, res) => {
+  if (!usesEnvKey(req.user)) return res.status(403).json({ error: 'לא זמין בחשבון זה' });
+  await User.updateOne({ _id: req.userId }, { aiOptOut: req.body.off === true });
   res.json({ ok: true });
 }));
 

@@ -102,6 +102,13 @@ export function AuthProvider({ children }) {
     const r = await api.updateProfile(fields);
     setUser(r.user);
   }
+  // Re-fetch /me — used after actions that change server-derived user state
+  // (e.g. saving/removing an AI API key, the owner's AI on/off toggle).
+  async function refreshUser() {
+    const r = await api.me();
+    setUser(r.user);
+    return r.user;
+  }
 
   return (
     <AuthContext.Provider
@@ -117,6 +124,7 @@ export function AuthProvider({ children }) {
         updateWhatsapp,
         updateGender,
         updateProfile,
+        refreshUser,
         needsOnboarding,
         startOnboarding,
         dismissOnboarding,

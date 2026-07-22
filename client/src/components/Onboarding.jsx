@@ -281,12 +281,13 @@ function buildSteps(isMobile) {
       title: 'יעד קיטו',
       text: 'כמה חודשים את/ה מתכנן/ת להיות בקיטו. זה מזין את מד ההתקדמות של תקופת הקיטו בתובנות. אפס = בלי יעד תקופה.',
     },
-    {
-      anchor: 'set-wa',
-      modal: 'settings',
-      emoji: '💬',
-      title: 'WhatsApp',
-      text: 'מזינים כאן מספר WhatsApp (כולל קידומת מדינה, למשל 972501234567) כדי לרשום ארוחות ולקבל עדכונים דרך וואטסאפ. אחרי מילוי השדות לוחצים "שמור".',
-    },
+    // WhatsApp service disabled for all users — restore this step with it.
+    // {
+    //   anchor: 'set-wa',
+    //   modal: 'settings',
+    //   emoji: '💬',
+    //   title: 'WhatsApp',
+    //   text: 'מזינים כאן מספר WhatsApp (כולל קידומת מדינה, למשל 972501234567) כדי לרשום ארוחות ולקבל עדכונים דרך וואטסאפ. אחרי מילוי השדות לוחצים "שמור".',
+    // },
   ];
 }

@@ -31,13 +31,16 @@ const ALL_PARAMS = [
   "items",
 ];
 
-// The product-link template we hand Claude — origin filled in, values as <placeholders>.
+// The product-link template we hand Claude — origin filled in, values as
+// <placeholders>. `cat` is the category Claude picks out of the user's own
+// list (sent alongside in the prompt); the confirm dialog shows it, editable.
 export function productLinkTemplate(origin) {
   return (
     `${origin}/?add=product` +
     `&name=<שם קצר>` +
     `&desc=<פירוט מלא>` +
     `&unit=<יחידה, למשל מנה>` +
+    `&cat=<קטגוריה מהרשימה>` +
     `&carbs=<פחמימות נטו>` +
     `&fat=<שומן>` +
     `&protein=<חלבון>` +
@@ -84,7 +87,7 @@ export function parseAppLink(search) {
   };
 
   if (type === "product") {
-    return { ...common, key: str("name"), unit: str("unit") };
+    return { ...common, key: str("name"), unit: str("unit"), cat: str("cat") };
   }
   // meal — parse the optional per-ingredient breakdown (URL-decoded JSON array).
   return {

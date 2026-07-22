@@ -12,9 +12,11 @@ import productRoutes from './routes/products.js';
 import templateRoutes from './routes/templates.js';
 import aiRoutes from './routes/ai.js';
 import adminRoutes from './routes/admin.js';
-import whatsappRoutes from './routes/whatsapp.js';
+// WhatsApp service disabled for all users — uncomment here, the mount below,
+// the boot log line, and the settings field in the client to bring it back.
+// import whatsappRoutes from './routes/whatsapp.js';
 import { aiConfigured } from './lib/anthropic.js';
-import { whatsappConfigured } from './lib/whatsapp.js';
+// import { whatsappConfigured } from './lib/whatsapp.js';
 import { rateLimit } from './middleware/rateLimit.js';
 
 // Fail fast on a missing/weak signing secret rather than silently 500-ing every
@@ -95,7 +97,8 @@ app.use('/api/admin', adminRoutes);
 // Twilio's inbound WhatsApp webhook. Public (secured by Twilio's request
 // signature, not a bearer token) and sends application/x-www-form-urlencoded,
 // which the urlencoded parser above already handles.
-app.use('/api/whatsapp', whatsappRoutes);
+// DISABLED for all users:
+// app.use('/api/whatsapp', whatsappRoutes);
 
 // In production, serve the built React app from the same origin as the API
 // (the client uses relative /api paths, so one origin means zero CORS setup).
@@ -121,7 +124,7 @@ connectDB(process.env.MONGODB_URI)
     app.listen(PORT, () => {
       console.log(`✓ KetoLog API on http://localhost:${PORT}`);
       console.log(`  AI ${aiConfigured() ? 'enabled' : 'DISABLED (set ANTHROPIC_API_KEY)'}`);
-      console.log(`  WhatsApp ${whatsappConfigured() ? 'enabled' : 'DISABLED (set TWILIO_* vars)'}`);
+      console.log('  WhatsApp DISABLED (service commented out)');
     });
   })
   .catch((err) => {

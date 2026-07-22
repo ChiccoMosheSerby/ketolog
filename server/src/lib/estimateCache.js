@@ -47,7 +47,7 @@ function productsLookupOf(products = []) {
 //   2. the AI estimator (cached for next time).
 // The result carries `source: 'local' | 'ai'` so meals can show where the
 // numbers came from, and callers get `{ cached, source }` alongside.
-export async function estimateMealCached(userId, desc, products = []) {
+export async function estimateMealCached(userId, desc, products = [], { apiKey } = {}) {
   let own = null;
   try {
     if (products.length) own = resolveFromProducts(desc, productsLookupOf(products));
@@ -63,7 +63,7 @@ export async function estimateMealCached(userId, desc, products = []) {
   const hit = await MealEstimate.findOne({ user: userId, key, fp }).lean();
   if (hit) return { result: { ...hit.result, source: 'ai' }, cached: true, source: 'ai' };
 
-  const result = await estimateMeal(desc, products, { userId });
+  const result = await estimateMeal(desc, products, { userId, apiKey });
 
   // upsert so two concurrent identical requests don't create duplicates (the
   // unique index would otherwise reject the second insert).

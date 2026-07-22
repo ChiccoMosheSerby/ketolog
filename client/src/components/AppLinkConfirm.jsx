@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import { useToast } from '../lib/toast.jsx';
 import { parseAppLink, clearAppLink } from '../lib/appLink.js';
+import { loadCats, DEFAULT_CAT } from '../lib/categories.js';
 import './AppLinkConfirm.scss';
 
 // When the app is opened via a Claude-generated PRODUCT deep link
@@ -14,6 +15,9 @@ export default function AppLinkConfirm() {
   const [draft, setDraft] = useState(null); // null = no pending product link
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
+  // category choices: defaults + this device's custom names right away, then
+  // enriched with the categories the saved products actually use
+  const [cats, setCats] = useState(() => loadCats());
 
   // Read the link once on mount, then strip it from the URL so a refresh or the
   // back button doesn't re-trigger the dialog.
@@ -25,11 +29,13 @@ export default function AppLinkConfirm() {
       key: d.key || '',
       desc: d.desc || '',
       unit: d.unit || 'מנה',
+      cat: d.cat || DEFAULT_CAT, // Claude's pick, editable below
       carb: d.carbs != null ? String(d.carbs) : '',
       fat: d.fat != null ? String(d.fat) : '',
       prot: d.protein != null ? String(d.protein) : '',
     });
     clearAppLink();
+    api.getProducts().then((ps) => setCats(loadCats(ps))).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -53,6 +59,7 @@ export default function AppLinkConfirm() {
         key: form.key.trim(),
         label: form.desc.trim() || form.key.trim(),
         unit: form.unit.trim() || 'מנה',
+        cat: (form.cat || '').trim() || DEFAULT_CAT,
         carbs: Number(form.carb) || 0,
         fat: Number(form.fat) || 0,
         protein: Number(form.prot) || 0,
@@ -92,6 +99,18 @@ export default function AppLinkConfirm() {
         <div className="plc-field">
           <label>יחידה</label>
           <input value={form.unit} onChange={set('unit')} placeholder="מנה" />
+        </div>
+        <div className="plc-field">
+          <label>קטגוריה{draft.cat ? ' (קלוד בחר — אפשר לשנות)' : ''}</label>
+          <select value={form.cat} onChange={set('cat')}>
+            {/* a category Claude invented (not in the list) is still offered */}
+            {!cats.includes(form.cat) && form.cat && (
+              <option value={form.cat}>{form.cat}</option>
+            )}
+            {cats.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
         </div>
 
         <div className="plc-macros">

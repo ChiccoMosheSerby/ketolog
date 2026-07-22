@@ -204,6 +204,7 @@ export default function SmartInsights() {
   const [reports, setReports] = useState(seeded ? seed.reports : []);
   const [generating, setGenerating] = useState(seeded ? seed.generating : []);
   const [aiOff, setAiOff] = useState(seeded ? seed.aiOff : false);
+  const [keyError, setKeyError] = useState(seeded ? seed.keyError || '' : '');
   const [selectedId, setSelectedId] = useState(seeded && seed.reports[0] ? seed.reports[0].id : null);
   const [error, setError] = useState(null);
   const poll = useRef({ count: 0, timer: null, alive: true });
@@ -232,6 +233,7 @@ export default function SmartInsights() {
   const applyResponse = useCallback((res) => {
     const c = setFromResponse(key, res);
     setAiOff(c.aiOff);
+    setKeyError(c.keyError || '');
     if (!c.enoughData) {
       setReports([]);
       setGenerating([]);
@@ -340,12 +342,23 @@ export default function SmartInsights() {
 
   const isGenerating = generating.length > 0;
 
+  // Why new reports aren't being generated — a dead/over-budget key (recorded
+  // by the server's background runs) or AI simply being off for this account.
+  const aiWarning =
+    keyError === 'no_credit'
+      ? '⚠️ נגמר הקרדיט במפתח ה-API שלך — דוחות חדשים לא ייווצרו עד שיתווסף קרדיט בחשבון Anthropic.'
+      : keyError === 'auth'
+        ? '⚠️ מפתח ה-API אינו תקין או בוטל — עדכנו אותו בהגדרות כדי שדוחות חדשים ייווצרו.'
+        : aiOff
+          ? 'תכונות ה-AI כבויות בחשבון זה — דוחות חדשים לא ייווצרו. אפשר להוסיף מפתח API בהגדרות.'
+          : '';
+
   if (reports.length === 0) {
     return (
       <div className="panel si-panel">
         <h2 className="si-title">תובנות חכמות</h2>
-        {aiOff ? (
-          <div className="si-note">התובנות אינן זמינות כרגע (שירות ה-AI לא מוגדר).</div>
+        {aiWarning ? (
+          <div className="si-note" role="alert">{aiWarning}</div>
         ) : isGenerating ? (
           <div className="si-loading">מכין/ה את הדוח הראשון שלך… זה עשוי לקחת עד דקה, והוא יופיע כאן אוטומטית.</div>
         ) : (
@@ -369,6 +382,12 @@ export default function SmartInsights() {
         </h2>
         {isGenerating && <span className="si-gen">מעדכן תובנות…</span>}
       </div>
+
+      {/* old reports stay readable when AI is off/broken — but say why there
+          won't be new ones */}
+      {aiWarning && (
+        <div className="si-note" role="alert">{aiWarning}</div>
+      )}
 
       {/* report history — newest first; "new" reports badged */}
       <div className="si-reports" role="tablist">

@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
+import { useAuth } from '../lib/auth.jsx';
 import { useToast } from '../lib/toast.jsx';
 import { fmt } from '../lib/helpers.js';
 import { toThumbnail, dataUrl } from '../lib/image.js';
@@ -14,6 +15,11 @@ const NEW_CAT = '__new__';
 
 export default function Products({ products, onAdd, onRename, onUpdate, onDelete }) {
   const toast = useToast();
+  // Photo → macro estimation is pure AI, so its buttons show only when AI is on
+  // for this account. Barcode scanning stays for everyone — without AI the
+  // server falls back to the raw database computation.
+  const { user } = useAuth();
+  const aiOn = !!user?.ai?.enabled;
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState(null); // product being renamed inline
   const [editName, setEditName] = useState('');
@@ -202,8 +208,11 @@ export default function Products({ products, onAdd, onRename, onUpdate, onDelete
         } שומן · ${next.prot || '?'} חלבון`,
         breakdown: r.breakdown,
       });
-    } catch {
-      setNote({ error: 'לא הצלחתי לזהות מהתמונה — נסה תמונה ברורה יותר או הזן ידנית.' });
+    } catch (err) {
+      // key problems (no credit / invalid key) come back with a specific
+      // message — show it so the user understands why AI stopped working
+      const msg = err?.message && err.message !== 'שגיאה' ? err.message : '';
+      setNote({ error: msg || 'לא הצלחתי לזהות מהתמונה — נסה תמונה ברורה יותר או הזן ידנית.' });
     } finally {
       setImgBusy(false);
     }
@@ -399,12 +408,16 @@ export default function Products({ products, onAdd, onRename, onUpdate, onDelete
           >
             {barBusy ? 'מחפש…' : 'ברקוד'}
           </button>
-          <button className="btn ghost" disabled={busy} onClick={() => setCapturing(true)}>
-            {imgBusy ? 'מזהה…' : '📷 צילום'}
-          </button>
-          <button className="btn ghost" disabled={busy} onClick={pickImage}>
-            {imgBusy ? 'מזהה…' : '🖼️ תמונה'}
-          </button>
+          {aiOn && (
+            <>
+              <button className="btn ghost" disabled={busy} onClick={() => setCapturing(true)}>
+                {imgBusy ? 'מזהה…' : '📷 צילום'}
+              </button>
+              <button className="btn ghost" disabled={busy} onClick={pickImage}>
+                {imgBusy ? 'מזהה…' : '🖼️ תמונה'}
+              </button>
+            </>
+          )}
           <input
             type="file"
             ref={fileRef}
