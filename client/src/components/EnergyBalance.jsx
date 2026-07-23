@@ -60,19 +60,6 @@ function WeightSpark({ weights }) {
   );
 }
 
-// A "collected / needed" progress row for the not-ready state.
-function NeedRow({ label, have, need }) {
-  const pct = Math.min((have / need) * 100, 100);
-  const done = have >= need;
-  return (
-    <div className={'eb-need' + (done ? ' done' : '')}>
-      <span className="eb-need-lab">{label}</span>
-      <span className="eb-need-track"><i style={{ width: pct + '%' }} /></span>
-      <span className="eb-need-num">{done ? '✓' : `${have}/${need}`}</span>
-    </div>
-  );
-}
-
 // Today's intake graded against a burn estimate — the colored chip + running
 // text. Shared by the measured state and the provisional (formula) state, so
 // the current day gets its surplus/even/deficit color from day one.
@@ -114,7 +101,6 @@ export default function EnergyBalance({ days, today, lossTarget = DEFAULT_LOSS_T
   const todayKcal = todayDoc ? dayKcal(todayDoc) : null;
 
   if (!eb.ready) {
-    const p = eb.progress;
     const pv = eb.provisional;
     return (
       <div className="energy-balance">
@@ -162,7 +148,7 @@ export default function EnergyBalance({ days, today, lossTarget = DEFAULT_LOSS_T
         )}
         <div className="d-note" style={pv ? undefined : { marginTop: 0 }}>
           תעד/י משקל בכרטיס <b>"שקילה"</b> שבהגדרות (⚙️) — מומלץ פעמיים בשבוע, באותו בוקר.
-          אחרי כשבועיים — שלוש שקילות ותיעוד אוכל רציף — נחשב מהנתונים שלך את
+          אחרי כשבועיים — לפחות שלוש שקילות ותיעוד אוכל רציף — נחשב מהנתונים שלך את
           שריפת הקלוריות היומית האמיתית שלך (TDEE), ומשם לדעת בכל יום אם אתה בחריגה, מאוזן
           או בגרעון.
         </div>
@@ -172,11 +158,6 @@ export default function EnergyBalance({ days, today, lossTarget = DEFAULT_LOSS_T
             ותעד/י שקילה אחת — ונציג כאן אומדן שריפה לפי נוסחת Mifflin-St Jeor עד שיצטברו נתונים.
           </div>
         )}
-        <div className="eb-needs">
-          <NeedRow label="שקילות שתועדו" have={p.weighIns} need={p.needWeighIns} />
-          <NeedRow label="ימים בין השקילה הראשונה לאחרונה" have={p.spanDays} need={p.needSpanDays} />
-          <NeedRow label="ימי תזונה מלאים בתקופה" have={p.kcalDays} need={p.needKcalDays} />
-        </div>
         {eb.weights.length >= 2 && <WeightSpark weights={eb.weights} />}
       </div>
     );
