@@ -22,12 +22,13 @@ function selectTab(id) {
   document.querySelector(`[data-tour-tab="${id}"]`)?.click();
 }
 
-// Open the settings modal by clicking the real gear button (its onClick also
-// closes the mobile drawer, so this works on both layouts). No-op if it is
-// already open.
+// Open the settings modal via the header's event hook — the settings button now
+// lives inside the user-menu dropdown, so there may be nothing to click while
+// the menu is closed. The Header listens and opens the modal (closing the
+// mobile drawer first), so this works on both layouts. No-op if already open.
 function openSettings() {
   if (document.querySelector('.settings-modal')) return;
-  document.querySelector('[data-tour="settings"]')?.click();
+  window.dispatchEvent(new Event('ketolog:openSettings'));
 }
 
 // Close the settings modal via its own close button, so React state stays in
@@ -399,12 +400,25 @@ function buildSteps(isMobile, aiOn) {
         : 'מכוונים את המצלמה לברקוד המוצר והערכים התזונתיים נמשכים ממסד מזון עולמי — עובד גם בלי מפתח AI (חישוב גולמי). עם מפתח API הדיוק משתפר ומתווסף גם זיהוי מוצר מצילום.',
     },
     {
-      anchor: isMobile ? 'menu' : 'settings',
-      emoji: '⚙️',
-      title: 'הגדרות',
+      anchor: isMobile ? 'menu' : 'usermenu',
+      emoji: '👤',
+      title: 'תפריט המשתמש',
       text: isMobile
-        ? 'כל ההגדרות האישיות נמצאות בתפריט (☰) כאן למעלה. בואו נפתח אותן ונעבור על מה שכדאי להגדיר בהתחלה.'
-        : 'כל ההגדרות האישיות נמצאות מאחורי הכפתור הזה. בואו נפתח אותן ונעבור על מה שכדאי להגדיר בהתחלה.',
+        ? 'בתפריט (☰) כאן למעלה מרוכז החשבון שלך: השם שלך, 📬 הודעות (שם מגיעות תשובות לדיווחים, עדכונים והודעות מערכת), מצב בהיר/כהה, הגדרות ו-התנתקות. נקודה אדומה על התפריט = יש הודעה חדשה.'
+        : 'התפריט הזה מרכז את החשבון שלך: השם שלך, 📬 הודעות (שם מגיעות תשובות לדיווחים, עדכונים והודעות מערכת), מצב בהיר/כהה, הגדרות ו-התנתקות. נקודה אדומה על התפריט = יש הודעה חדשה.',
+    },
+    {
+      anchor: isMobile ? 'menu' : 'usermenu',
+      emoji: '🐞',
+      title: 'נתקלתם בבעיה? ספרו לנו',
+      text: 'בתפריט יש "דיווח על תקלה" — כותבים מה קרה ומצרפים עד 3 צילומי מסך (אפשר גם בהדבקה מהלוח, Ctrl/Cmd+V). הדיווח נשלח עם השם והאימייל שלך, והתשובה חוזרת אליך ל-📬 הודעות. עכשיו בואו נפתח את ההגדרות.',
+    },
+    {
+      anchor: 'set-name',
+      modal: 'settings',
+      emoji: '✏️',
+      title: 'השם שלך',
+      text: 'כך נציג אותך בתפריט ובדיווחי תקלות. לא חובה — בלי שם נציג את תחילת האימייל.',
     },
     {
       anchor: 'set-target',
@@ -448,7 +462,7 @@ function buildSteps(isMobile, aiOn) {
       title: 'תכונות AI — אופציונלי',
       text: aiOn
         ? 'ה-AI פעיל בחשבון שלך. כאן רואים את הסטטוס, את השימוש החודשי בדולרים, ומגדירים תקציב חודשי — תקבל/י התראה כשמתקרבים אליו, עוד לפני שהקרדיט נגמר.'
-        : 'בלי מפתח — הכל עובד דרך קלוד בחינם. מי שמדביק כאן מפתח API של Anthropic (מ-console.anthropic.com) מקבל: חישוב ארוחה בלחיצה אחת בתוך האפליקציה, את הצ׳אט קֶטוֹ, דוחות תובנות אוטומטיים, זיהוי מוצר מתמונה וברקוד מדויק יותר. המפתח נבדק, נשמר מוצפן ורץ על חשבונך — ואפשר להגדיר תקציב חודשי עם התראה.',
+        : 'בלי מפתח — הכל עובד דרך קלוד בחינם. מי שמדביק כאן מפתח API של Anthropic (מ-console.anthropic.com) מקבל: חישוב ארוחה בלחיצה אחת בתוך האפליקציה, את הצ׳אט קֶטוֹ, דוחות תובנות אוטומטיים, זיהוי מוצר מתמונה וברקוד מדויק יותר. המפתח נבדק, נשמר מוצפן ורץ על חשבונך — ואפשר להגדיר תקציב חודשי עם התראה. קיצור דרך לכאן: 🔑 מפתח API בתפריט המשתמש.',
     },
     // WhatsApp service disabled for all users — restore this step with it.
     // {

@@ -23,11 +23,15 @@ export default function SettingsModal({
   firstDate,
   days,
   onSaveWeight,
+  // opened from the user menu's "🔑 מפתח API" shortcut: scroll straight to the
+  // AI section and focus the key input
+  focusAi = false,
 }) {
   const { user, updateProfile, startOnboarding, refreshUser } = useAuth();
   const { theme, toggle } = useTheme();
   const toast = useToast();
 
+  const [name, setName] = useState('');
   const [gender, setGender] = useState('');
   const [target, setTarget] = useState('20');
   const [loss, setLoss] = useState('2');
@@ -132,6 +136,15 @@ export default function SettingsModal({
       await api.saveAiKey(k);
       await refreshUser();
       setAiKey('');
+      // a fresh key should surface the chat bubble by default, even if it was
+      // hidden on this device before — the hide toggle below still works
+      try {
+        localStorage.removeItem(CHAT_HIDDEN_KEY);
+      } catch {
+        /* storage unavailable — bubble state just stays as-is */
+      }
+      setHideChat(false);
+      window.dispatchEvent(new Event('ketolog:chatHiddenChanged'));
       toast('המפתח אומת ונשמר — תכונות ה-AI הופעלו 🎉');
     } catch (e) {
       toast(e.message || 'שמירת המפתח נכשלה');
@@ -173,6 +186,7 @@ export default function SettingsModal({
     if (!open) return;
     setResetOpen(false);
     setResetText('');
+    setName(user?.name || '');
     setGender(user?.gender || '');
     setTarget(String(user?.dailyCarbTarget ?? 20));
     setLoss(String(user?.monthlyLossTarget ?? 2));
@@ -194,6 +208,18 @@ export default function SettingsModal({
   // the component only renders while open, so the trap is simply always active
   const trapRef = useFocusTrap(open);
 
+  // "🔑 מפתח API" shortcut: once the modal is rendered, bring the AI section
+  // into view and put the cursor in the key field (if this account has one).
+  useEffect(() => {
+    if (!open || !focusAi) return;
+    const t = setTimeout(() => {
+      const section = document.querySelector('.settings-ai');
+      section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      section?.querySelector('input[type="password"]')?.focus({ preventScroll: true });
+    }, 80);
+    return () => clearTimeout(t);
+  }, [open, focusAi]);
+
   if (!open) return null;
 
   async function save() {
@@ -213,9 +239,11 @@ export default function SettingsModal({
     // sent (existing linked numbers stay stored on the user doc, untouched).
     // const digits = wa.replace(/\D/g, '');
     // if (digits && (digits.length < 8 || digits.length > 15)) return toast('מספר WhatsApp לא תקין');
+    if (name.trim().length > 60) return toast('השם ארוך מדי (עד 60 תווים)');
     setSaving(true);
     try {
       await updateProfile({
+        name: name.trim(),
         gender,
         dailyCarbTarget: t,
         monthlyLossTarget: w,
@@ -261,6 +289,17 @@ export default function SettingsModal({
           <h2>הגדרות</h2>
           <button className="settings-close" aria-label="סגור" onClick={onClose}>✕</button>
         </div>
+
+        <label className="settings-field" data-tour="set-name">
+          <span className="settings-lab">שם (מוצג בתפריט ובדיווחי תקלות)</span>
+          <input
+            type="text"
+            maxLength={60}
+            placeholder="איך לקרוא לך?"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </label>
 
         <div className="settings-field">
           <span className="settings-lab">פנייה</span>

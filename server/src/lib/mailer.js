@@ -107,6 +107,32 @@ export async function sendApprovalRequest({ email, approveUrl }) {
   return r;
 }
 
+// Notify the admin that a user filed a bug report. The report itself (including
+// screenshots) lives in the app's admin panel — the email is just the ping.
+// Falls back to a console log when no email backend is configured.
+export async function sendBugReportNotice({ email, name, description, imagesCount }) {
+  const who = name ? `${name} (${email})` : email;
+  const subject = `KetoLog — דיווח תקלה חדש מ-${who}`;
+  const attach = imagesCount ? `\n\nמצורפות ${imagesCount} תמונות — זמינות בפאנל הדיווחים באפליקציה.` : '';
+  const text =
+    `התקבל דיווח תקלה חדש מ-${who}:\n\n${description}${attach}\n\n` +
+    `לצפייה ולמענה: פתחו את KetoLog → תפריט המשתמש → דיווחי תקלות.`;
+  const html =
+    `<p>התקבל דיווח תקלה חדש מ-<strong>${escapeHtml(who)}</strong>:</p>` +
+    `<blockquote style="border-inline-start:3px solid #ccc;margin:8px 0;padding:4px 12px;white-space:pre-wrap">${escapeHtml(description)}</blockquote>` +
+    (imagesCount ? `<p>מצורפות ${imagesCount} תמונות — זמינות בפאנל הדיווחים באפליקציה.</p>` : '') +
+    `<p style="color:#888;font-size:13px">לצפייה ולמענה: KetoLog → תפריט המשתמש → דיווחי תקלות.</p>`;
+
+  const r = await deliver({ to: ADMIN_EMAIL, subject, text, html });
+  if (!r.delivered) {
+    console.log(`\n[bugs] no email backend configured — new bug report from ${who}:`);
+    console.log('[bugs]', description.slice(0, 200), '\n');
+    return r;
+  }
+  console.log(`[bugs] bug-report notice emailed to ${ADMIN_EMAIL} (via ${r.via})`);
+  return r;
+}
+
 // Send a password-reset link to the account owner. Like sendApprovalRequest,
 // falls back to logging the link when no email backend is configured so the
 // flow still works in development.

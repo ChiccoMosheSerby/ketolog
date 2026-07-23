@@ -81,6 +81,20 @@ export const api = {
   getMyAiUsage: () => request('GET', '/ai/usage'),
   setAiBudget: (usd) => request('POST', '/ai/budget', { usd }),
 
+  // bug reports — filed with the account's name/email attached server-side
+  reportBug: (description, images) => request('POST', '/bugs', { description, images }),
+  getMyBugReports: () => request('GET', '/bugs/mine'),
+
+  // in-app messages (bug replies, system announcements) + unread badge
+  getMessages: () => request('GET', '/messages'),
+  markMessagesRead: () => request('POST', '/messages/read-all'),
+
   // admin — per-user AI cost breakdown (admin accounts only)
   getAdminUsage: () => request('GET', '/admin/usage'),
+  // admin — bug reports: list, reply (reply lands in the reporter's messages)
+  getAdminBugs: () => request('GET', '/admin/bugs'),
+  replyToBug: (id, reply, status) => request('POST', `/admin/bugs/${id}/reply`, { reply, status }),
+  // admin — system message to one user (email) or broadcast to everyone
+  sendSystemMessage: (title, body, email) =>
+    request('POST', '/admin/messages', { title, body, email }),
 };

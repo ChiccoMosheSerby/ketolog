@@ -41,6 +41,7 @@ const userPayload = (u) => {
   return {
     id: u._id,
     email: u.email,
+    name: u.name || '',
     gender: u.gender || '',
     dailyCarbTarget: u.dailyCarbTarget,
     monthlyLossTarget: u.monthlyLossTarget ?? 2,
@@ -68,7 +69,7 @@ const userPayload = (u) => {
 };
 
 const PROFILE_FIELDS =
-  'email gender dailyCarbTarget monthlyLossTarget heightCm birthYear ketoStartDate ketoGoalMonths whatsappPhone anthropicApiKey aiOptOut aiKeyError aiMonthlyBudgetUsd';
+  'email name gender dailyCarbTarget monthlyLossTarget heightCm birthYear ketoStartDate ketoGoalMonths whatsappPhone anthropicApiKey aiOptOut aiKeyError aiMonthlyBudgetUsd';
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 // Base URL for the approval link in the email.
@@ -285,6 +286,11 @@ router.get('/me', requireAuth, asyncHandler(async (req, res) => {
 // PATCH /me -> update profile settings (daily carb target + keto-period goal)
 router.patch('/me', requireAuth, asyncHandler(async (req, res) => {
   const update = {};
+  if (req.body.name != null) {
+    const n = String(req.body.name).trim();
+    if (n.length > 60) return res.status(400).json({ error: 'השם ארוך מדי (עד 60 תווים)' });
+    update.name = n;
+  }
   if (req.body.gender != null) {
     const g = String(req.body.gender);
     if (!['male', 'female', ''].includes(g)) {

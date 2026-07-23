@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 // Light/dark theme. Dark is the default; the choice persists in localStorage
 // and is applied to <html data-theme> (see the inline boot script in index.html
@@ -21,14 +21,20 @@ export function applyTheme(theme) {
   } catch {
     /* private mode — runtime toggle still works for this session */
   }
+  // keep every useTheme() instance in sync (menu toggle + settings toggle)
+  window.dispatchEvent(new Event('ketolog:themeChanged'));
 }
 
 export function useTheme() {
   const [theme, setTheme] = useState(currentTheme);
+  // re-read when any other component switches the theme
+  useEffect(() => {
+    const sync = () => setTheme(currentTheme());
+    window.addEventListener('ketolog:themeChanged', sync);
+    return () => window.removeEventListener('ketolog:themeChanged', sync);
+  }, []);
   function toggle() {
-    const next = theme === 'dark' ? 'light' : 'dark';
-    applyTheme(next);
-    setTheme(next);
+    applyTheme(theme === 'dark' ? 'light' : 'dark');
   }
   return { theme, toggle };
 }

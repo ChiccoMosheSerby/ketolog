@@ -1,0 +1,209 @@
+/* ---------- Bug report dialog ---------- */
+
+.bug-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: rgba(18, 28, 22, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.bug-modal {
+  width: min(520px, 100%);
+  max-height: min(86vh, 720px);
+  overflow-y: auto;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-md);
+  padding: 16px 18px 18px;
+}
+
+.bug-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  h2 {
+    font-size: 17px;
+    margin: 0;
+  }
+}
+
+.bug-close {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--card);
+  cursor: pointer;
+  color: var(--ink-soft);
+}
+
+.bug-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+  > span {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink-soft);
+  }
+  textarea {
+    resize: vertical;
+    min-height: 96px;
+  }
+}
+
+/* screenshot thumbnails + the add tile */
+.bug-shots {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bug-shot {
+  position: relative;
+  width: 76px;
+  height: 76px;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  button {
+    position: absolute;
+    top: 3px;
+    inset-inline-end: 3px;
+    width: 20px;
+    height: 20px;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    font-size: 11px;
+    cursor: pointer;
+    line-height: 1;
+  }
+}
+
+.bug-add {
+  width: 76px;
+  height: 76px;
+  border: 1.5px dashed var(--line);
+  border-radius: var(--r-sm);
+  background: var(--card);
+  color: var(--ink-soft);
+  font-size: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  &:hover {
+    border-color: var(--olive-soft);
+    color: var(--olive);
+  }
+}
+
+.bug-hint {
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin-bottom: 12px;
+}
+
+.bug-send {
+  width: 100%;
+}
+
+/* post-send confirmation */
+.bug-sent {
+  text-align: center;
+  padding: 18px 0 8px;
+  .bug-sent-emoji {
+    font-size: 34px;
+    margin-bottom: 6px;
+  }
+  p {
+    margin: 4px 0;
+  }
+  .btn {
+    margin-top: 12px;
+  }
+}
+
+/* previous reports (status + admin reply) */
+.bug-mine {
+  margin-top: 16px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+.bug-mine-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  margin-bottom: 8px;
+}
+.bug-prev {
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--card);
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  font-size: 12.5px;
+}
+.bug-prev-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.bug-prev-date {
+  color: var(--ink-soft);
+  font-size: 11.5px;
+}
+.bug-prev-desc {
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.bug-prev-reply {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border-inline-start: 3px solid var(--olive);
+  background: var(--green-tint);
+  border-radius: var(--r-sm);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* status chips (shared look with the admin panel) */
+.bug-status {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  &.open {
+    background: #fef3c7;
+    color: #92400e;
+  }
+  &.answered {
+    background: #dbeafe;
+    color: #1e40af;
+  }
+  &.closed {
+    background: #dcfce7;
+    color: #166534;
+  }
+}

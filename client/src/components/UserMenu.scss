@@ -1,0 +1,174 @@
+/* ---------- Header account menu: person trigger + dropdown card ---------- */
+
+.umenu {
+  position: relative;
+  flex: none;
+}
+
+.umenu-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  box-shadow: var(--shadow-xs);
+  &:hover {
+    background: var(--green-tint);
+    border-color: var(--olive-soft);
+  }
+}
+
+.umenu-name {
+  font-weight: 600;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.umenu-chev {
+  font-size: 10px;
+  color: var(--ink-soft);
+}
+
+/* small round monogram, reused in the dropdown header */
+.umenu-avatar {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--olive);
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* unread indicator on the trigger itself */
+.umenu-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #dc2626;
+}
+
+/* the dropdown card (RTL: anchored to the left edge of the trigger) */
+.umenu-pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 60;
+  min-width: 230px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-md);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* identity header inside the card */
+.umenu-id {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+
+  .umenu-avatar {
+    width: 34px;
+    height: 34px;
+    font-size: 15px;
+  }
+}
+.umenu-who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  b {
+    font-size: 14px;
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  small {
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.umenu-sep {
+  height: 1px;
+  background: var(--line);
+  margin: 4px 2px;
+}
+
+.umenu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--ink);
+  text-align: start;
+  &:hover {
+    background: var(--green-tint);
+  }
+}
+
+.umenu-logout span {
+  font-weight: 700;
+}
+
+/* soft side-note on a menu item (e.g. "API key not set yet") */
+.umenu-hint {
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+.umenu-badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* flat variant for the mobile drawer — same items, no popover chrome */
+.umenu-list {
+  display: flex;
+  flex-direction: column;
+
+  .umenu-id {
+    padding-inline: 2px;
+  }
+  .umenu-item {
+    padding-inline: 6px;
+    font-size: 14.5px;
+  }
+}

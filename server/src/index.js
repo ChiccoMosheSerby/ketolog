@@ -12,6 +12,8 @@ import productRoutes from './routes/products.js';
 import templateRoutes from './routes/templates.js';
 import aiRoutes from './routes/ai.js';
 import adminRoutes from './routes/admin.js';
+import bugRoutes from './routes/bugs.js';
+import messageRoutes from './routes/messages.js';
 // WhatsApp service disabled for all users — uncomment here, the mount below,
 // the boot log line, and the settings field in the client to bring it back.
 // import whatsappRoutes from './routes/whatsapp.js';
@@ -94,6 +96,8 @@ app.use('/api/products', productRoutes);
 app.use('/api/templates', templateRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/bugs', bugRoutes);
+app.use('/api/messages', messageRoutes);
 // Twilio's inbound WhatsApp webhook. Public (secured by Twilio's request
 // signature, not a bearer token) and sends application/x-www-form-urlencoded,
 // which the urlencoded parser above already handles.

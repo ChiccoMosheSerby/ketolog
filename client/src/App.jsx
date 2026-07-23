@@ -3,6 +3,7 @@ import Login from './components/Login.jsx';
 import Diary from './components/Diary.jsx';
 import ChatWidget from './components/ChatWidget.jsx';
 import Onboarding from './components/Onboarding.jsx';
+import MenuIntro from './components/MenuIntro.jsx';
 import AppLinkConfirm from './components/AppLinkConfirm.jsx';
 import { AppSkeleton } from './components/Skeleton.jsx';
 
@@ -18,6 +19,8 @@ export default function App() {
       {user?.ai?.enabled && <ChatWidget />}
       <AppLinkConfirm />
       {needsOnboarding && <Onboarding />}
+      {/* one-time "what's new" spotlight for existing users (new header menu) */}
+      {!needsOnboarding && <MenuIntro />}
     </>
   );
 }

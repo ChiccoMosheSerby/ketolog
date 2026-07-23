@@ -1,11 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { kcalZone } from '../lib/helpers.js';
-import { useAuth } from '../lib/auth.jsx';
+import { api } from '../lib/api.js';
+import { useToast } from '../lib/toast.jsx';
 import { useMediaQuery, MOBILE_QUERY } from '../lib/useMediaQuery.js';
 import { useFocusTrap } from '../lib/useFocusTrap.js';
 import CarbRing from './CarbRing.jsx';
 import SettingsModal from './SettingsModal.jsx';
 import AdminUsage from './AdminUsage.jsx';
+import UserMenu from './UserMenu.jsx';
+import MessagesPanel from './MessagesPanel.jsx';
+import BugReportModal from './BugReportModal.jsx';
+import AdminBugs from './AdminBugs.jsx';
 import './Header.scss';
 
 // The 3 live day summaries. `mini` shrinks them for the mobile top bar.
@@ -76,36 +81,78 @@ export function TargetLegend() {
   );
 }
 
-// Compact identity bar: email, a gear that opens the settings modal, and logout.
-// Everything else (target, keto goal, WhatsApp, gender, theme, tour, export)
-// lives inside the settings modal now.
-function UserBar({ onOpenSettings, onOpenAdmin }) {
-  const { user, logout } = useAuth();
-  return (
-    <div className="userbar">
-      <span className="uemail">{user?.email}</span>
-      {user?.isAdmin && (
-        <button className="btn ghost mini" onClick={onOpenAdmin} title="שימוש ועלויות">
-          💰 שימוש
-        </button>
-      )}
-      <button className="btn ghost mini" onClick={onOpenSettings} title="הגדרות" data-tour="settings">
-        ⚙ הגדרות
-      </button>
-      <button className="btn ghost mini" onClick={logout}>
-        התנתק
-      </button>
-    </div>
-  );
-}
-
 export default function Header({ stats, onExport, onExportExcel, firstDate, days, onSaveWeight }) {
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // when true, the settings modal opens scrolled to the AI/API-key section
+  const [settingsFocusAi, setSettingsFocusAi] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
+  const [adminBugsOpen, setAdminBugsOpen] = useState(false);
+  const [bugOpen, setBugOpen] = useState(false);
+  const [msgsOpen, setMsgsOpen] = useState(false);
+  const toast = useToast();
+  // unread in-app messages — drives the badge in the user menu / hamburger dot
+  const [unread, setUnread] = useState(0);
+  // admin only: bug reports still waiting for an answer
+  const [openBugs, setOpenBugs] = useState(0);
+  // last-seen counts, so a mid-session increase can pop a toast (null = first
+  // load — badges only, no toast for things that were already waiting)
+  const seenRef = useRef(null);
   // the drawer stays mounted (it slides), so the trap keys off drawerOpen
   const drawerRef = useFocusTrap(drawerOpen);
+
+  // Check the inbox on load and then every couple of minutes (volume is tiny).
+  // A count that grew since the previous check means something new arrived —
+  // surface it with a toast on top of the badge.
+  const checkInbox = useCallback(() => {
+    api
+      .getMessages()
+      .then((r) => {
+        const bugs = r.openBugs || 0;
+        setUnread(r.unread);
+        setOpenBugs(bugs);
+        const seen = seenRef.current;
+        if (seen && r.unread > seen.unread) toast('📬 הודעה חדשה — פתחו את ההודעות בתפריט');
+        else if (seen && bugs > seen.openBugs) toast('🐞 התקבל דיווח תקלה חדש');
+        seenRef.current = { unread: r.unread, openBugs: bugs };
+      })
+      .catch(() => {});
+  }, [toast]);
+
+  useEffect(() => {
+    checkInbox();
+    const t = setInterval(checkInbox, 120_000);
+    return () => clearInterval(t);
+  }, [checkInbox]);
+
+  // The guided tour (and anything else) can open settings without knowing where
+  // the button lives — it now sits inside the user-menu dropdown.
+  useEffect(() => {
+    const openSettings = () => {
+      setDrawerOpen(false);
+      setSettingsOpen(true);
+    };
+    window.addEventListener('ketolog:openSettings', openSettings);
+    return () => window.removeEventListener('ketolog:openSettings', openSettings);
+  }, []);
+
+  // One dispatcher for every user-menu item (dropdown + drawer list).
+  const onMenuAction = useCallback((what) => {
+    setDrawerOpen(false);
+    if (what === 'messages') setMsgsOpen(true);
+    else if (what === 'usage') setAdminOpen(true);
+    else if (what === 'adminBugs') setAdminBugsOpen(true);
+    else if (what === 'settings') setSettingsOpen(true);
+    else if (what === 'apiKey') {
+      setSettingsFocusAi(true);
+      setSettingsOpen(true);
+    } else if (what === 'bugReport') setBugOpen(true);
+  }, []);
+  const onMessagesRead = useCallback(() => {
+    setUnread(0);
+    if (seenRef.current) seenRef.current.unread = 0;
+  }, []);
 
   // Close the drawer if we grow back to desktop.
   useEffect(() => {
@@ -134,7 +181,11 @@ export default function Header({ stats, onExport, onExportExcel, firstDate, days
     <>
       <SettingsModal
         open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
+        focusAi={settingsFocusAi}
+        onClose={() => {
+          setSettingsOpen(false);
+          setSettingsFocusAi(false);
+        }}
         onExport={onExport}
         onExportExcel={onExportExcel}
         firstDate={firstDate}
@@ -142,6 +193,16 @@ export default function Header({ stats, onExport, onExportExcel, firstDate, days
         onSaveWeight={onSaveWeight}
       />
       <AdminUsage open={adminOpen} onClose={() => setAdminOpen(false)} />
+      <AdminBugs
+        open={adminBugsOpen}
+        onClose={() => {
+          setAdminBugsOpen(false);
+          // replying/closing reports changes the open count — refresh the badge
+          checkInbox();
+        }}
+      />
+      <BugReportModal open={bugOpen} onClose={() => setBugOpen(false)} />
+      <MessagesPanel open={msgsOpen} onClose={() => setMsgsOpen(false)} onRead={onMessagesRead} />
     </>
   );
 
@@ -150,10 +211,7 @@ export default function Header({ stats, onExport, onExportExcel, firstDate, days
       <header className="top">
         <div className="headrow">
           <Stats stats={stats} />
-          <UserBar
-            onOpenSettings={() => setSettingsOpen(true)}
-            onOpenAdmin={() => setAdminOpen(true)}
-          />
+          <UserMenu unread={unread} openBugs={openBugs} onAction={onMenuAction} />
         </div>
         {modals}
       </header>
@@ -173,6 +231,9 @@ export default function Header({ stats, onExport, onExportExcel, firstDate, days
           <span></span>
           <span></span>
           <span></span>
+          {unread + openBugs > 0 && (
+            <i className="ham-dot" aria-label={`${unread + openBugs} עדכונים חדשים`} />
+          )}
         </button>
         <Stats stats={stats} mini />
       </div>
@@ -190,10 +251,7 @@ export default function Header({ stats, onExport, onExportExcel, firstDate, days
         <button className="drawer-close" aria-label="סגור" onClick={() => setDrawerOpen(false)}>
           ✕
         </button>
-        <UserBar
-          onOpenSettings={() => { setDrawerOpen(false); setSettingsOpen(true); }}
-          onOpenAdmin={() => { setDrawerOpen(false); setAdminOpen(true); }}
-        />
+        <UserMenu variant="list" unread={unread} openBugs={openBugs} onAction={onMenuAction} />
         <TargetLegend />
       </aside>
       {modals}

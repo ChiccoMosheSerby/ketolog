@@ -4,6 +4,9 @@ const userSchema = new mongoose.Schema(
   {
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash: { type: String, required: true },
+    // Display name, set in settings. Optional — the UI falls back to the email
+    // prefix. Attached to bug reports so the admin knows who is writing.
+    name: { type: String, default: '', trim: true, maxlength: 60 },
     // Grammatical gender for Hebrew address ('male' | 'female'). Empty = unset,
     // so AI text falls back to neutral dual forms (/ית). Drives correctly-
     // gendered wording in the insight reports.
