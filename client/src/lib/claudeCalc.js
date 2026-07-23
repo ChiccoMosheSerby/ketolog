@@ -89,7 +89,13 @@ export function buildPrompt({ text, days, target, ketoMonths, avg, origin, mode,
     '(פחמימות נטו, שומן, חלבון, קק"ל) והסבר קצר של החישוב.',
   ].join("\n");
 
-  return `${context}\n\n${KETO_PROMPT_RULES}\n\n${request}`;
+  // Best-effort: users with claude.ai Memory enabled get the rules carried
+  // into future keto chats too. Not guaranteed (plan/setting dependent, and
+  // stored as a paraphrase), so the rules still ride along on every redirect.
+  const memoryNote =
+    "שמור את כללי החישוב האלו בזיכרון והחל אותם גם בשיחות עתידיות בנושא קיטו/ketolog.";
+
+  return `${context}\n\n${KETO_PROMPT_RULES}\n${memoryNote}\n\n${request}`;
 }
 
 // Copy text to the clipboard, tolerating older/locked-down browsers.
