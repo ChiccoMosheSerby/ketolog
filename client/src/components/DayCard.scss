@@ -122,11 +122,22 @@
   color: var(--ink-soft);
   font-weight: 400;
 }
+/* the header numbers — net carbs, ☕ counter, kcal — sit on one line, aligned
+   on their shared baseline. RTL page + row-reverse lays the DOM order (total,
+   coffee, kcal) out left-to-right, so the big carb total is the leftmost item
+   and the whole block hugs the left edge (mobile included). */
 .day-hnums {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 1px;
+  flex-direction: row-reverse;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+.hsep {
+  color: var(--ink-soft);
+  opacity: 0.5;
+  font-size: 12px;
 }
 .day-total {
   font-family: "IBM Plex Mono", monospace;
@@ -152,6 +163,15 @@
     font-weight: 400;
   }
 }
+/* optional coffee counter (settings → תצוגת כרטיס היום) */
+.day-coffee {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: help;
+}
 .day.open .chev {
   transform: rotate(-135deg);
   margin-bottom: -3px;
@@ -163,55 +183,8 @@
   max-width: 760px;
 }
 
-/* meter — the carb line */
-.meter {
-  position: relative;
-  height: 8px;
-  background: var(--tint);
-  margin: 0 20px;
-  border-radius: 999px;
-  > span {
-    display: block;
-    height: 100%;
-    border-radius: 999px;
-    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-}
-.meter-mark {
-  position: absolute;
-  top: -3px;
-  bottom: -3px;
-  right: 40%;
-  width: 2px;
-  background: var(--ink);
-  opacity: 0.4;
-  border-radius: 1px;
-}
-.meter-scale {
-  position: relative;
-  height: 14px;
-  margin: 5px 20px 0;
-  span {
-    position: absolute;
-    top: 0;
-    font-size: 9.5px;
-    color: var(--ink-soft);
-    white-space: nowrap;
-    font-variant-numeric: tabular-nums;
-  }
-  .s0 {
-    right: 0;
-  }
-  .s50 {
-    left: 0;
-  }
-  .s20 {
-    right: 40%;
-    transform: translateX(50%);
-    color: var(--ink);
-    font-weight: 600;
-  }
-}
+/* one-line status caption under the day head (the carb meter bar it used to
+   accompany was removed — the caption carries the zone message alone) */
 .meter-cap {
   font-size: 11px;
   color: var(--ink-soft);
@@ -488,6 +461,12 @@
     column-gap: 12px;
     font-size: 12px;
     color: var(--ink-soft);
+    /* kcal hidden in settings — the kcal column is not rendered at all, so
+       the table collapses to name + carbs (the header span pin to column 2
+       below then points at the carb column) */
+    &.no-kcal {
+      grid-template-columns: minmax(0, max-content) max-content;
+    }
     li {
       display: contents;
     }

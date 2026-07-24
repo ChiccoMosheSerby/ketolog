@@ -659,6 +659,8 @@ export default function Diary() {
                 onSaveItemProduct={saveItemAsProduct}
                 target={target}
                 kcalTarget={kcalTarget}
+                showKcal={user?.cardShowKcal !== false}
+                showCoffee={!!user?.cardShowCoffee}
               />
             ))
           )}
@@ -715,6 +717,8 @@ export default function Diary() {
         onSaveItemProduct={saveItemAsProduct}
         target={target}
         kcalTarget={kcalTarget}
+        showKcal={user?.cardShowKcal !== false}
+        showCoffee={!!user?.cardShowCoffee}
       />
       )}
 
@@ -849,6 +853,8 @@ export default function Diary() {
               onSaveItemProduct={saveItemAsProduct}
               target={target}
               kcalTarget={kcalTarget}
+              showKcal={user?.cardShowKcal !== false}
+              showCoffee={!!user?.cardShowCoffee}
             />
           </div>
         </div>

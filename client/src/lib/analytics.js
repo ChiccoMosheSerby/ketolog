@@ -49,9 +49,14 @@ export function buildKetoProgress(days, goal, today, target = TARGET) {
   const end = addMonthsISO(start, goal.months);
   const totalDays = Math.max(1, diffDays(start, end));
   const elapsed = Math.min(Math.max(diffDays(start, today), 0), totalDays);
-  // adherence: logged, completed (past) days inside the window
+  // adherence: logged, completed days inside the window (past days, plus
+  // today once the user has closed it)
   const inWindow = days.filter(
-    (d) => mealsOf(d).length > 0 && d.date >= start && d.date < today && d.date <= end
+    (d) =>
+      mealsOf(d).length > 0 &&
+      d.date >= start &&
+      (d.date < today || (d.date === today && d.closed)) &&
+      d.date <= end
   );
   const inTarget = inWindow.filter((d) => dayTotal(d) <= target).length;
 
@@ -60,18 +65,20 @@ export function buildKetoProgress(days, goal, today, target = TARGET) {
   //   good   — logged, at/under target
   //   over   — logged, over target
   //   missed — a past day with no meals logged
-  //   today  — the current (in-progress) day
+  //   today  — the current (in-progress) day; once closed it's judged like a
+  //            past day (good/over/missed)
   //   future — still ahead
   const totalByDate = new Map();
   days.forEach((d) => {
     if (mealsOf(d).length > 0) totalByDate.set(d.date, dayTotal(d));
   });
+  const closedToday = !!days.find((d) => d.date === today)?.closed;
   const strip = [];
   for (let i = 0; i < totalDays; i++) {
     const date = addDaysISO(start, i);
     let status;
     if (date > today) status = 'future';
-    else if (date === today) status = 'today';
+    else if (date === today && !closedToday) status = 'today';
     else if (totalByDate.has(date)) status = totalByDate.get(date) <= target ? 'good' : 'over';
     else status = 'missed';
     strip.push({
@@ -118,8 +125,11 @@ export function buildAnalytics(days, target = TARGET, opts = {}) {
   const { today, ketoGoal } = opts;
   // Statistics only count days that have already passed — today is still in
   // progress, so including it would skew records (a half-eaten day looks
-  // "cleanest") and averages. Drop today (and any stray future date).
-  const all = asc(days).filter((d) => !today || d.date < today);
+  // "cleanest") and averages. Drop today (and any stray future date), unless
+  // the user explicitly closed today ("סגירת היום") — then it's complete.
+  const all = asc(days).filter(
+    (d) => !today || d.date < today || (d.date === today && d.closed)
+  );
   // A "logged" day is one with at least one meal — metric-only days (just a
   // weight, say) shouldn't drag the carb averages down to 0.
   const logged = all.filter((d) => mealsOf(d).length > 0);

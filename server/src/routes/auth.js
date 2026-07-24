@@ -50,6 +50,8 @@ const userPayload = (u) => {
     ketoStartDate: u.ketoStartDate || '',
     ketoGoalMonths: u.ketoGoalMonths || 0,
     whatsappPhone: u.whatsappPhone || '',
+    cardShowKcal: u.cardShowKcal !== false,
+    cardShowCoffee: Boolean(u.cardShowCoffee),
     isAdmin: isAdmin(u),
     // The client gates every AI-facing control on this block (never the key itself).
     ai: {
@@ -69,7 +71,7 @@ const userPayload = (u) => {
 };
 
 const PROFILE_FIELDS =
-  'email name gender dailyCarbTarget monthlyLossTarget heightCm birthYear ketoStartDate ketoGoalMonths whatsappPhone anthropicApiKey aiOptOut aiKeyError aiMonthlyBudgetUsd';
+  'email name gender dailyCarbTarget monthlyLossTarget heightCm birthYear ketoStartDate ketoGoalMonths whatsappPhone anthropicApiKey aiOptOut aiKeyError aiMonthlyBudgetUsd cardShowKcal cardShowCoffee';
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 // Base URL for the approval link in the email.
@@ -345,6 +347,8 @@ router.patch('/me', requireAuth, asyncHandler(async (req, res) => {
     }
     update.ketoStartDate = d;
   }
+  if (req.body.cardShowKcal != null) update.cardShowKcal = Boolean(req.body.cardShowKcal);
+  if (req.body.cardShowCoffee != null) update.cardShowCoffee = Boolean(req.body.cardShowCoffee);
   if (req.body.whatsappPhone != null) {
     // Normalize to bare E.164 digits so it compares equal to what Twilio sends.
     // Empty string unlinks. Otherwise require a plausible international number.

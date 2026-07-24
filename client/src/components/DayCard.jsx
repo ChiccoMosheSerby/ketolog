@@ -4,6 +4,7 @@ import {
   dayTotal,
   dayMacroGrams,
   dayKcal,
+  dayCoffeeCount,
   kcalZone,
   macroPct,
   macroKcal,
@@ -11,7 +12,6 @@ import {
   fmt,
   heDate,
   zoneInfo,
-  maxRange,
   TARGET,
 } from "../lib/helpers.js";
 import "./DayCard.scss";
@@ -125,10 +125,12 @@ export default function DayCard({
   closed = false,
   target = TARGET,
   kcalTarget = 0,
+  // day-card display prefs (settings → תצוגת כרטיס היום)
+  showKcal = true,
+  showCoffee = false,
 }) {
   const total = dayTotal(day);
   const zi = zoneInfo(total, target);
-  const maxr = maxRange(target);
   const meals = [...(day.meals || [])].sort((a, b) =>
     (a.time || "").localeCompare(b.time || ""),
   );
@@ -136,6 +138,7 @@ export default function DayCard({
   const mp = macroPct(g);
   const kcal = dayKcal(day);
   const kz = kcalZone(kcal, kcalTarget);
+  const coffeeCount = showCoffee ? dayCoffeeCount(day) : 0;
 
   // Per-meal fold: rows show only time · title · carbs; tapping a row reveals
   // the item breakdown, macro split and the row actions.
@@ -178,8 +181,21 @@ export default function DayCard({
             <span className="day-total" style={{ color: zi.color }}>
               {fmt(total)} <small>ג' נטו</small>
             </span>
-            {(kcal != null || (onCloseDay && !closed && kcalTarget > 0)) && (
-              <span className="day-kcal-row">
+            {coffeeCount > 0 && (
+              <>
+                <span className="hsep" aria-hidden="true">|</span>
+                <span
+                  className="day-coffee"
+                  title={`${coffeeCount} כוסות קפה ביום זה`}
+                >
+                  ☕ {coffeeCount}
+                </span>
+              </>
+            )}
+            {showKcal && (kcal != null || (onCloseDay && !closed && kcalTarget > 0)) && (
+              <>
+                <span className="hsep" aria-hidden="true">|</span>
+                <span className="day-kcal-row">
                 {kcal != null && (
                   <span
                     className="day-kcal"
@@ -197,29 +213,18 @@ export default function DayCard({
                     title={`גבול קצב היעד: ${kcalTarget.toLocaleString()} קק"ל ליום`}
                   >
                     {(kcal || 0) <= kcalTarget
-                      ? `· נותרו ~${Math.round(kcalTarget - (kcal || 0)).toLocaleString()}`
-                      : `· ~${Math.round((kcal || 0) - kcalTarget).toLocaleString()} מעל היעד`}
+                      ? `| נותרו ~${Math.round(kcalTarget - (kcal || 0)).toLocaleString()}`
+                      : `| ~${Math.round((kcal || 0) - kcalTarget).toLocaleString()} מעל היעד`}
                   </span>
                 )}
-              </span>
+                </span>
+              </>
             )}
           </span>
           <span className="chev"></span>
         </span>
       </div>
 
-      <div className="meter">
-        <span style={{ width: zi.pct + "%", background: zi.color }}></span>
-        <i
-          className="meter-mark"
-          title={"גבול היעד: " + fmt(target) + " גרם"}
-        ></i>
-      </div>
-      <div className="meter-scale">
-        <span className="s0">0</span>
-        <span className="s20">יעד {fmt(target)}</span>
-        <span className="s50">{fmt(maxr)}</span>
-      </div>
       <div className="meter-cap">{zi.cap}</div>
 
       {/* "close the day" — only the current day gets this (onCloseDay prop).
@@ -286,9 +291,11 @@ export default function DayCard({
                   ></span>
                   פחמ' <b>{mp.carb}%</b> · {fmt(g.carb)} ג'
                 </span>
-                <span style={{ marginInlineStart: "auto" }}>
-                  ~{mp.kcal} קק"ל
-                </span>
+                {showKcal && (
+                  <span style={{ marginInlineStart: "auto" }}>
+                    ~{mp.kcal} קק"ל
+                  </span>
+                )}
               </div>
             </div>
           ) : (
@@ -387,7 +394,7 @@ export default function DayCard({
                       </div>
                       <div className="carb">
                         {fmt(Number(m.carbs) || 0)} ג'
-                        {mkcal != null && (
+                        {showKcal && mkcal != null && (
                           <span
                             className="carb-kcal"
                             title="קלוריות לארוחה (לפי המאקרו שתועד)"
@@ -401,9 +408,9 @@ export default function DayCard({
                     {mopen && (
                     <div className="meal-more">
                       {items.length > 0 && (
-                        <ul className="meal-items">
+                        <ul className={"meal-items" + (showKcal ? "" : " no-kcal")}>
                           <li className="mi-head">
-                            <span>קק״ל</span>
+                            {showKcal && <span>קק״ל</span>}
                             <span>ג׳ פחמימות</span>
                           </li>
                           {items.map((it, i) => {
@@ -438,14 +445,17 @@ export default function DayCard({
                                     </button>
                                   )}
                                 </span>
-                                {/* always rendered — each row must fill its
-                                    grid column even when kcal is unknown */}
-                                <span
-                                  className="mi-kcal"
-                                  title={ikcal != null ? "קלוריות לפריט (לפי המאקרו שלו)" : undefined}
-                                >
-                                  {ikcal != null && <>~{ikcal}</>}
-                                </span>
+                                {/* always rendered (when kcal is shown) — each
+                                    row must fill its grid column even when the
+                                    item's kcal is unknown */}
+                                {showKcal && (
+                                  <span
+                                    className="mi-kcal"
+                                    title={ikcal != null ? "קלוריות לפריט (לפי המאקרו שלו)" : undefined}
+                                  >
+                                    {ikcal != null && <>~{ikcal}</>}
+                                  </span>
+                                )}
                                 <span className="mi-carb">
                                   {fmt((Number(it.carbs) || 0) * (it.qty || 1))}
                                 </span>

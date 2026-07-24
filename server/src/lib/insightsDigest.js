@@ -111,7 +111,11 @@ function ketoProgress(days, ketoGoalMonths, today, target) {
   const totalDays = Math.max(1, diffDays(start, end));
   const elapsed = Math.min(Math.max(diffDays(start, today), 0), totalDays);
   const inWindow = days.filter(
-    (d) => mealsOf(d).length > 0 && d.date >= start && d.date < today && d.date <= end
+    (d) =>
+      mealsOf(d).length > 0 &&
+      d.date >= start &&
+      (d.date < today || (d.date === today && d.closed)) &&
+      d.date <= end
   );
   const inTarget = inWindow.filter((d) => dayTotal(d) <= target).length;
   return {
@@ -131,8 +135,11 @@ function ketoProgress(days, ketoGoalMonths, today, target) {
  * @param {{target:number, ketoGoalMonths:number, today:string}} opts
  */
 export function buildDigest(days, { target = 20, ketoGoalMonths = 0, today } = {}) {
-  // Only completed days count for stats — today is still in progress.
-  const all = asc(days).filter((d) => !today || d.date < today);
+  // Only completed days count for stats — today is still in progress, unless
+  // the user explicitly closed it ("סגירת היום"), which marks it complete.
+  const all = asc(days).filter(
+    (d) => !today || d.date < today || (d.date === today && d.closed)
+  );
   const logged = all.filter((d) => mealsOf(d).length > 0);
 
   const totals = logged.map(dayTotal);
@@ -170,7 +177,8 @@ export function buildDigest(days, { target = 20, ketoGoalMonths = 0, today } = {
     if (pct) macroAvg = { days: n, ...pct };
   }
 
-  // weight trend
+  // weight trend — every weight the user ever logged goes to the model, not
+  // just a recent window, so long-range trends are visible in the report
   const weightPoints = all
     .map((d) => ({ date: d.date, w: parseWeight(d.metrics?.weight) }))
     .filter((p) => p.w != null);
@@ -183,7 +191,7 @@ export function buildDigest(days, { target = 20, ketoGoalMonths = 0, today } = {
       delta: round1(weightPoints[weightPoints.length - 1].w - weightPoints[0].w),
       min: round1(Math.min(...ws)),
       max: round1(Math.max(...ws)),
-      points: weightPoints.slice(-14),
+      points: weightPoints,
     };
   }
 

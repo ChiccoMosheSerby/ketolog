@@ -46,6 +46,10 @@ const userSchema = new mongoose.Schema(
     // Optional self-set monthly AI spend budget (USD, 0 = none). Compared
     // against the recorded usage to warn the user before they run out.
     aiMonthlyBudgetUsd: { type: Number, default: 0, min: 0, max: 10000 },
+    // Day-card display preferences (settings → תצוגת כרטיס היום): show the
+    // kcal figures on the card, and show a ☕ counter of the day's coffees.
+    cardShowKcal: { type: Boolean, default: true },
+    cardShowCoffee: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

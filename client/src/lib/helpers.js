@@ -70,6 +70,15 @@ export function hasMacros(d) {
   return (d.meals || []).some((m) => m.fat != null || m.protein != null);
 }
 
+// A meal counts as coffee only when it actually mentions coffee (same patterns
+// the analytics/insights use), so a stray "נס" elsewhere never registers.
+const COFFEE_RE = /קפה|אספרסו|espresso|קפוצ['׳]?ינו|cappuccino|לאטה|latte|מקיאטו|אמריקנו/i;
+
+// How many coffee meals the day holds — the optional ☕ counter on the day card.
+export function dayCoffeeCount(d) {
+  return (d.meals || []).filter((m) => COFFEE_RE.test(`${m.desc || ''} ${m.cat || ''}`)).length;
+}
+
 export function fmt(n) {
   return (Math.round(n * 100) / 100).toString();
 }

@@ -81,6 +81,25 @@
   }
 }
 
+/* checkbox row (day-card display prefs) */
+.settings-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13.5px;
+  color: var(--ink);
+
+  input {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    accent-color: var(--accent, var(--olive));
+    cursor: pointer;
+    flex: none;
+  }
+}
+
 /* gender segmented control */
 .settings-seg {
   display: inline-flex;

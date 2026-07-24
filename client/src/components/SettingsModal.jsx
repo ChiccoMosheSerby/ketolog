@@ -39,6 +39,9 @@ export default function SettingsModal({
   const [birthYear, setBirthYear] = useState('');
   const [keto, setKeto] = useState('0');
   const [wa, setWa] = useState('');
+  // day-card display prefs: kcal figures on the card, ☕ coffee counter
+  const [showKcal, setShowKcal] = useState(true);
+  const [showCoffee, setShowCoffee] = useState(false);
   const [saving, setSaving] = useState(false);
   const [xFrom, setXFrom] = useState('');
   const [xTo, setXTo] = useState('');
@@ -194,6 +197,8 @@ export default function SettingsModal({
     setBirthYear(user?.birthYear ? String(user.birthYear) : '');
     setKeto(String(user?.ketoGoalMonths || 0));
     setWa(user?.whatsappPhone || '');
+    setShowKcal(user?.cardShowKcal !== false);
+    setShowCoffee(!!user?.cardShowCoffee);
     setXFrom(firstDate || todayISO());
     setXTo(todayISO());
   }, [open, user, firstDate]);
@@ -250,6 +255,8 @@ export default function SettingsModal({
         heightCm: Math.round(h),
         birthYear: by,
         ketoGoalMonths: m,
+        cardShowKcal: showKcal,
+        cardShowCoffee: showCoffee,
         // whatsappPhone: digits,
       });
       toast('ההגדרות נשמרו');
@@ -345,6 +352,26 @@ export default function SettingsModal({
           <span className="settings-lab">יעד קיטו (חודשים · 0 = ללא)</span>
           <input type="number" min="0" max="60" value={keto} onChange={(e) => setKeto(e.target.value)} />
         </label>
+
+        <div className="settings-group">
+          <div className="settings-lab">תצוגת כרטיס היום</div>
+          <label className="settings-check">
+            <input
+              type="checkbox"
+              checked={showKcal}
+              onChange={(e) => setShowKcal(e.target.checked)}
+            />
+            <span>הצגת קלוריות (קק"ל) בכרטיס היום</span>
+          </label>
+          <label className="settings-check">
+            <input
+              type="checkbox"
+              checked={showCoffee}
+              onChange={(e) => setShowCoffee(e.target.checked)}
+            />
+            <span>הצגת מספר כוסות הקפה בכרטיס היום ☕</span>
+          </label>
+        </div>
 
         {/* WhatsApp service disabled for all users — kept for a possible return.
         <label className="settings-field" data-tour="set-wa">
