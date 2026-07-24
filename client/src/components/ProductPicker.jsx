@@ -53,8 +53,8 @@ export default function ProductPicker({
     () => localStorage.getItem(SORT_KEY) || "usage",
   );
   const [query, setQuery] = useState("");
-  // categories start folded — only favorites and what the user opens are open
-  const [openCats, setOpenCats] = useState(() => new Set([STARRED_CAT]));
+  // categories start folded (favorites included) — only what the user opens is open
+  const [openCats, setOpenCats] = useState(() => new Set());
   // the row whose details tooltip is open (tap toggles; only one at a time —
   // tapping the same row again, another row, or the background closes it).
   // `below` flips the bubble under the row when the row sits near the top of
@@ -526,7 +526,6 @@ export default function ProductPicker({
                   STARRED_CAT,
                   starred.map(productRow),
                   starred.length,
-                  true,
                 )}
 
               {groups.map(([cat, list]) =>
