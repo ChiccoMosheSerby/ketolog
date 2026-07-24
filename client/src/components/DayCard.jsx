@@ -121,6 +121,9 @@ export default function DayCard({
   onSaveTemplate,
   onSaveProduct,
   onSaveItemProduct,
+  // (...names) => true when one of them already matches a saved product —
+  // such meals/items don't offer "הוסף כמוצר" again
+  isSavedProduct = () => false,
   onCloseDay,
   closed = false,
   target = TARGET,
@@ -337,6 +340,12 @@ export default function DayCard({
                     : null;
                 const mkcal = macroKcal(m);
                 const mopen = openMeals.has(m._id);
+                // the meal-level "הוסף כמוצר" is redundant when the meal
+                // itself, or every item in it, already exists as a product
+                const mealSaved =
+                  isSavedProduct(m.desc, m.cat) ||
+                  (items.length > 0 &&
+                    items.every((it) => isSavedProduct(it.name, it.desc)));
                 return (
                   <div className={"meal" + (mopen ? " open" : "")} key={m._id}>
                     <div
@@ -363,7 +372,7 @@ export default function DayCard({
                       <div className="desc">
                         {m.desc || m.cat}
                         <AddToTextBtn text={m.desc || m.cat} />
-                        {onSaveProduct && (
+                        {onSaveProduct && !mealSaved && (
                           <button
                             type="button"
                             className="mini-act"
@@ -429,7 +438,8 @@ export default function DayCard({
                                     </>
                                   )}
                                   <AddToTextBtn text={it.desc || it.name} />
-                                  {onSaveItemProduct && (
+                                  {onSaveItemProduct &&
+                                    !isSavedProduct(it.name, it.desc) && (
                                     <button
                                       type="button"
                                       className="mini-act"

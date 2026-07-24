@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { fmt } from "../lib/helpers.js";
+import { fmt, macroKcal } from "../lib/helpers.js";
 import { useFocusTrap } from "../lib/useFocusTrap.js";
 import {
   DEFAULT_CAT,
@@ -215,7 +215,9 @@ export default function ProductPicker({
     if (window.confirm(`למחוק את "${p.key}" מהמוצרים שלך?`)) onDeleteProduct(p._id);
   }
 
-  const productRow = (p) => (
+  const productRow = (p) => {
+    const kcal = macroKcal(p);
+    return (
     <div
       className={
         "picker-item" +
@@ -255,6 +257,7 @@ export default function ProductPicker({
           <span className="pi-meta">
             <span className="pi-carb">{fmt(p.carbs)} פחמ'</span> · {fmt(p.fat)}{" "}
             שומן · {fmt(p.protein)} חלבון
+            {kcal != null && <> · ~{kcal} קק"ל</>}
             {uses(p.key) > 0 && (
               <span className="pi-uses"> · נרשם {uses(p.key)}×</span>
             )}
@@ -269,6 +272,7 @@ export default function ProductPicker({
         <span className="pi-tip-vals">
           <span className="pi-carb">{fmt(p.carbs)} פחמ'</span> · {fmt(p.fat)}{" "}
           שומן · {fmt(p.protein)} חלבון
+          {kcal != null && <> · ~{kcal} קק"ל</>}
         </span>
         {onUpdateProduct && (
           <label className="pi-tip-cat" onClick={(e) => e.stopPropagation()}>
@@ -320,9 +324,12 @@ export default function ProductPicker({
         </button>
       )}
     </div>
-  );
+    );
+  };
 
-  const templateRow = (t) => (
+  const templateRow = (t) => {
+    const kcal = macroKcal(t);
+    return (
     <div
       className={
         "picker-item" +
@@ -345,6 +352,7 @@ export default function ProductPicker({
           <span className="pi-name">{t.name}</span>
           <span className="pi-meta">
             <span className="pi-carb">{fmt(t.carbs)} פחמ'</span>
+            {kcal != null && <> · ~{kcal} קק"ל</>}
           </span>
         </span>
       </button>
@@ -353,6 +361,7 @@ export default function ProductPicker({
         {t.desc && t.desc !== t.name && <span>{t.desc}</span>}
         <span className="pi-tip-vals">
           <span className="pi-carb">{fmt(t.carbs)} פחמ'</span>
+          {kcal != null && <> · ~{kcal} קק"ל</>}
         </span>
       </span>
       <button
@@ -372,7 +381,8 @@ export default function ProductPicker({
         ✕
       </button>
     </div>
-  );
+    );
+  };
 
   // headers are <button>s, so inner controls are spans with a button role
   const gheadAction = (className, title, glyph, fn) => (

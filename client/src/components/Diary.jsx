@@ -333,6 +333,22 @@ export default function Diary() {
     const created = await api.addProduct(p);
     setProducts((prev) => [...prev, created]);
   }
+  // A meal/item whose name or description already matches a saved product
+  // (by its short name or full label) shouldn't offer "הוסף כמוצר" again.
+  const savedProductNames = useMemo(() => {
+    const s = new Set();
+    for (const p of products) {
+      for (const v of [p.key, p.label]) {
+        const n = (v || "").trim();
+        if (n) s.add(n);
+      }
+    }
+    return s;
+  }, [products]);
+  const isSavedProduct = useCallback(
+    (...names) => names.some((n) => savedProductNames.has((n || "").trim())),
+    [savedProductNames],
+  );
   // Partial product update (name / category / star) — shared by the products
   // panel and the picker popup.
   async function updateProduct(id, patch) {
@@ -658,6 +674,7 @@ export default function Diary() {
                 onSaveTemplate={saveMealAsTemplate}
                 onSaveProduct={saveMealAsProduct}
                 onSaveItemProduct={saveItemAsProduct}
+                isSavedProduct={isSavedProduct}
                 target={target}
                 kcalTarget={kcalTarget}
                 showKcal={user?.cardShowKcal !== false}
@@ -716,6 +733,7 @@ export default function Diary() {
         onSaveTemplate={saveMealAsTemplate}
         onSaveProduct={saveMealAsProduct}
         onSaveItemProduct={saveItemAsProduct}
+        isSavedProduct={isSavedProduct}
         target={target}
         kcalTarget={kcalTarget}
         showKcal={user?.cardShowKcal !== false}
@@ -856,6 +874,7 @@ export default function Diary() {
               onSaveTemplate={saveMealAsTemplate}
               onSaveProduct={saveMealAsProduct}
               onSaveItemProduct={saveItemAsProduct}
+              isSavedProduct={isSavedProduct}
               target={target}
               kcalTarget={kcalTarget}
               showKcal={user?.cardShowKcal !== false}
