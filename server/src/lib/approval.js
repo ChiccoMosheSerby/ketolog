@@ -1,43 +1,46 @@
-import crypto from 'node:crypto';
-import jwt from 'jsonwebtoken';
+import crypto from "node:crypto";
+import jwt from "jsonwebtoken";
 
 // Accounts on this list are approved automatically — they never need a human to
 // let them in, and they can't be locked out by the approval gate.
-export const AUTO_APPROVED_EMAILS = new Set([
-  'chiccomoshe@gmail.com',
-  'chicco@r2net.com',
-]);
+export const AUTO_APPROVED_EMAILS = new Set(["chiccomoshe@gmail.com"]);
 
 // Where approval-request emails go (and who can approve).
-export const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'chiccomoshe@gmail.com';
+export const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "chiccomoshe@gmail.com";
 
 // A user may sign in only if explicitly approved OR on the auto-approve list.
 export function isApproved(user) {
   if (!user) return false;
   if (user.approved === true) return true;
-  return AUTO_APPROVED_EMAILS.has((user.email || '').toLowerCase());
+  return AUTO_APPROVED_EMAILS.has((user.email || "").toLowerCase());
 }
 
 // Admins get the in-app usage/cost dashboard and the /api/admin routes.
 // Deliberately narrower than the auto-approve list: only the owner's personal
 // account sees usage/costs.
-const USAGE_ADMIN_EMAILS = new Set(['chiccomoshe@gmail.com']);
+const USAGE_ADMIN_EMAILS = new Set(["chiccomoshe@gmail.com"]);
 export function isAdmin(user) {
-  return Boolean(user) && USAGE_ADMIN_EMAILS.has((user.email || '').toLowerCase());
+  return (
+    Boolean(user) && USAGE_ADMIN_EMAILS.has((user.email || "").toLowerCase())
+  );
 }
 
 // Signed, single-purpose, time-limited token embedded in the approval link.
 export function makeApprovalToken(user) {
-  return jwt.sign({ sub: user._id.toString(), purpose: 'approve' }, process.env.JWT_SECRET, {
-    expiresIn: '7d',
-  });
+  return jwt.sign(
+    { sub: user._id.toString(), purpose: "approve" },
+    process.env.JWT_SECRET,
+    {
+      expiresIn: "7d",
+    },
+  );
 }
 
 // Returns the userId to approve, or null if the token is invalid/expired/wrong purpose.
 export function readApprovalToken(token) {
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET);
-    return payload.purpose === 'approve' ? payload.sub : null;
+    return payload.purpose === "approve" ? payload.sub : null;
   } catch {
     return null;
   }
@@ -49,9 +52,9 @@ export function readApprovalToken(token) {
 // link stops validating.
 export function passwordFingerprint(user) {
   return crypto
-    .createHash('sha256')
-    .update(String(user?.passwordHash || ''))
-    .digest('hex')
+    .createHash("sha256")
+    .update(String(user?.passwordHash || ""))
+    .digest("hex")
     .slice(0, 16);
 }
 
@@ -59,9 +62,13 @@ export function passwordFingerprint(user) {
 // Bound to the current password so it can be used at most once (see fingerprint).
 export function makeResetToken(user) {
   return jwt.sign(
-    { sub: user._id.toString(), purpose: 'reset', pv: passwordFingerprint(user) },
+    {
+      sub: user._id.toString(),
+      purpose: "reset",
+      pv: passwordFingerprint(user),
+    },
     process.env.JWT_SECRET,
-    { expiresIn: '1h' }
+    { expiresIn: "1h" },
   );
 }
 
@@ -71,7 +78,7 @@ export function makeResetToken(user) {
 export function readResetToken(token) {
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET);
-    if (payload.purpose !== 'reset') return null;
+    if (payload.purpose !== "reset") return null;
     return { userId: payload.sub, pv: payload.pv };
   } catch {
     return null;

@@ -24,6 +24,7 @@ import SmartInsights from "./SmartInsights.jsx";
 import Header from "./Header.jsx";
 import TabShell from "./TabShell.jsx";
 import NameDialog from "./NameDialog.jsx";
+import AdminPanel from "./AdminPanel.jsx";
 import { SkeletonCard } from "./Skeleton.jsx";
 import { useInsightsBadge } from "../lib/insightsStore.js";
 import { useFocusTrap } from "../lib/useFocusTrap.js";
@@ -777,6 +778,10 @@ export default function Diary() {
     },
     { id: "products", label: "המוצרים שלי", content: productsPanel },
   ];
+  // Admins get the management tab: users + activity, costs, system messages.
+  if (user?.isAdmin) {
+    tabs.push({ id: "admin", label: "ניהול", content: <AdminPanel /> });
+  }
 
   // The active-day calendar (prev/next + date input) sits in the tab row itself,
   // steering the same date the Today tab, AddMeal, quick add and menu use.

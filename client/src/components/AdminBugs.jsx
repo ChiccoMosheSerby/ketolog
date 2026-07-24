@@ -25,8 +25,8 @@ function Lightbox({ src, onClose }) {
 
 // Admin-only: every bug report users filed — description, screenshots, status —
 // with a reply box. Sending a reply stores it on the report and delivers it to
-// the reporter's messages (📬). A small broadcast form at the top sends a
-// system message to one user or to everyone.
+// the reporter's messages (📬). System messages are sent from the ניהול tab
+// (AdminPanel), not from here.
 
 const STATUS = {
   open: { lab: 'פתוח', cls: 'open' },
@@ -115,17 +115,9 @@ function Report({ report, open, onToggle, onReplied }) {
 }
 
 export default function AdminBugs({ open, onClose }) {
-  const toast = useToast();
   const [state, setState] = useState({ status: 'loading', reports: [] });
   // which report is expanded — parent-owned so a sent reply can advance it
   const [expandedId, setExpandedId] = useState(null);
-
-  // broadcast form
-  const [bcTitle, setBcTitle] = useState('');
-  const [bcBody, setBcBody] = useState('');
-  const [bcEmail, setBcEmail] = useState('');
-  const [bcBusy, setBcBusy] = useState(false);
-  const [bcOpen, setBcOpen] = useState(false);
 
   function load() {
     setState((s) => ({ ...s, status: 'loading' }));
@@ -162,23 +154,6 @@ export default function AdminBugs({ open, onClose }) {
 
   if (!open) return null;
 
-  async function broadcast() {
-    if (!bcTitle.trim() || bcBusy) return;
-    setBcBusy(true);
-    try {
-      const r = await api.sendSystemMessage(bcTitle.trim(), bcBody.trim(), bcEmail.trim());
-      toast(`ההודעה נשלחה ל-${r.sent} משתמשים`);
-      setBcTitle('');
-      setBcBody('');
-      setBcEmail('');
-      setBcOpen(false);
-    } catch (e) {
-      toast(e.message || 'שליחת ההודעה נכשלה');
-    } finally {
-      setBcBusy(false);
-    }
-  }
-
   const { status, reports } = state;
 
   return (
@@ -193,41 +168,6 @@ export default function AdminBugs({ open, onClose }) {
         <div className="abugs-head">
           <h2>🐞 דיווחי תקלות</h2>
           <button className="abugs-close" aria-label="סגור" onClick={onClose}>✕</button>
-        </div>
-
-        {/* system message to one user / everyone */}
-        <div className="abugs-bc">
-          <button className="btn ghost mini" onClick={() => setBcOpen((o) => !o)}>
-            📢 הודעת מערכת {bcOpen ? '▾' : '▸'}
-          </button>
-          {bcOpen && (
-            <div className="abugs-bc-form">
-              <input
-                type="text"
-                maxLength={120}
-                placeholder="כותרת"
-                value={bcTitle}
-                onChange={(e) => setBcTitle(e.target.value)}
-              />
-              <textarea
-                rows={3}
-                maxLength={4000}
-                placeholder="תוכן ההודעה (לא חובה)"
-                value={bcBody}
-                onChange={(e) => setBcBody(e.target.value)}
-              />
-              <input
-                type="email"
-                dir="ltr"
-                placeholder="אימייל של משתמש ספציפי — ריק = לכולם"
-                value={bcEmail}
-                onChange={(e) => setBcEmail(e.target.value)}
-              />
-              <button className="btn mini" onClick={broadcast} disabled={bcBusy || !bcTitle.trim()}>
-                {bcBusy ? 'שולח…' : bcEmail.trim() ? 'שליחה למשתמש' : 'שליחה לכולם'}
-              </button>
-            </div>
-          )}
         </div>
 
         {status === 'loading' && <div className="abugs-note">טוען דיווחים…</div>}

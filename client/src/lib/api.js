@@ -89,8 +89,12 @@ export const api = {
   getMessages: () => request('GET', '/messages'),
   markMessagesRead: () => request('POST', '/messages/read-all'),
 
-  // admin — per-user AI cost breakdown (admin accounts only)
-  getAdminUsage: () => request('GET', '/admin/usage'),
+  // admin — users overview (activity + costs), per-user drill-down, approval
+  // toggle and sent-system-message history (admin accounts only)
+  getAdminUsers: () => request('GET', '/admin/users'),
+  getAdminUser: (id) => request('GET', `/admin/users/${id}`),
+  setUserApproval: (id, approved) => request('POST', `/admin/users/${id}/approval`, { approved }),
+  getAdminMessages: () => request('GET', '/admin/messages'),
   // admin — bug reports: list, reply (reply lands in the reporter's messages)
   getAdminBugs: () => request('GET', '/admin/bugs'),
   replyToBug: (id, reply, status) => request('POST', `/admin/bugs/${id}/reply`, { reply, status }),

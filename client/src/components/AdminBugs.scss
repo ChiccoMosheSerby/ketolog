@@ -1,4 +1,4 @@
-/* ---------- Admin: bug reports + system broadcast ---------- */
+/* ---------- Admin: bug reports ---------- */
 
 .abugs-scrim {
   position: fixed;
@@ -47,27 +47,6 @@
   font-size: 13px;
   color: var(--ink-soft);
   padding: 12px 0;
-}
-
-/* broadcast form */
-.abugs-bc {
-  margin-bottom: 14px;
-}
-.abugs-bc-form {
-  margin-top: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  background: var(--card);
-  padding: 10px;
-  textarea {
-    resize: vertical;
-  }
-  .btn {
-    align-self: flex-start;
-  }
 }
 
 /* one report row */

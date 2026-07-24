@@ -6,7 +6,6 @@ import { useMediaQuery, MOBILE_QUERY } from '../lib/useMediaQuery.js';
 import { useFocusTrap } from '../lib/useFocusTrap.js';
 import CarbRing from './CarbRing.jsx';
 import SettingsModal from './SettingsModal.jsx';
-import AdminUsage from './AdminUsage.jsx';
 import UserMenu from './UserMenu.jsx';
 import MessagesPanel from './MessagesPanel.jsx';
 import BugReportModal from './BugReportModal.jsx';
@@ -87,7 +86,6 @@ export default function Header({ stats, onExport, onExportExcel, firstDate, days
   const [settingsOpen, setSettingsOpen] = useState(false);
   // when true, the settings modal opens scrolled to the AI/API-key section
   const [settingsFocusAi, setSettingsFocusAi] = useState(false);
-  const [adminOpen, setAdminOpen] = useState(false);
   const [adminBugsOpen, setAdminBugsOpen] = useState(false);
   const [bugOpen, setBugOpen] = useState(false);
   const [msgsOpen, setMsgsOpen] = useState(false);
@@ -141,7 +139,6 @@ export default function Header({ stats, onExport, onExportExcel, firstDate, days
   const onMenuAction = useCallback((what) => {
     setDrawerOpen(false);
     if (what === 'messages') setMsgsOpen(true);
-    else if (what === 'usage') setAdminOpen(true);
     else if (what === 'adminBugs') setAdminBugsOpen(true);
     else if (what === 'settings') setSettingsOpen(true);
     else if (what === 'apiKey') {
@@ -192,7 +189,6 @@ export default function Header({ stats, onExport, onExportExcel, firstDate, days
         days={days}
         onSaveWeight={onSaveWeight}
       />
-      <AdminUsage open={adminOpen} onClose={() => setAdminOpen(false)} />
       <AdminBugs
         open={adminBugsOpen}
         onClose={() => {

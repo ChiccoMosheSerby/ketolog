@@ -4,7 +4,7 @@ import { useTheme } from '../lib/theme.js';
 import './UserMenu.scss';
 
 // The header's account menu. Desktop: a person button that opens a small
-// dropdown card — user name on top, then messages / usage / theme / settings /
+// dropdown card — user name on top, then messages / theme / settings /
 // bug report, and logout at the bottom. In the mobile drawer the same items
 // render as a flat list (variant="list").
 //
@@ -38,11 +38,6 @@ function MenuItems({ user, unread, openBugs, onAction, isAdmin }) {
         {unread > 0 && <span className="umenu-badge">{unread}</span>}
       </button>
 
-      {isAdmin && (
-        <button className="umenu-item" onClick={() => onAction('usage')}>
-          <span>💰 שימוש</span>
-        </button>
-      )}
       {isAdmin && (
         <button className="umenu-item" onClick={() => onAction('adminBugs')}>
           <span>🐞 דיווחי תקלות</span>

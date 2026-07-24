@@ -1,0 +1,324 @@
+/* ============================================================
+   AdminPanel — the admin-only "ניהול" tab: users + activity,
+   AI costs, approval control, system messages + history.
+   Rendered as tab content (no modal shell): totals tiles up
+   top, then collapsible per-user cards.
+   ============================================================ */
+.ap {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ap-note {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  &.center {
+    text-align: center;
+    padding: 24px 0;
+  }
+}
+
+.ap-section {
+  margin: 6px 0 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* ---- totals row ---- */
+.ap-totals {
+  display: flex;
+  gap: 10px;
+}
+.ap-tile {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 8px;
+  background: var(--tint, rgba(20, 154, 94, 0.08));
+  border: 1px solid var(--line);
+  border-radius: var(--r-md, 14px);
+}
+.ap-tile-num {
+  font-family: 'IBM Plex Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ink);
+  direction: ltr;
+}
+.ap-tile-lab {
+  font-size: 11px;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+/* ---- user cards ---- */
+.ap-users {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ap-user {
+  border: 1px solid var(--line);
+  border-radius: var(--r-md, 14px);
+  background: var(--card);
+  overflow: hidden;
+}
+.ap-user-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  border: none;
+  padding: 11px 14px;
+  cursor: pointer;
+  font: inherit;
+  color: var(--ink);
+  text-align: start;
+  &:hover { background: var(--tint, rgba(20, 154, 94, 0.06)); }
+}
+.ap-chip {
+  flex: none;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  &.ok { background: rgba(20, 154, 94, 0.14); color: var(--olive, #149a5e); }
+  &.auto { background: rgba(90, 120, 200, 0.14); color: #5a78c8; }
+  &.off { background: rgba(200, 90, 90, 0.14); color: #c85a5a; }
+}
+.ap-who {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.ap-head-stats {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11.5px;
+  color: var(--ink-soft);
+}
+.ap-cost {
+  font-family: 'IBM Plex Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--olive, #149a5e);
+  direction: ltr;
+}
+.ap-chev {
+  flex: none;
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.ap-user-body {
+  border-top: 1px solid var(--line);
+  padding: 12px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* stat grid inside an expanded card */
+.ap-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.ap-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm, 10px);
+}
+.ap-stat-num {
+  font-family: 'IBM Plex Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  direction: ltr;
+}
+.ap-stat-lab {
+  font-size: 10.5px;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+/* generic sub-block (costs / recent days / messages / compose) */
+.ap-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ap-block-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.ap-kind {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 0;
+  font-size: 12.5px;
+}
+.ap-kind-name { color: var(--ink); flex: 1; }
+.ap-kind-calls { color: var(--ink-soft); font-size: 11.5px; }
+.ap-kind-cost {
+  font-family: 'IBM Plex Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  direction: ltr;
+  min-width: 64px;
+  text-align: end;
+}
+
+/* recent days list */
+.ap-days {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.ap-day {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  padding: 3px 0;
+  color: var(--ink-soft);
+}
+.ap-day-date {
+  font-family: 'IBM Plex Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.ap-day-weight {
+  font-weight: 700;
+  color: var(--olive, #149a5e);
+}
+.ap-day-closed { color: var(--olive, #149a5e); }
+
+/* messages sent to this user */
+.ap-msg {
+  padding: 3px 0;
+}
+.ap-msg-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.ap-msg-body {
+  /* indented past the read dot so it hangs under the title */
+  margin-inline-start: 16px;
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.ap-read-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #c8a05a;
+  &.read { background: var(--olive, #149a5e); }
+}
+.ap-msg-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+}
+.ap-msg-date {
+  flex: none;
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+
+/* compose form (per-user + global) */
+.ap-compose {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm, 10px);
+  background: var(--paper, transparent);
+  padding: 10px;
+  textarea { resize: vertical; }
+  .btn { align-self: flex-start; }
+}
+
+.ap-approval {
+  display: flex;
+  justify-content: flex-end;
+  .danger { color: #c85a5a; }
+}
+
+/* sent-history rows */
+.ap-history {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ap-hist-row {
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm, 10px);
+  background: var(--card);
+  padding: 9px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ap-hist-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ap-hist-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.ap-hist-body {
+  font-size: 12px;
+  color: var(--ink-soft);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.ap-hist-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+/* mobile: tighter header row + 2-col stat grid */
+@media (max-width: 640px) {
+  .ap-head-stats span:not(.ap-cost) { display: none; }
+  .ap-stats { grid-template-columns: repeat(2, 1fr); }
+  .ap-totals { flex-direction: column; }
+}
