@@ -312,11 +312,18 @@
   bottom: auto;
   top: calc(100% + 6px);
 }
-.pi-star {
+/* favorites column at the row start: star (מועדפים) stacked above pin
+   (quick chip next to the meal text box) — two independent toggles */
+.pi-fav {
   flex: none;
+  display: flex;
+  flex-direction: column;
   width: 26px;
-  border: none;
   border-inline-end: 1px solid var(--line);
+}
+.pi-star {
+  flex: 1;
+  border: none;
   background: none;
   color: var(--ink-soft);
   font-size: 13px;
@@ -331,6 +338,29 @@
   }
   &.on {
     color: var(--protein);
+  }
+}
+/* the emoji can't recolor, so off = grayscale & dimmed, on = full color */
+.pi-pin {
+  flex: 1;
+  border: none;
+  background: none;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  filter: grayscale(1);
+  opacity: 0.35;
+  transition:
+    filter 0.15s ease,
+    opacity 0.15s ease,
+    background 0.15s ease;
+  &:hover {
+    background: var(--green-tint);
+    opacity: 0.7;
+  }
+  &.on {
+    filter: none;
+    opacity: 1;
   }
 }
 .pi-x {

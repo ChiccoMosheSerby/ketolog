@@ -366,13 +366,26 @@ export default function Products({ products, onAdd, onRename, onUpdate, onDelete
                       )}
                     </div>
                     {onUpdate && (
-                      <button
-                        className={'pstar' + (p.starred ? ' on' : '')}
-                        title={p.starred ? 'הסר ממועדפים' : 'הוסף למועדפים'}
-                        onClick={() => onUpdate(p._id, { starred: !p.starred })}
-                      >
-                        {p.starred ? '★' : '☆'}
-                      </button>
+                      <div className="pfav">
+                        <button
+                          className={'pstar' + (p.starred ? ' on' : '')}
+                          title={p.starred ? 'הסר ממועדפים' : 'הוסף למועדפים'}
+                          onClick={() => onUpdate(p._id, { starred: !p.starred })}
+                        >
+                          {p.starred ? '★' : '☆'}
+                        </button>
+                        <button
+                          className={'ppin' + (p.pinned ? ' on' : '')}
+                          title={
+                            p.pinned
+                              ? 'הסר את הקיצור מליד תיבת הטקסט'
+                              : 'הצמד ליד תיבת הטקסט — כפתור הוספה מהיר'
+                          }
+                          onClick={() => onUpdate(p._id, { pinned: !p.pinned })}
+                        >
+                          📌
+                        </button>
+                      </div>
                     )}
                     {editId === p._id ? (
                       <>

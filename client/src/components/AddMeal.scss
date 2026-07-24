@@ -210,6 +210,67 @@
   }
 }
 
+/* 📌 pinned quick chips — a one-line carousel under the composer row.
+   No wrapping: overflow swipes/scrolls horizontally (scrollbar hidden),
+   with snap so chips land cleanly */
+.quick-chips {
+  flex: 1 1 100%; /* own line under the flex composer row */
+  display: flex;
+  gap: 5px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none; /* Firefox */
+  -webkit-overflow-scrolling: touch;
+  padding: 1px; /* keep the chip borders from being clipped */
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+/* quiet by design — the chips are shortcuts, not CTAs: muted ink, hairline
+   border, and the green only arrives on hover / once a chip is in the meal */
+.quick-chip {
+  flex: none;
+  scroll-snap-align: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 170px;
+  padding: 2px 9px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--ink-soft);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.06s ease;
+  &:hover {
+    background: var(--green-tint);
+    border-color: var(--olive-soft);
+    color: var(--accent-ink);
+  }
+  &:active {
+    transform: translateY(1px);
+  }
+  &.picked {
+    background: var(--green-tint);
+    border-color: var(--olive-soft);
+    color: var(--accent-ink);
+  }
+}
+.qc-qty {
+  font-size: 10px;
+  font-weight: 700;
+}
+
 /* mobile: the text box gets the full width on top (typing is the main act),
    and ALL the actions fold into one compact row beneath it —
    [🧺] [🧮 ↺] ……… [📦 🤖 ✓] (RTL: picker on the right, senders on the left) */
@@ -221,10 +282,21 @@
     display: grid;
     gap: 6px;
     grid-template-columns: auto auto 1fr;
+    /* the chips carousel sits between the text box and the action row,
+       like a keyboard suggestion strip */
     grid-template-areas:
       "desc desc desc"
+      "chips chips chips"
       "ctas tools submits";
     align-items: center;
+  }
+  .quick-chips {
+    grid-area: chips;
+    min-width: 0; /* let the carousel scroll instead of widening the grid */
+  }
+  .quick-chip {
+    padding: 4px 10px;
+    font-size: 12px;
   }
   .desc-wrap {
     grid-area: desc;

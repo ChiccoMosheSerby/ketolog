@@ -48,6 +48,7 @@ router.patch('/:id', asyncHandler(async (req, res) => {
     up.cat = String(req.body.cat).trim() || 'נשנוש / ביניים';
   }
   if (req.body.starred !== undefined) up.starred = !!req.body.starred;
+  if (req.body.pinned !== undefined) up.pinned = !!req.body.pinned;
   if (!Object.keys(up).length) return res.status(400).json({ error: 'אין מה לעדכן' });
   const product = await Product.findOneAndUpdate(
     { _id: req.params.id, user: req.userId },

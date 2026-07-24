@@ -118,6 +118,15 @@ export default function AddMeal({
     return m;
   }, [days]);
 
+  // Products pinned with 📌 (the second favorites level) become one-tap chips
+  // right in the composer — most-logged first, so the daily staples lead.
+  const pinnedChips = useMemo(() => {
+    const u = (p) => usage.get((p.key || "").trim()) || 0;
+    return (products || [])
+      .filter((p) => p.pinned)
+      .sort((a, b) => u(b) - u(a) || (a.key || "").localeCompare(b.key || "", "he"));
+  }, [products, usage]);
+
   // Opened via a Claude meal deep link (?add=meal&…): prefill this form with the
   // computed values so the meal lands on the existing entry form, ready to log on
   // the user's approval. Because carbs is filled, logging won't trigger an AI
@@ -572,6 +581,36 @@ export default function AddMeal({
             ↺
           </button>
         </div>
+
+        {/* 📌 pinned quick chips — one tap adds the product to the meal text.
+            A single-line carousel: when there are many, it swipes/scrolls
+            horizontally instead of stacking */}
+        {pinnedChips.length > 0 && (
+          <div
+            className="quick-chips"
+            data-swipe-free
+            role="group"
+            aria-label="מוצרים מוצמדים — הוספה מהירה"
+          >
+            {pinnedChips.map((p) => {
+              const qty = descIsPure
+                ? picked.find((x) => x.key === p.key)?.qty || 0
+                : 0;
+              return (
+                <button
+                  key={p._id}
+                  type="button"
+                  className={"quick-chip" + (qty > 0 ? " picked" : "")}
+                  title={`${unitKey(p)} · ${fmt(p.carbs)} ג' פחמ' — הוספה לפירוט הארוחה`}
+                  onClick={() => applyProduct(p)}
+                >
+                  {p.key}
+                  {qty > 0 && <b className="qc-qty">×{fmt(qty)}</b>}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {note && (

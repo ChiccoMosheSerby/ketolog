@@ -226,14 +226,28 @@ export default function ProductPicker({
       key={p._id}
     >
       {onUpdateProduct && (
-        <button
-          type="button"
-          className={"pi-star" + (p.starred ? " on" : "")}
-          title={p.starred ? "הסר ממועדפים" : "הוסף למועדפים — יוצג למעלה"}
-          onClick={() => onUpdateProduct(p._id, { starred: !p.starred })}
-        >
-          {p.starred ? "★" : "☆"}
-        </button>
+        <div className="pi-fav">
+          <button
+            type="button"
+            className={"pi-star" + (p.starred ? " on" : "")}
+            title={p.starred ? "הסר ממועדפים" : "הוסף למועדפים — יוצג למעלה"}
+            onClick={() => onUpdateProduct(p._id, { starred: !p.starred })}
+          >
+            {p.starred ? "★" : "☆"}
+          </button>
+          <button
+            type="button"
+            className={"pi-pin" + (p.pinned ? " on" : "")}
+            title={
+              p.pinned
+                ? "הסר את הקיצור מליד תיבת הטקסט"
+                : "הצמד ליד תיבת הטקסט — כפתור הוספה מהיר"
+            }
+            onClick={() => onUpdateProduct(p._id, { pinned: !p.pinned })}
+          >
+            📌
+          </button>
+        </div>
       )}
       <button
         type="button"
@@ -456,7 +470,7 @@ export default function ProductPicker({
           <div className="picker-htext">
             <span className="picker-title">המוצרים והארוחות שלי</span>
             <span className="picker-sub">
-              קליק מוסיף לפירוט הארוחה · ★ מצמיד למעלה
+              קליק מוסיף לפירוט הארוחה · ★ מועדפים · 📌 קיצור ליד תיבת הטקסט
             </span>
           </div>
           <button className="picker-close" title="סגירה" onClick={onClose}>

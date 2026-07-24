@@ -70,6 +70,11 @@ function Carousel({ tabs, active, change, extra }) {
   const [emblaRef, emblaApi] = useEmblaCarousel({
     direction: "rtl",
     align: "start",
+    // Nested horizontal scrollers (e.g. the pinned quick-chips strip in the
+    // composer) mark themselves with data-swipe-free — a drag starting inside
+    // one scrolls IT, not the tab carousel.
+    watchDrag: (_api, evt) =>
+      !(evt.target instanceof Element && evt.target.closest("[data-swipe-free]")),
   });
 
   // Bind once per api: jump to the shared `active` on mount, then mirror swipes back out.
