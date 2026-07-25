@@ -1,0 +1,952 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KetoLog — Architecture</title>
+<style>
+/* ---------- tokens ---------- */
+:root {
+  --bg: #f5f7f3;
+  --surface: #ffffff;
+  --surface-2: #eef1ea;
+  --ink: #1b231f;
+  --ink-2: #55635b;
+  --ink-3: #8a978f;
+  --line: #d8ded3;
+  --accent: #2e7d5b;        /* local / deterministic */
+  --accent-soft: #e2efe7;
+  --clay: #c0662f;          /* paid AI call */
+  --clay-soft: #f6e8dc;
+  --blue: #4a6b8a;          /* external services */
+  --blue-soft: #e5ecf2;
+  --danger: #a4463c;
+  --code-bg: #eef1ea;
+  --shadow: 0 1px 2px rgba(27,35,31,.06), 0 4px 14px rgba(27,35,31,.05);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12171a;
+    --surface: #1a211d;
+    --surface-2: #202824;
+    --ink: #e4eae3;
+    --ink-2: #a7b3aa;
+    --ink-3: #6f7d74;
+    --line: #2c352f;
+    --accent: #5cba8e;
+    --accent-soft: #1e2f27;
+    --clay: #e09059;
+    --clay-soft: #33261c;
+    --blue: #7fa3c4;
+    --blue-soft: #1d2732;
+    --danger: #d98078;
+    --code-bg: #202824;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 14px rgba(0,0,0,.25);
+  }
+}
+:root[data-theme="light"] {
+  --bg: #f5f7f3; --surface: #ffffff; --surface-2: #eef1ea;
+  --ink: #1b231f; --ink-2: #55635b; --ink-3: #8a978f; --line: #d8ded3;
+  --accent: #2e7d5b; --accent-soft: #e2efe7;
+  --clay: #c0662f; --clay-soft: #f6e8dc;
+  --blue: #4a6b8a; --blue-soft: #e5ecf2;
+  --danger: #a4463c; --code-bg: #eef1ea;
+  --shadow: 0 1px 2px rgba(27,35,31,.06), 0 4px 14px rgba(27,35,31,.05);
+}
+:root[data-theme="dark"] {
+  --bg: #12171a; --surface: #1a211d; --surface-2: #202824;
+  --ink: #e4eae3; --ink-2: #a7b3aa; --ink-3: #6f7d74; --line: #2c352f;
+  --accent: #5cba8e; --accent-soft: #1e2f27;
+  --clay: #e09059; --clay-soft: #33261c;
+  --blue: #7fa3c4; --blue-soft: #1d2732;
+  --danger: #d98078; --code-bg: #202824;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 14px rgba(0,0,0,.25);
+}
+
+/* ---------- base ---------- */
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Avenir Next", "Helvetica Neue", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+}
+code, pre, .mono {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: .86em;
+}
+code { background: var(--code-bg); padding: .1em .38em; border-radius: 4px; }
+pre {
+  background: var(--code-bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px 18px;
+  overflow-x: auto;
+  line-height: 1.55;
+}
+pre code { background: none; padding: 0; }
+a { color: var(--accent); text-decoration: none; }
+a:hover, a:focus-visible { text-decoration: underline; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+
+/* ---------- header ---------- */
+header {
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+.head-inner {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 40px 28px 32px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.head-title h1 {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 700;
+  letter-spacing: -.03em;
+  line-height: 1.05;
+  text-wrap: balance;
+}
+.head-title h1 .he {
+  color: var(--accent);
+  font-weight: 600;
+  margin-inline-start: .35em;
+}
+.head-title p {
+  margin: 10px 0 0;
+  max-width: 62ch;
+  color: var(--ink-2);
+}
+.head-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+}
+.badges { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.badge {
+  font-size: .74rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  border-radius: 999px;
+  padding: 3px 11px;
+  white-space: nowrap;
+}
+#theme-toggle {
+  font: inherit;
+  font-size: .82rem;
+  color: var(--ink-2);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 14px;
+  cursor: pointer;
+}
+#theme-toggle:hover { color: var(--ink); border-color: var(--ink-3); }
+
+/* ---------- shell ---------- */
+.shell {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 36px 28px 80px;
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  gap: 48px;
+}
+nav.toc {
+  position: sticky;
+  top: 24px;
+  align-self: start;
+  font-size: .88rem;
+}
+nav.toc .toc-label {
+  font-size: .7rem;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 10px;
+}
+nav.toc ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+nav.toc a {
+  display: block;
+  color: var(--ink-2);
+  padding: 5px 10px;
+  border-left: 2px solid var(--line);
+  border-radius: 0 6px 6px 0;
+}
+nav.toc a:hover { color: var(--ink); background: var(--surface-2); text-decoration: none; }
+nav.toc a.active { color: var(--accent); border-left-color: var(--accent); font-weight: 600; }
+@media (max-width: 900px) {
+  .shell { grid-template-columns: 1fr; gap: 24px; }
+  nav.toc { position: static; }
+  nav.toc ol { flex-direction: row; flex-wrap: wrap; gap: 6px; }
+  nav.toc a { border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; }
+}
+
+/* ---------- content ---------- */
+main { min-width: 0; }
+section { margin-bottom: 64px; }
+section > h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  margin: 0 0 6px;
+  scroll-margin-top: 24px;
+  text-wrap: balance;
+}
+section > .kicker {
+  font-size: .72rem;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+section > p, section li { max-width: 72ch; }
+p { color: var(--ink); }
+p.lede { color: var(--ink-2); margin-top: 0; }
+h3 { font-size: 1.06rem; margin: 28px 0 8px; letter-spacing: -.01em; }
+
+/* ---------- diagrams ---------- */
+figure.diagram {
+  margin: 22px 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 10px;
+}
+figure.diagram .scroll { overflow-x: auto; }
+figure.diagram svg { display: block; min-width: 720px; width: 100%; height: auto; }
+figure.diagram figcaption {
+  font-size: .82rem;
+  color: var(--ink-3);
+  padding: 8px 10px 4px;
+  border-top: 1px solid var(--line);
+  margin-top: 8px;
+}
+.legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: .82rem; color: var(--ink-2); padding: 6px 10px 0; }
+.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.swatch.local { background: var(--accent-soft); border: 1.5px solid var(--accent); }
+.swatch.ai { background: var(--clay-soft); border: 1.5px solid var(--clay); }
+.swatch.ext { background: var(--blue-soft); border: 1.5px solid var(--blue); }
+.swatch.off { background: transparent; border: 1.5px dashed var(--ink-3); }
+
+/* svg text/shape classes (inline SVG inherits page CSS) */
+svg text { font-family: "Avenir Next", "Helvetica Neue", ui-sans-serif, system-ui, sans-serif; fill: var(--ink); }
+svg .t-title { font-size: 13px; font-weight: 700; }
+svg .t-sub { font-size: 11px; fill: var(--ink-2); }
+svg .t-label { font-size: 10.5px; fill: var(--ink-2); }
+svg .t-mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11px; }
+svg .box { fill: var(--surface-2); stroke: var(--line); stroke-width: 1.25; rx: 8; }
+svg .box-local { fill: var(--accent-soft); stroke: var(--accent); }
+svg .box-ai { fill: var(--clay-soft); stroke: var(--clay); }
+svg .box-ext { fill: var(--blue-soft); stroke: var(--blue); }
+svg .box-off { fill: none; stroke: var(--ink-3); stroke-dasharray: 5 4; }
+svg .box-plain { fill: var(--surface); stroke: var(--line); }
+svg .wire { stroke: var(--ink-3); stroke-width: 1.4; fill: none; }
+svg .wire-accent { stroke: var(--accent); }
+svg .wire-off { stroke-dasharray: 5 4; }
+svg .arrowhead { fill: var(--ink-3); }
+svg .arrowhead-accent { fill: var(--accent); }
+
+/* ---------- collapsibles / tree ---------- */
+details {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  margin: 10px 0;
+}
+details > summary {
+  cursor: pointer;
+  padding: 11px 16px;
+  font-weight: 600;
+  list-style: none;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+details > summary::-webkit-details-marker { display: none; }
+details > summary::before {
+  content: "▸";
+  color: var(--accent);
+  font-size: .8em;
+  transition: transform .15s ease;
+}
+details[open] > summary::before { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) { details > summary::before { transition: none; } }
+details > summary .hint { font-weight: 400; font-size: .84rem; color: var(--ink-3); }
+details > .d-body { padding: 2px 18px 16px; }
+
+/* folder tree */
+.tree { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: .84rem; line-height: 1.9; }
+.tree details { border: none; background: none; margin: 0; }
+.tree details > summary { padding: 0; font-weight: 600; color: var(--ink); }
+.tree details > summary::before { content: "▸"; }
+.tree details > .d-body { padding: 0 0 0 20px; border-left: 1px solid var(--line); margin-left: 5px; }
+.tree ul { list-style: none; margin: 0; padding: 0 0 0 20px; border-left: 1px solid var(--line); margin-left: 5px; }
+.tree li { white-space: nowrap; }
+.tree .note { color: var(--ink-3); font-family: "Avenir Next", ui-sans-serif, system-ui, sans-serif; font-size: .92em; margin-left: 8px; }
+.tree .dim { color: var(--ink-3); }
+.tree .tag-off { color: var(--danger); font-size: .85em; border: 1px dashed var(--danger); border-radius: 4px; padding: 0 5px; margin-left: 6px; }
+
+/* ---------- tables ---------- */
+.tbl-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: .89rem; }
+th, td { text-align: left; padding: 8px 14px 8px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: .72rem; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; }
+td.mono { white-space: nowrap; }
+.pill {
+  display: inline-block;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: .72rem;
+  font-weight: 600;
+  border-radius: 5px;
+  padding: 1px 7px;
+  margin-right: 6px;
+}
+.pill.get { color: var(--accent); background: var(--accent-soft); }
+.pill.post { color: var(--clay); background: var(--clay-soft); }
+.pill.put, .pill.patch { color: var(--blue); background: var(--blue-soft); }
+.pill.del { color: var(--danger); background: var(--surface-2); }
+
+/* ---------- callouts ---------- */
+.note-card {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 12px 18px;
+  margin: 16px 0;
+  max-width: 76ch;
+}
+.note-card.ai { border-left-color: var(--clay); }
+.note-card p { margin: 6px 0; font-size: .93rem; }
+.note-card .nc-title { font-weight: 700; font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
+
+footer {
+  border-top: 1px solid var(--line);
+  color: var(--ink-3);
+  font-size: .82rem;
+  padding: 24px 28px 40px;
+  max-width: 1160px;
+  margin: 0 auto;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="head-inner">
+    <div class="head-title">
+      <h1>KetoLog<span class="he" dir="rtl" lang="he">יומן קטו</span></h1>
+      <p>A Hebrew, RTL keto diary. MERN, single-service deploy: one Express process serves the API, proxies Claude, and ships the built React app from the same origin. This page maps how a request actually moves through it.</p>
+    </div>
+    <div class="head-meta">
+      <button id="theme-toggle" type="button" aria-label="Toggle color theme">◐ theme</button>
+      <div class="badges">
+        <span class="badge">React 18 + Vite</span>
+        <span class="badge">Express 4</span>
+        <span class="badge">MongoDB · Mongoose</span>
+        <span class="badge">Claude API</span>
+        <span class="badge">Render · free tier</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="shell">
+<nav class="toc" aria-label="Sections">
+  <div class="toc-label">Contents</div>
+  <ol>
+    <li><a href="#overview">Overview</a></li>
+    <li><a href="#system">System map</a></li>
+    <li><a href="#flow">Request flow</a></li>
+    <li><a href="#folders">Folder map</a></li>
+    <li><a href="#api">API surface</a></li>
+    <li><a href="#models">Data models</a></li>
+    <li><a href="#ai">The AI layer</a></li>
+    <li><a href="#ops">Run &amp; deploy</a></li>
+    <li><a href="#notes">Field notes</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<!-- ================= OVERVIEW ================= -->
+<section id="overview">
+  <div class="kicker">01 · Overview</div>
+  <h2>What this is</h2>
+  <p class="lede">Log meals in free-text Hebrew, photograph a product label, or scan a barcode — the app turns any of them into net carbs / fat / protein and keeps a per-user cloud diary with daily metrics, saved products, a tool-using keto chat assistant, and periodic insights.</p>
+  <p>Three design commitments shape everything below:</p>
+  <ul>
+    <li><strong>One origin.</strong> The browser only ever talks to the Express server. In production Express also serves <code>client/dist</code>, so there is no CORS story and the Anthropic key never leaves the server.</li>
+    <li><strong>Local before AI.</strong> Every meal description first tries a deterministic match against the user's own saved products (<code>mealResolver</code>), then a cache (<code>estimateCache</code>), and only then a paid Claude call. The resolver's rule is <em>precision over recall</em>: any doubt falls through to the AI rather than risk a silently wrong number in the log.</li>
+    <li><strong>The AI proposes, the user commits.</strong> The chat assistant's write tools never touch the database; they emit confirmation cards, and the browser commits them through the ordinary REST routes only after a tap.</li>
+  </ul>
+</section>
+
+<!-- ================= SYSTEM MAP ================= -->
+<section id="system">
+  <div class="kicker">02 · System map</div>
+  <h2>One process, five neighbors</h2>
+  <p class="lede">Everything funnels through the Express app in <a href="server/src/index.js"><code>server/src/index.js</code></a>. External services hang off the right edge; two of them are wired but currently switched off in code.</p>
+
+  <figure class="diagram">
+    <div class="scroll">
+    <svg viewBox="0 0 940 480" role="img" aria-label="System architecture: browser talks to the Express API, which talks to MongoDB Atlas, the Anthropic API, Open Food Facts, and email providers; OpenAI Whisper and Twilio WhatsApp are wired but disabled.">
+      <defs>
+        <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" class="arrowhead"/>
+        </marker>
+        <marker id="ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" class="arrowhead-accent"/>
+        </marker>
+      </defs>
+
+      <!-- Browser -->
+      <rect class="box box-local" x="24" y="150" width="212" height="150" rx="10"/>
+      <text class="t-title" x="130" y="180" text-anchor="middle">Browser</text>
+      <text class="t-sub" x="130" y="202" text-anchor="middle">React 18 SPA · Vite · SCSS</text>
+      <text class="t-sub" x="130" y="220" text-anchor="middle">JWT in localStorage</text>
+      <text class="t-sub" x="130" y="238" text-anchor="middle">relative /api paths only</text>
+      <text class="t-sub" x="130" y="262" text-anchor="middle" style="font-style:italic">client/src</text>
+
+      <!-- Express -->
+      <rect class="box box-plain" x="336" y="44" width="270" height="392" rx="12"/>
+      <text class="t-title" x="471" y="72" text-anchor="middle">Express API · Node ≥ 18 · :4000</text>
+      <text class="t-sub" x="471" y="90" text-anchor="middle" style="font-style:italic">server/src/index.js</text>
+
+      <rect class="box" x="356" y="104" width="230" height="34" rx="6"/>
+      <text class="t-sub" x="471" y="125" text-anchor="middle">CORS allowlist · hardening headers</text>
+
+      <rect class="box" x="356" y="146" width="230" height="34" rx="6"/>
+      <text class="t-sub" x="471" y="167" text-anchor="middle">rateLimit — /api/ai · 30 req/min</text>
+
+      <rect class="box" x="356" y="188" width="230" height="34" rx="6"/>
+      <text class="t-sub" x="471" y="209" text-anchor="middle">requireAuth — Bearer JWT</text>
+
+      <rect class="box box-local" x="356" y="230" width="230" height="94" rx="6"/>
+      <text class="t-sub" x="471" y="251" text-anchor="middle" style="font-weight:700">routes/</text>
+      <text class="t-mono" x="471" y="272" text-anchor="middle">auth · days · products · templates</text>
+      <text class="t-mono" x="471" y="290" text-anchor="middle">ai · admin · bugs · messages</text>
+      <text class="t-mono" x="471" y="308" text-anchor="middle" style="opacity:.55">whatsapp (mount commented out)</text>
+
+      <rect class="box" x="356" y="336" width="230" height="34" rx="6"/>
+      <text class="t-sub" x="471" y="357" text-anchor="middle">static client/dist + SPA fallback</text>
+
+      <rect class="box" x="356" y="378" width="230" height="34" rx="6"/>
+      <text class="t-sub" x="471" y="399" text-anchor="middle">error handler → 500</text>
+
+      <!-- Browser <-> Express -->
+      <line class="wire wire-accent" x1="236" y1="190" x2="336" y2="190" marker-end="url(#ah-acc)"/>
+      <text class="t-label" x="286" y="181" text-anchor="middle">fetch /api/*</text>
+      <line class="wire" x1="336" y1="260" x2="236" y2="260" marker-end="url(#ah)"/>
+      <text class="t-label" x="286" y="251" text-anchor="middle">prod: index.html</text>
+
+      <!-- Externals -->
+      <rect class="box box-ext" x="700" y="44" width="216" height="58" rx="10"/>
+      <text class="t-title" x="808" y="68" text-anchor="middle">MongoDB Atlas</text>
+      <text class="t-sub" x="808" y="88" text-anchor="middle">Mongoose · 10 collections</text>
+
+      <rect class="box box-ai" x="700" y="118" width="216" height="58" rx="10"/>
+      <text class="t-title" x="808" y="142" text-anchor="middle">Anthropic API</text>
+      <text class="t-sub" x="808" y="162" text-anchor="middle">estimators + chat + insights</text>
+
+      <rect class="box box-ext" x="700" y="192" width="216" height="58" rx="10"/>
+      <text class="t-title" x="808" y="216" text-anchor="middle">Open Food Facts</text>
+      <text class="t-sub" x="808" y="236" text-anchor="middle">barcode → raw nutrition</text>
+
+      <rect class="box box-ext" x="700" y="266" width="216" height="58" rx="10"/>
+      <text class="t-title" x="808" y="290" text-anchor="middle">Brevo HTTPS / Gmail SMTP</text>
+      <text class="t-sub" x="808" y="310" text-anchor="middle">approval + password-reset mail</text>
+
+      <rect class="box box-off" x="700" y="340" width="216" height="50" rx="10"/>
+      <text class="t-title" x="808" y="361" text-anchor="middle" style="opacity:.65">OpenAI Whisper</text>
+      <text class="t-sub" x="808" y="379" text-anchor="middle">voice input — disabled</text>
+
+      <rect class="box box-off" x="700" y="404" width="216" height="50" rx="10"/>
+      <text class="t-title" x="808" y="425" text-anchor="middle" style="opacity:.65">Twilio WhatsApp</text>
+      <text class="t-sub" x="808" y="443" text-anchor="middle">meal-by-text bot — disabled</text>
+
+      <!-- Express -> externals -->
+      <path class="wire" d="M606 120 L640 120 L640 73 L700 73" marker-end="url(#ah)"/>
+      <path class="wire" d="M606 160 L648 160 L648 147 L700 147" marker-end="url(#ah)"/>
+      <path class="wire" d="M606 210 L648 210 L648 221 L700 221" marker-end="url(#ah)"/>
+      <path class="wire" d="M606 262 L640 262 L640 295 L700 295" marker-end="url(#ah)"/>
+      <path class="wire wire-off" d="M606 320 L632 320 L632 365 L700 365" marker-end="url(#ah)"/>
+      <path class="wire wire-off" d="M606 352 L624 352 L624 429 L700 429" marker-end="url(#ah)"/>
+    </svg>
+    </div>
+    <div class="legend">
+      <span><span class="swatch local"></span>app code / free</span>
+      <span><span class="swatch ai"></span>paid AI call</span>
+      <span><span class="swatch ext"></span>external service</span>
+      <span><span class="swatch off"></span>wired but disabled</span>
+    </div>
+    <figcaption>The Vite dev server proxies <code>/api/*</code> to :4000 during development; in production the static-file rows at the bottom take over and the whole app is one origin.</figcaption>
+  </figure>
+
+  <div class="note-card">
+    <p class="nc-title">Why one origin matters here</p>
+    <p>The CORS layer is an allowlist that <em>withholds headers instead of throwing</em> on unknown origins — because the approval / password-reset forms arrive via cross-origin email-link redirects that send an unrecognized (often <code>null</code>) Origin and must still work. Same-origin deployment makes CORS a non-event for the app itself.</p>
+  </div>
+</section>
+
+<!-- ================= REQUEST FLOW ================= -->
+<section id="flow">
+  <div class="kicker">03 · Request flow</div>
+  <h2>Anatomy of a meal estimate</h2>
+  <p class="lede"><code>POST /api/ai/estimate-meal</code> is the most layered request in the app — it crosses every middleware, two money-saving short-circuits, and finally Claude. Each right-hand exit is an early response; only the bottom path costs anything.</p>
+
+  <figure class="diagram">
+    <div class="scroll">
+    <svg viewBox="0 0 900 760" role="img" aria-label="Flow chart of POST /api/ai/estimate-meal: rate limit, JWT auth, key resolution, estimate cache, local meal resolver, then a Claude call, normalization and response. Early exits return 429, 401, 503, or a cached or locally matched 200.">
+      <defs>
+        <marker id="fh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" class="arrowhead"/>
+        </marker>
+        <marker id="fh-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" class="arrowhead-accent"/>
+        </marker>
+      </defs>
+
+      <!-- main column: x 120..480, center 300 -->
+      <rect class="box box-plain" x="120" y="16" width="360" height="52" rx="9"/>
+      <text class="t-title" x="300" y="38" text-anchor="middle">POST /api/ai/estimate-meal</text>
+      <text class="t-mono" x="300" y="57" text-anchor="middle">{ desc: "חצי אבוקדו ושתי ביצים" }</text>
+
+      <line class="wire" x1="300" y1="68" x2="300" y2="94" marker-end="url(#fh)"/>
+
+      <rect class="box" x="120" y="96" width="360" height="48" rx="9"/>
+      <text class="t-title" x="300" y="116" text-anchor="middle">rateLimit "ai"</text>
+      <text class="t-sub" x="300" y="134" text-anchor="middle">30 req/min per client IP (trust proxy = 1)</text>
+      <line class="wire" x1="480" y1="120" x2="576" y2="120" marker-end="url(#fh)"/>
+      <text class="t-label" x="528" y="112" text-anchor="middle">over</text>
+      <rect class="box box-plain" x="578" y="98" width="300" height="44" rx="8"/>
+      <text class="t-sub" x="728" y="124" text-anchor="middle" style="fill:var(--danger)">429 · too many requests</text>
+
+      <line class="wire" x1="300" y1="144" x2="300" y2="170" marker-end="url(#fh)"/>
+
+      <rect class="box" x="120" y="172" width="360" height="48" rx="9"/>
+      <text class="t-title" x="300" y="192" text-anchor="middle">requireAuth</text>
+      <text class="t-sub" x="300" y="210" text-anchor="middle">verify Bearer JWT · load req.user</text>
+      <line class="wire" x1="480" y1="196" x2="576" y2="196" marker-end="url(#fh)"/>
+      <text class="t-label" x="528" y="188" text-anchor="middle">bad token</text>
+      <rect class="box box-plain" x="578" y="174" width="300" height="44" rx="8"/>
+      <text class="t-sub" x="728" y="200" text-anchor="middle" style="fill:var(--danger)">401 · unauthorized</text>
+
+      <line class="wire" x1="300" y1="220" x2="300" y2="246" marker-end="url(#fh)"/>
+
+      <rect class="box" x="120" y="248" width="360" height="48" rx="9"/>
+      <text class="t-title" x="300" y="268" text-anchor="middle">resolveAi</text>
+      <text class="t-sub" x="300" y="286" text-anchor="middle">owner → env key · others → their saved (encrypted) key</text>
+      <line class="wire" x1="480" y1="272" x2="576" y2="272" marker-end="url(#fh)"/>
+      <text class="t-label" x="528" y="264" text-anchor="middle">no key</text>
+      <rect class="box box-plain" x="578" y="250" width="300" height="44" rx="8"/>
+      <text class="t-sub" x="728" y="276" text-anchor="middle" style="fill:var(--danger)">503 · ai_off — add a key in settings</text>
+
+      <line class="wire" x1="300" y1="296" x2="300" y2="322" marker-end="url(#fh)"/>
+
+      <rect class="box box-local" x="120" y="324" width="360" height="48" rx="9"/>
+      <text class="t-title" x="300" y="344" text-anchor="middle">estimateCache</text>
+      <text class="t-sub" x="300" y="362" text-anchor="middle">same desc + product context already computed?</text>
+      <line class="wire wire-accent" x1="480" y1="348" x2="576" y2="348" marker-end="url(#fh-acc)"/>
+      <text class="t-label" x="528" y="340" text-anchor="middle">hit</text>
+      <rect class="box box-local" x="578" y="326" width="300" height="44" rx="8"/>
+      <text class="t-sub" x="728" y="352" text-anchor="middle">200 · cached estimate — no AI call</text>
+
+      <line class="wire" x1="300" y1="372" x2="300" y2="398" marker-end="url(#fh)"/>
+      <text class="t-label" x="316" y="390">miss</text>
+
+      <rect class="box box-local" x="120" y="400" width="360" height="60" rx="9"/>
+      <text class="t-title" x="300" y="420" text-anchor="middle">mealResolver — local, pure, no network</text>
+      <text class="t-sub" x="300" y="437" text-anchor="middle">parse Hebrew qty words → match saved products by name</text>
+      <text class="t-sub" x="300" y="452" text-anchor="middle" style="font-style:italic">precision over recall: any doubt → fall through</text>
+      <line class="wire wire-accent" x1="480" y1="430" x2="576" y2="430" marker-end="url(#fh-acc)"/>
+      <text class="t-label" x="528" y="422" text-anchor="middle">full match</text>
+      <rect class="box box-local" x="578" y="408" width="300" height="44" rx="8"/>
+      <text class="t-sub" x="728" y="434" text-anchor="middle">200 · from your own products — free</text>
+
+      <line class="wire" x1="300" y1="460" x2="300" y2="486" marker-end="url(#fh)"/>
+      <text class="t-label" x="316" y="478">any segment unmatched</text>
+
+      <rect class="box box-ai" x="120" y="488" width="360" height="64" rx="9"/>
+      <text class="t-title" x="300" y="510" text-anchor="middle">Claude · CLAUDE_MODEL</text>
+      <text class="t-sub" x="300" y="527" text-anchor="middle">system = ketoCore rules (shared/ketoCore.js)</text>
+      <text class="t-sub" x="300" y="542" text-anchor="middle">+ the user's saved products as reference values</text>
+
+      <line class="wire" x1="300" y1="552" x2="300" y2="578" marker-end="url(#fh)"/>
+
+      <rect class="box" x="120" y="580" width="360" height="56" rx="9"/>
+      <text class="t-title" x="300" y="601" text-anchor="middle">normalize · cache · meter</text>
+      <text class="t-sub" x="300" y="618" text-anchor="middle">totals re-derived from per-item breakdown · usage recorded</text>
+      <line class="wire" x1="480" y1="608" x2="576" y2="608" marker-end="url(#fh)"/>
+      <text class="t-label" x="528" y="600" text-anchor="middle">API error</text>
+      <rect class="box box-plain" x="578" y="586" width="300" height="44" rx="8"/>
+      <text class="t-sub" x="728" y="605" text-anchor="middle" style="fill:var(--danger)">402 key invalid/out of credit · flagged on user</text>
+      <text class="t-sub" x="728" y="621" text-anchor="middle" style="fill:var(--danger)">502 anything else</text>
+
+      <line class="wire wire-accent" x1="300" y1="636" x2="300" y2="662" marker-end="url(#fh-acc)"/>
+
+      <rect class="box box-local" x="120" y="664" width="360" height="52" rx="9"/>
+      <text class="t-title" x="300" y="686" text-anchor="middle">200 OK</text>
+      <text class="t-mono" x="300" y="704" text-anchor="middle">{ net_carbs, fat, protein, items[] }</text>
+    </svg>
+    </div>
+    <div class="legend">
+      <span><span class="swatch local"></span>free / deterministic</span>
+      <span><span class="swatch ai"></span>paid Claude call</span>
+    </div>
+    <figcaption>The same key-resolution and failure-mapping wrapper (<code>resolveAi</code> / <code>aiFailure</code>) fronts every AI route: image estimation, barcode interpretation, chat, and insights.</figcaption>
+  </figure>
+
+  <h3>The other flows, briefly</h3>
+  <ul>
+    <li><strong>Photo → product</strong>: <code>POST /api/ai/estimate-image</code> sends a base64 label photo (hence the 12&nbsp;MB JSON body limit) straight to Claude vision with the same keto rules; the result pre-fills a confirm/edit form, never the log directly.</li>
+    <li><strong>Barcode</strong>: <code>POST /api/ai/barcode</code> asks Open Food Facts for raw nutrition, then Claude converts it to keto net carbs. Unknown barcode → <code>404 {found:false}</code> and the UI falls back to the photo flow.</li>
+    <li><strong>Chat</strong>: <code>POST /api/ai/chat</code> runs a tool-use loop (max 6 turns). Read tools query MongoDB scoped to the user; write tools only <em>propose</em> — the browser commits accepted cards via <code>/api/days</code> and <code>/api/products</code>.</li>
+  </ul>
+</section>
+
+<!-- ================= FOLDER MAP ================= -->
+<section id="folders">
+  <div class="kicker">04 · Folder map</div>
+  <h2>Where things live</h2>
+  <p class="lede">Two npm workspaces-by-convention (<code>server/</code>, <code>client/</code>) plus one deliberately shared file. Click folders to expand.</p>
+
+  <div class="tree">
+    <details open>
+      <summary>ketolog/</summary>
+      <div class="d-body">
+        <ul>
+          <li>package.json <span class="note">root orchestrator — build installs+builds client, then installs server</span></li>
+          <li>render.yaml <span class="note">Render blueprint: one web service, all env vars documented inline</span></li>
+          <li>README.md <span class="note">setup instructions (this page is the architecture companion)</span></li>
+        </ul>
+        <details>
+          <summary>shared/</summary>
+          <div class="d-body">
+            <ul>
+              <li>ketoCore.js <span class="note">the net-carb rulebook, single source of truth for BOTH the server prompts and the client's claude.ai deep-link prompt</span></li>
+            </ul>
+          </div>
+        </details>
+        <details open>
+          <summary>server/src/</summary>
+          <div class="d-body">
+            <ul>
+              <li>index.js <span class="note">app assembly: env checks, CORS, hardening, mounts, static serving</span></li>
+              <li>db.js <span class="note">Mongoose connection</span></li>
+            </ul>
+            <details>
+              <summary>middleware/</summary>
+              <div class="d-body"><ul>
+                <li>auth.js <span class="note">requireAuth — verifies the Bearer JWT, loads req.user</span></li>
+                <li>rateLimit.js <span class="note">named in-memory per-IP windows</span></li>
+              </ul></div>
+            </details>
+            <details>
+              <summary>routes/</summary>
+              <div class="d-body"><ul>
+                <li>auth.js <span class="note">register / login / me · admin-approval + password-reset email flows</span></li>
+                <li>days.js <span class="note">the diary: day upserts, metrics, embedded meals CRUD</span></li>
+                <li>products.js <span class="note">the user's saved-products list</span></li>
+                <li>templates.js <span class="note">reusable meal templates</span></li>
+                <li>ai.js <span class="note">estimators, barcode, chat, insights, BYO-key management, usage/budget</span></li>
+                <li>admin.js <span class="note">owner-only: users, approvals, bug replies, broadcast messages</span></li>
+                <li>bugs.js <span class="note">in-app bug reports</span></li>
+                <li>messages.js <span class="note">user inbox (admin replies/broadcasts)</span></li>
+                <li>whatsapp.js <span class="tag-off">disabled</span> <span class="note">Twilio inbound webhook, signature-verified</span></li>
+              </ul></div>
+            </details>
+            <details>
+              <summary>lib/</summary>
+              <div class="d-body"><ul>
+                <li>anthropic.js <span class="note">SDK clients (one per key, retries=4), model pins, estimator prompts</span></li>
+                <li>aiAccess.js <span class="note">who pays: owner env key vs user's encrypted BYO key; key-error flags</span></li>
+                <li>estimateCache.js <span class="note">desc+products → cached estimate (backed by MealEstimate)</span></li>
+                <li>mealResolver.js <span class="note">pure Hebrew-text → saved-product matcher; unit-tested</span></li>
+                <li>logMeal.js <span class="note">shared "calculate then append meal" pipeline (app + WhatsApp bot)</span></li>
+                <li>chatAgent.js <span class="note">the keto assistant: tool loop, propose-only writes</span></li>
+                <li>insightsAgent.js / insightsDigest.js <span class="note">periodic log analysis → Insight docs</span></li>
+                <li>openfoodfacts.js <span class="note">barcode lookup client</span></li>
+                <li>mailer.js <span class="note">Brevo HTTPS API in prod (Render blocks SMTP), SMTP locally</span></li>
+                <li>approval.js <span class="note">new-user approval tokens + emails to ADMIN_EMAIL</span></li>
+                <li>usage.js <span class="note">per-user Anthropic/OpenAI usage metering</span></li>
+                <li>transcribe.js <span class="tag-off">disabled</span> <span class="note">Whisper speech-to-text for the mic button</span></li>
+                <li>whatsapp.js <span class="tag-off">disabled</span> <span class="note">Twilio send/verify helpers</span></li>
+                <li>http.js <span class="note">asyncHandler wrapper</span></li>
+              </ul></div>
+            </details>
+            <details>
+              <summary>models/</summary>
+              <div class="d-body"><ul>
+                <li><span class="dim">User · Day · Product · MealTemplate · MealEstimate · Conversation · Message · Insight · Usage · BugReport</span> <span class="note">→ see Data models</span></li>
+              </ul></div>
+            </details>
+            <details>
+              <summary>test/ · scripts/</summary>
+              <div class="d-body"><ul>
+                <li>test/mealResolver.test.js <span class="note">the resolver is pure, so it's the one unit-tested module</span></li>
+                <li>scripts/ <span class="note">one-off data utilities (dump user food, copy meal logs)</span></li>
+              </ul></div>
+            </details>
+          </div>
+        </details>
+        <details open>
+          <summary>client/src/</summary>
+          <div class="d-body">
+            <ul>
+              <li>main.jsx / App.jsx <span class="note">entry + top-level tab shell, auth gate, data loading</span></li>
+            </ul>
+            <details>
+              <summary>components/ <span class="dim">(~30 pairs of .jsx + .scss)</span></summary>
+              <div class="d-body"><ul>
+                <li>TabShell · Header · UserMenu <span class="note">chrome and navigation</span></li>
+                <li>Dashboard · DiaryGrid · Diary · DayCard · CarbRing · EnergyBalance · WeighIn · RecordBanner <span class="note">the diary views and daily metrics</span></li>
+                <li>AddMeal · ProductPicker · BarcodeScanner · CameraCapture · ClaudeCalcModal <span class="note">the logging composer and its input modes</span></li>
+                <li>Products <span class="note">saved-product management</span></li>
+                <li>ChatWidget · SmartInsights · MessagesPanel <span class="note">assistant, insights feed, inbox</span></li>
+                <li>Login · Onboarding · MenuIntro · NameDialog · SettingsModal <span class="note">account lifecycle</span></li>
+                <li>AdminPanel · AdminBugs · BugReportModal <span class="note">owner tools + feedback</span></li>
+              </ul></div>
+            </details>
+            <details>
+              <summary>lib/</summary>
+              <div class="d-body"><ul>
+                <li>api.js <span class="note">thin fetch wrapper: JWT header, relative /api paths, 401 → logout</span></li>
+                <li>auth.jsx / theme.js / toast.jsx <span class="note">context providers &amp; UI utilities</span></li>
+                <li>claudeCalc.js / ketoPromptRules.js <span class="note">the claude.ai deep-link flow (embeds ketoCore in a URL)</span></li>
+                <li>exportExcel.js / exportLog.js <span class="note">diary export (exceljs)</span></li>
+                <li>quickAddPatterns.js · categories.js · helpers.js · energyBalance.js <span class="note">domain logic</span></li>
+                <li>useSpeech.js · useFocusTrap.js · useMediaQuery.js <span class="note">hooks</span></li>
+              </ul></div>
+            </details>
+            <ul>
+              <li>data/demoProducts.js <span class="note">starter product list</span></li>
+              <li>styles/base.scss <span class="note">global RTL base styles</span></li>
+            </ul>
+          </div>
+        </details>
+        <ul>
+          <li>client/public/ <span class="note">PWA bits: manifest, icons, apple-touch-icon</span></li>
+        </ul>
+      </div>
+    </details>
+  </div>
+</section>
+
+<!-- ================= API ================= -->
+<section id="api">
+  <div class="kicker">05 · API surface</div>
+  <h2>Every route, grouped</h2>
+  <p class="lede">All routes require <code>Authorization: Bearer &lt;JWT&gt;</code> except <code>/api/health</code> and the <code>/api/auth</code> entry points. Expand a group for the full table.</p>
+
+  <details>
+    <summary><span class="mono">/api/auth</span> <span class="hint">accounts, approval &amp; reset flows</span></summary>
+    <div class="d-body tbl-wrap"><table>
+      <thead><tr><th>Route</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td class="mono"><span class="pill post">POST</span>/register · /login</td><td>Create account / sign in → JWT. Both rate-limited. New accounts wait for admin approval.</td></tr>
+        <tr><td class="mono"><span class="pill get">GET</span><span class="pill post">POST</span>/approve</td><td>Admin approval link from email → server-rendered confirmation page + form.</td></tr>
+        <tr><td class="mono"><span class="pill post">POST</span>/forgot-password · <span class="pill get">GET</span><span class="pill post">POST</span>/reset-password</td><td>Email-token password reset, server-rendered form, all rate-limited.</td></tr>
+        <tr><td class="mono"><span class="pill get">GET</span><span class="pill patch">PATCH</span>/me</td><td>Current user / update profile &amp; settings (carb target, etc.).</td></tr>
+        <tr><td class="mono"><span class="pill post">POST</span>/reset-account</td><td>Wipe days + insights after typed confirmation — fresh day 1.</td></tr>
+      </tbody>
+    </table></div>
+  </details>
+
+  <details>
+    <summary><span class="mono">/api/days</span> <span class="hint">the diary itself</span></summary>
+    <div class="d-body tbl-wrap"><table>
+      <thead><tr><th>Route</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td class="mono"><span class="pill get">GET</span>/</td><td>All days for the logged-in user.</td></tr>
+        <tr><td class="mono"><span class="pill put">PUT</span>/:date</td><td>Upsert a day (label / fields).</td></tr>
+        <tr><td class="mono"><span class="pill patch">PATCH</span>/:date/metrics</td><td>Set one metric: weight / run / abs / status.</td></tr>
+        <tr><td class="mono"><span class="pill post">POST</span><span class="pill patch">PATCH</span><span class="pill del">DEL</span>/:date/meals[/:mealId]</td><td>Add / edit / remove a meal (meals are embedded in the Day doc).</td></tr>
+      </tbody>
+    </table></div>
+  </details>
+
+  <details>
+    <summary><span class="mono">/api/products</span> · <span class="mono">/api/templates</span> <span class="hint">personal food library</span></summary>
+    <div class="d-body tbl-wrap"><table>
+      <thead><tr><th>Route</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td class="mono"><span class="pill get">GET</span><span class="pill post">POST</span><span class="pill patch">PATCH</span><span class="pill del">DEL</span>/products[/:id]</td><td>Saved products with hand-confirmed per-unit macros — also the mealResolver's ground truth.</td></tr>
+        <tr><td class="mono"><span class="pill get">GET</span><span class="pill post">POST</span><span class="pill del">DEL</span>/templates[/:id]</td><td>Reusable meal templates for one-tap logging.</td></tr>
+      </tbody>
+    </table></div>
+  </details>
+
+  <details>
+    <summary><span class="mono">/api/ai</span> <span class="hint">rate-limited 30/min · the whole AI layer</span></summary>
+    <div class="d-body tbl-wrap"><table>
+      <thead><tr><th>Route</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td class="mono"><span class="pill post">POST</span>/estimate-meal</td><td>Free-text Hebrew → macros (the flow diagrammed above). Today mainly serves the WhatsApp path; the in-app composer moved to the claude.ai-link flow.</td></tr>
+        <tr><td class="mono"><span class="pill post">POST</span>/estimate-image</td><td>Base64 label/package photo → product fields (Claude vision).</td></tr>
+        <tr><td class="mono"><span class="pill post">POST</span>/barcode</td><td>Open Food Facts lookup + Claude keto interpretation; 404 when unknown.</td></tr>
+        <tr><td class="mono"><span class="pill get">GET</span><span class="pill post">POST</span>/chat · <span class="pill post">POST</span>/chat/:id/actions/:actionId</td><td>Assistant history / a chat turn (tool loop) / commit or decline a proposed action.</td></tr>
+        <tr><td class="mono"><span class="pill get">GET</span>/insights · <span class="pill post">POST</span>/insights/:id/seen</td><td>Generate-if-due and list periodic insight reports; mark read.</td></tr>
+        <tr><td class="mono"><span class="pill post">POST</span><span class="pill del">DEL</span>/key · <span class="pill post">POST</span>/opt-out</td><td>Bring-your-own Anthropic key (stored encrypted) / remove it / opt out of AI.</td></tr>
+        <tr><td class="mono"><span class="pill get">GET</span>/usage · <span class="pill post">POST</span>/budget</td><td>Metered spend per user / set a monthly cap.</td></tr>
+        <tr><td class="mono"><span class="pill post">POST</span>/transcribe</td><td>Whisper speech-to-text — currently returns 503 (feature switched off).</td></tr>
+      </tbody>
+    </table></div>
+  </details>
+
+  <details>
+    <summary><span class="mono">/api/admin</span> · <span class="mono">/api/bugs</span> · <span class="mono">/api/messages</span> <span class="hint">owner tools &amp; feedback loop</span></summary>
+    <div class="d-body tbl-wrap"><table>
+      <thead><tr><th>Route</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td class="mono"><span class="pill get">GET</span>/admin/users[/:id] · <span class="pill post">POST</span>/admin/users/:id/approval</td><td>User list, detail, approve/revoke.</td></tr>
+        <tr><td class="mono"><span class="pill get">GET</span>/admin/bugs · <span class="pill post">POST</span>/admin/bugs/:id/reply</td><td>Review bug reports, reply (lands in the user's inbox).</td></tr>
+        <tr><td class="mono"><span class="pill get">GET</span><span class="pill post">POST</span>/admin/messages</td><td>Read / broadcast messages to users.</td></tr>
+        <tr><td class="mono"><span class="pill post">POST</span>/bugs · <span class="pill get">GET</span>/bugs/mine</td><td>File a bug report (rate-limited) / my reports + replies.</td></tr>
+        <tr><td class="mono"><span class="pill get">GET</span>/messages · <span class="pill post">POST</span>/messages/read-all</td><td>User inbox / mark all read.</td></tr>
+      </tbody>
+    </table></div>
+  </details>
+</section>
+
+<!-- ================= MODELS ================= -->
+<section id="models">
+  <div class="kicker">06 · Data models</div>
+  <h2>Ten collections, one owner</h2>
+  <p class="lede">Every document except <code>User</code> carries a <code>user</code> ref — all queries are scoped to the authenticated user, which is the app's whole authorization model beyond the admin flag.</p>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Model</th><th>Role</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">User</td><td>Account, bcrypt password hash, approval state, carb target, AI settings (BYO key — encrypted — plus error flags, budget, opt-out).</td></tr>
+      <tr><td class="mono">Day</td><td>One doc per user per date: label, metrics (weight / run / abs / status), and the meals <em>embedded</em> as a subdocument array — a day is always fetched whole.</td></tr>
+      <tr><td class="mono">Product</td><td>A saved food with confirmed per-unit macros; doubles as ground truth for the local resolver and as reference values in AI prompts.</td></tr>
+      <tr><td class="mono">MealTemplate</td><td>A reusable named meal for one-tap logging.</td></tr>
+      <tr><td class="mono">MealEstimate</td><td>The estimate cache: description + product context → previously computed result.</td></tr>
+      <tr><td class="mono">Conversation</td><td>Chat assistant history + proposed (pending) actions.</td></tr>
+      <tr><td class="mono">Message</td><td>Inbox items: admin replies and broadcasts.</td></tr>
+      <tr><td class="mono">Insight</td><td>A generated periodic report over the user's log.</td></tr>
+      <tr><td class="mono">Usage</td><td>Metering records for Anthropic / OpenAI calls (tokens, model, kind) — feeds <code>/api/ai/usage</code> and budgets.</td></tr>
+      <tr><td class="mono">BugReport</td><td>In-app bug reports and their admin replies.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ================= AI LAYER ================= -->
+<section id="ai">
+  <div class="kicker">07 · The AI layer</div>
+  <h2>One rulebook, many mouths</h2>
+  <p><a href="shared/ketoCore.js"><code>shared/ketoCore.js</code></a> is the single source of truth for how net carbs are computed — fiber and which sugar alcohols to subtract, Israeli/EU vs US label conventions, a mass-balance sanity check for non-compliant labels. It is imported verbatim by <em>both</em> sides:</p>
+  <ul>
+    <li><strong>Server</strong> — <code>lib/anthropic.js</code> builds the estimator system prompts (meal / image / barcode) from it.</li>
+    <li><strong>Client</strong> — <code>lib/ketoPromptRules.js</code> embeds it in a <code>claude.ai/new?q=…</code> deep link (the ClaudeCalcModal flow), so a user calculating in the Claude app gets the same rules. It's kept compact because percent-encoded Hebrew inflates ~6× in a URL.</li>
+  </ul>
+  <div class="note-card ai">
+    <p class="nc-title">Who pays for tokens</p>
+    <p><code>lib/aiAccess.js</code> resolves a key per request: owner accounts ride the app's <code>ANTHROPIC_API_KEY</code>; everyone else brings their own key, stored encrypted, with invalid-key / out-of-credit errors flagged on the user and explained specifically (402) rather than as a generic failure. Per-user usage is metered and a monthly budget can be set. Estimators and chat each pin their model via <code>CLAUDE_MODEL</code> / <code>CHAT_MODEL</code> (both default <code>claude-opus-4-8</code>), and the SDK runs with <code>maxRetries: 4</code> so brief API overloads self-heal mid-chat.</p>
+  </div>
+  <p>The chat assistant (<code>lib/chatAgent.js</code>) is a proper tool-using agent with a hard 6-turn loop cap: read tools (<code>get_today_log</code>, <code>get_log</code>, <code>get_recent_days</code>, <code>list_products</code>) hit MongoDB live, write tools (<code>propose_meal</code>, <code>propose_product</code>) only ever surface confirmation cards.</p>
+</section>
+
+<!-- ================= OPS ================= -->
+<section id="ops">
+  <div class="kicker">08 · Run &amp; deploy</div>
+  <h2>Local in two terminals, prod in one service</h2>
+  <h3>Local</h3>
+<pre><code># once: server/.env from server/.env.example
+#   MONGODB_URI, ANTHROPIC_API_KEY, JWT_SECRET (≥32 chars — the server refuses to boot otherwise)
+
+cd server &amp;&amp; npm run dev     # API on :4000 (node --watch)
+cd client &amp;&amp; npm run dev     # Vite on :5173 — open this; /api/* is proxied to :4000</code></pre>
+  <p>No Anthropic key? Everything still runs — the AI endpoints return a clear "AI off" message instead.</p>
+
+  <h3>Production (Render blueprint)</h3>
+  <p><a href="render.yaml"><code>render.yaml</code></a> defines a single free-tier web service: <code>npm install &amp;&amp; npm run build</code> (root script builds the client, installs the server), <code>npm start</code>, health-checked at <code>/api/health</code>. Express finds <code>client/dist</code> and serves it with an SPA fallback for non-<code>/api</code> paths. Secrets (<code>MONGODB_URI</code>, <code>ANTHROPIC_API_KEY</code>, Brevo/Twilio keys) are set in the dashboard; <code>JWT_SECRET</code> is Render-generated.</p>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Env var</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">MONGODB_URI</td><td>Atlas connection string (free cluster).</td></tr>
+      <tr><td class="mono">ANTHROPIC_API_KEY</td><td>The owner's key; other users bring their own via settings.</td></tr>
+      <tr><td class="mono">JWT_SECRET</td><td>Token signing — boot fails fast if missing or &lt; 32 chars.</td></tr>
+      <tr><td class="mono">CLAUDE_MODEL · CHAT_MODEL</td><td>Model pins for estimators / assistant.</td></tr>
+      <tr><td class="mono">ADMIN_EMAIL · BREVO_* · SMTP_*</td><td>New-user approval + reset mail. Brevo HTTPS API in prod (Render blocks outbound SMTP), Gmail SMTP locally.</td></tr>
+      <tr><td class="mono">CORS_ORIGINS</td><td>Only needed if the client is ever hosted on another origin.</td></tr>
+      <tr><td class="mono">OPENAI_API_KEY · TRANSCRIBE_MODEL</td><td>Voice input (Whisper) — feature currently off.</td></tr>
+      <tr><td class="mono">TWILIO_*</td><td>WhatsApp meal-logging bot — wired, currently unmounted.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ================= FIELD NOTES ================= -->
+<section id="notes">
+  <div class="kicker">09 · Field notes</div>
+  <h2>The decisions you'd otherwise rediscover the hard way</h2>
+  <ul>
+    <li><strong><code>dns.setDefaultResultOrder('ipv4first')</code></strong> at boot — Render has no IPv6 egress, so preferring AAAA records made outbound TLS (notably SMTP) fail with <code>ENETUNREACH</code>.</li>
+    <li><strong><code>trust proxy = 1</code></strong> — exactly one hop (Render's proxy), so rate limiting sees real client IPs without opening IP spoofing via forged <code>X-Forwarded-For</code> chains.</li>
+    <li><strong>JSON limit is 12&nbsp;MB</strong> on purpose: label photos travel as base64 in JSON bodies. The urlencoded parser stays at 16&nbsp;KB for the tiny server-rendered auth forms.</li>
+    <li><strong>Meals are embedded in Day docs</strong>, not a collection — a diary day is always read and written whole, which keeps the client a simple "fetch all days" load.</li>
+    <li><strong>The resolver is the only unit-tested module</strong> (<code>server/test/mealResolver.test.js</code>) precisely because it's the only pure one — and the one where a silent wrong answer would corrupt the log.</li>
+    <li><strong>Estimator totals are re-derived from the per-item breakdown</strong> (<code>normalizeMeal</code>) since the model pin rejects the <code>temperature</code> param — consistency comes from reconciliation, not greedy decoding.</li>
+    <li><strong>Disabled ≠ deleted.</strong> WhatsApp and voice transcription are kept fully wired behind flags/comments (<code>VOICE_DISABLED</code>, commented mounts in <code>index.js</code>) with re-enable instructions inline — the code is the feature-flag documentation.</li>
+  </ul>
+</section>
+
+</main>
+</div>
+
+<footer>
+  KetoLog architecture guide · hand-built diagrams (inline SVG, no dependencies, no build step) · reflects the codebase as of 2026-07-25 · open <code>README.md</code> for setup steps.
+</footer>
+
+<script>
+(function () {
+  var root = document.documentElement;
+  var btn = document.getElementById('theme-toggle');
+  var KEY = 'ketolog-readme-theme';
+  try {
+    var saved = localStorage.getItem(KEY);
+    if (saved === 'dark' || saved === 'light') root.dataset.theme = saved;
+  } catch (e) {}
+  btn.addEventListener('click', function () {
+    var systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    var current = root.dataset.theme || (systemDark ? 'dark' : 'light');
+    var next = current === 'dark' ? 'light' : 'dark';
+    root.dataset.theme = next;
+    try { localStorage.setItem(KEY, next); } catch (e) {}
+  });
+
+  // TOC highlight on scroll
+  var links = Array.prototype.slice.call(document.querySelectorAll('nav.toc a'));
+  var sections = links.map(function (a) { return document.querySelector(a.getAttribute('href')); });
+  function onScroll() {
+    var y = window.scrollY + 120;
+    var active = 0;
+    for (var i = 0; i < sections.length; i++) {
+      if (sections[i] && sections[i].offsetTop <= y) active = i;
+    }
+    links.forEach(function (a, i) { a.classList.toggle('active', i === active); });
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+})();
+</script>
+
+</body>
+</html>
