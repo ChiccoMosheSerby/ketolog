@@ -100,6 +100,36 @@ router.patch('/:date/meals/:mealId', asyncHandler(async (req, res) => {
   res.json(day);
 }));
 
+// DELETE /api/days/:date/meals/:mealId/items/:index  -> remove a single item
+// from a logged meal. The meal totals shed the deleted line's contribution
+// (qty × per-unit) instead of being recomputed from the remaining items, so a
+// manually-adjusted meal total keeps its adjustment. Deleting the last item
+// removes the whole meal — an empty breakdown with leftover totals would lie.
+router.delete('/:date/meals/:mealId/items/:index', asyncHandler(async (req, res) => {
+  const { date, mealId } = req.params;
+  const index = Number(req.params.index);
+  const day = await Day.findOne({ user: req.userId, date });
+  const meal = day?.meals?.id(mealId);
+  if (!meal) return res.status(404).json({ error: 'ארוחה לא נמצאה' });
+  if (!Number.isInteger(index) || index < 0 || index >= meal.items.length) {
+    return res.status(404).json({ error: 'פריט לא נמצא' });
+  }
+  if (meal.items.length === 1) {
+    day.meals.pull(mealId);
+  } else {
+    const [it] = meal.items.splice(index, 1);
+    const qty = Number(it.qty) > 0 ? Number(it.qty) : 1;
+    // subtract the line total; null stays null (macro was never recorded)
+    const sub = (cur, per) =>
+      cur == null ? null : Math.max(0, Math.round((Number(cur) - qty * (Number(per) || 0)) * 100) / 100);
+    meal.carbs = sub(meal.carbs, it.carbs) ?? 0;
+    meal.fat = sub(meal.fat, it.fat);
+    meal.protein = sub(meal.protein, it.protein);
+  }
+  await day.save();
+  res.json(day);
+}));
+
 // DELETE /api/days/:date/meals/:mealId
 router.delete('/:date/meals/:mealId', asyncHandler(async (req, res) => {
   const { date, mealId } = req.params;

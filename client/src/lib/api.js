@@ -43,6 +43,8 @@ export const api = {
   addMeal: (date, meal) => request('POST', `/days/${date}/meals`, meal),
   updateMeal: (date, mealId, patch) => request('PATCH', `/days/${date}/meals/${mealId}`, patch),
   deleteMeal: (date, mealId) => request('DELETE', `/days/${date}/meals/${mealId}`),
+  deleteMealItem: (date, mealId, index) =>
+    request('DELETE', `/days/${date}/meals/${mealId}/items/${index}`),
 
   // products
   getProducts: () => request('GET', '/products'),

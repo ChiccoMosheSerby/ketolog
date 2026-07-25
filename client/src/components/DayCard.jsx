@@ -116,6 +116,7 @@ export default function DayCard({
   open,
   onToggle,
   onDeleteMeal,
+  onDeleteMealItem,
   onSetMealTime,
   onCopyMeal,
   onSaveTemplate,
@@ -452,6 +453,24 @@ export default function DayCard({
                                       }}
                                     >
                                       📦
+                                    </button>
+                                  )}
+                                  {onDeleteMealItem && (
+                                    <button
+                                      type="button"
+                                      className="mi-del"
+                                      title={
+                                        items.length === 1
+                                          ? "מחק פריט (הפריט האחרון — הארוחה תימחק)"
+                                          : "מחק פריט ועדכן את חישוב הארוחה"
+                                      }
+                                      aria-label="מחק פריט מהארוחה"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onDeleteMealItem(iso, m._id, i);
+                                      }}
+                                    >
+                                      ✕
                                     </button>
                                   )}
                                 </span>

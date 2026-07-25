@@ -308,6 +308,15 @@ export default function Diary() {
     toast("הארוחה נמחקה");
   }
 
+  // Delete a single item from a logged meal — the server subtracts the item's
+  // macros from the meal totals; deleting the last item removes the meal.
+  async function deleteMealItem(date, mealId, index) {
+    const day = await api.deleteMealItem(date, mealId, index);
+    mergeDay(day);
+    const mealGone = !(day.meals || []).some((m) => m._id === mealId);
+    toast(mealGone ? "הפריט האחרון נמחק — הארוחה הוסרה" : "הפריט נמחק והארוחה עודכנה");
+  }
+
   // Edit a logged meal's time (HH:MM). DayCard sorts meals by time, so the row
   // moves into its new chronological slot as soon as the update lands.
   async function updateMealTime(date, mealId, time) {
@@ -669,6 +678,7 @@ export default function Diary() {
                 open={expanded.has(d.date)}
                 onToggle={() => toggle(d.date)}
                 onDeleteMeal={deleteMeal}
+                onDeleteMealItem={deleteMealItem}
                 onSetMealTime={updateMealTime}
                 onCopyMeal={copyMealToActive}
                 onSaveTemplate={saveMealAsTemplate}
@@ -728,6 +738,7 @@ export default function Diary() {
         closed={dayClosed}
         onToggle={() => toggle(activeDate)}
         onDeleteMeal={deleteMeal}
+        onDeleteMealItem={deleteMealItem}
         onSetMealTime={updateMealTime}
         onCopyMeal={copyMealToActive}
         onSaveTemplate={saveMealAsTemplate}
@@ -869,6 +880,7 @@ export default function Diary() {
               open
               onToggle={() => {}}
               onDeleteMeal={deleteMeal}
+              onDeleteMealItem={deleteMealItem}
               onSetMealTime={updateMealTime}
               onCopyMeal={copyMealToActive}
               onSaveTemplate={saveMealAsTemplate}

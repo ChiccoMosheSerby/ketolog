@@ -532,6 +532,28 @@
         background: var(--green-tint);
       }
     }
+    /* delete a single item — the meal totals shed its macros */
+    .mi-del {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 10px;
+      line-height: 1;
+      padding: 3px 5px;
+      border-radius: 999px;
+      color: var(--ink-soft);
+      opacity: 0.45;
+      flex: none;
+      transition:
+        opacity 0.15s ease,
+        background 0.15s ease,
+        color 0.15s ease;
+      &:hover {
+        opacity: 1;
+        color: var(--red);
+        background: var(--danger-tint);
+      }
+    }
   }
   /* per-meal macro split — a slimmer echo of the day bar, with its own numbers */
   .meal-macro {
@@ -641,6 +663,11 @@
     .meal-items .mi-save {
       opacity: 0.75; // no hover on touch — keep it tappable
       font-size: 15px;
+      padding: 4px 7px;
+    }
+    .meal-items .mi-del {
+      opacity: 0.7; // no hover on touch — keep it tappable
+      font-size: 12px;
       padding: 4px 7px;
     }
   }
