@@ -71,8 +71,9 @@ export const api = {
   resolveAction: (conversationId, actionId, decision) =>
     request('POST', `/ai/chat/${conversationId}/actions/${actionId}`, { decision }),
 
-  // AI insights — auto-generated weekly/monthly report history
+  // AI insights — weekly/monthly report history (auto mode) or on-demand runs
   getInsights: (today) => request('GET', `/ai/insights${today ? `?today=${today}` : ''}`),
+  runInsightsNow: (today) => request('POST', '/ai/insights/run', { today }),
   markInsightSeen: (id) => request('POST', `/ai/insights/${id}/seen`),
 
   // bring-your-own AI key + owner's AI on/off preview toggle

@@ -39,6 +39,12 @@
   color: var(--ink-soft);
 }
 
+/* the on-demand "run a new report" button (manual insights mode) */
+.si-run {
+  align-self: flex-start;
+  white-space: nowrap;
+}
+
 .si-loading,
 .si-note {
   color: var(--ink-soft);

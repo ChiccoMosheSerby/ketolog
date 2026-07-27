@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
-import { heDate } from '../lib/helpers.js';
+import { heDate, todayISO } from '../lib/helpers.js';
 import { renderText } from '../lib/markdown.jsx';
 import {
   getCache,
@@ -12,10 +12,13 @@ import {
 } from '../lib/insightsStore.js';
 import './SmartInsights.scss';
 
-// Auto-generated weekly/monthly insight reports. The user never triggers a run:
-// opening the panel loads the report history and, in the background, the server
-// generates any just-completed period that's due. The latest report is shown by
-// default; older ones are browsable; unseen reports are highlighted as "new".
+// Weekly/monthly insight reports. In the default 'auto' mode the user never
+// triggers a run: opening the panel loads the report history and, in the
+// background, the server generates any just-completed period that's due. In
+// 'manual' mode (settings → דוחות תובנות חכמות) nothing runs by itself — a
+// "run now" button generates an on-demand report over the last 7 days. The
+// latest report is shown by default; older ones are browsable; unseen reports
+// are highlighted as "new".
 //
 // Data is cached at module scope so switching tabs re-shows it instantly without
 // a refetch — a new fetch only happens when the cache is stale or a generation
@@ -27,7 +30,7 @@ const PRIORITY_TONE = { high: 'red', med: 'amber', low: 'olive' };
 const SEVERITY_LABEL = { alert: 'חריגה', watch: 'לב', info: 'שים לב' };
 const SEVERITY_TONE = { alert: 'red', watch: 'amber', info: 'olive' };
 const OUTLOOK_TONE = { positive: 'olive', neutral: 'soft', negative: 'red' };
-const PERIOD_LABEL = { weekly: 'שבועי', monthly: 'חודשי' };
+const PERIOD_LABEL = { weekly: 'שבועי', monthly: 'חודשי', ondemand: 'לפי דרישה' };
 
 const POLL_MS = 20000;
 const POLL_MAX = 5;
@@ -241,6 +244,8 @@ function Report({ ins, collapsible }) {
 export default function SmartInsights({ demo = false }) {
   const { user } = useAuth();
   const key = user?.email || '';
+  // 'manual' insights mode: reports run on click instead of weekly/monthly.
+  const manual = user?.insightsMode === 'manual';
   const seed = getCache();
   const seeded = seed && seed.key === key;
 
@@ -251,6 +256,11 @@ export default function SmartInsights({ demo = false }) {
   const [keyError, setKeyError] = useState(seeded ? seed.keyError || '' : '');
   const [selectedId, setSelectedId] = useState(seeded && seed.reports[0] ? seed.reports[0].id : null);
   const [error, setError] = useState(null);
+  // on-demand run state: button busy flag, run failure message, and a nonce
+  // that restarts the polling effect so the finished report gets picked up
+  const [runBusy, setRunBusy] = useState(false);
+  const [runError, setRunError] = useState('');
+  const [pollNonce, setPollNonce] = useState(0);
   const poll = useRef({ count: 0, timer: null, alive: true });
 
   // Is the panel actually on screen? On mobile the carousel keeps every tab
@@ -338,7 +348,25 @@ export default function SmartInsights({ demo = false }) {
       if (p.timer) clearTimeout(p.timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
+  }, [key, pollNonce]);
+
+  // Manual mode: run an on-demand report now. The server kicks generation off
+  // in the background and returns the pending state; bumping pollNonce restarts
+  // the polling effect so the finished report lands here within a few polls.
+  const runNow = useCallback(async () => {
+    if (runBusy) return;
+    setRunBusy(true);
+    setRunError('');
+    try {
+      const res = await api.runInsightsNow(todayISO());
+      applyResponse(res);
+      setPollNonce((n) => n + 1);
+    } catch (e) {
+      setRunError(e.message || 'הפקת הדוח נכשלה כרגע');
+    } finally {
+      setRunBusy(false);
+    }
+  }, [runBusy, applyResponse]);
 
   // Mark the shown report seen after a short dwell — but only while the panel
   // is actually visible, so the תובנות nav badge stays until the user really
@@ -372,7 +400,8 @@ export default function SmartInsights({ demo = false }) {
           </h2>
         </div>
         <div className="si-note">
-          כך נראה דוח אמיתי — הדוחות שלך ייכתבו אוטומטית מהנתונים שתתעד/י, מדי שבוע וחודש.
+          כך נראה דוח אמיתי — הדוחות שלך ייכתבו אוטומטית מהנתונים שתתעד/י, מדי שבוע וחודש
+          (או בלחיצת כפתור, אם תבחר/י במצב "לפי דרישה" בהגדרות).
         </div>
         <Report ins={DEMO_REPORT} collapsible />
       </div>
@@ -424,6 +453,16 @@ export default function SmartInsights({ demo = false }) {
           <div className="si-note" role="alert">{aiWarning}</div>
         ) : isGenerating ? (
           <div className="si-loading">מכין/ה את הדוח הראשון שלך… זה עשוי לקחת עד דקה, והוא יופיע כאן אוטומטית.</div>
+        ) : manual ? (
+          <>
+            <div className="si-note">
+              במצב "לפי דרישה" הדוחות נוצרים בלחיצה — הפיקו עכשיו דוח על שבעת הימים האחרונים.
+            </div>
+            {runError && <div className="si-note" role="alert">⚠️ {runError}</div>}
+            <button className="btn mini si-run" onClick={runNow} disabled={runBusy}>
+              {runBusy ? 'מפעיל…' : '✨ הפק דוח חדש'}
+            </button>
+          </>
         ) : (
           <div className="si-note">
             הדוח הראשון ייווצר אוטומטית בתום השבוע/החודש הקרוב — ב{heDate(nextReportDue().date)}.
@@ -443,7 +482,16 @@ export default function SmartInsights({ demo = false }) {
           תובנות חכמות
           {anyUnseen && <span className="si-new-dot" title="יש דוח חדש">חדש</span>}
         </h2>
-        {isGenerating && <span className="si-gen">מעדכן תובנות…</span>}
+        {isGenerating ? (
+          <span className="si-gen">מעדכן תובנות…</span>
+        ) : (
+          manual &&
+          !aiOff && (
+            <button className="btn mini si-run" onClick={runNow} disabled={runBusy}>
+              {runBusy ? 'מפעיל…' : '✨ הפק דוח חדש'}
+            </button>
+          )
+        )}
       </div>
 
       {/* old reports stay readable when AI is off/broken — but say why there
@@ -451,6 +499,7 @@ export default function SmartInsights({ demo = false }) {
       {aiWarning && (
         <div className="si-note" role="alert">{aiWarning}</div>
       )}
+      {runError && <div className="si-note" role="alert">⚠️ {runError}</div>}
 
       {/* report history — newest first; "new" reports badged */}
       <div className="si-reports" role="tablist">
@@ -477,14 +526,18 @@ export default function SmartInsights({ demo = false }) {
             דוח {PERIOD_LABEL[selected.period]} · {selected.label} · נוצר ב־{heDate(String(selected.generatedAt).slice(0, 10))}
           </div>
         )}
-        {(() => {
-          const next = nextReportDue();
-          return (
-            <div className="si-next">
-              הדוח {NEXT_LABEL[next.period]} הבא: {heDate(next.date)}
-            </div>
-          );
-        })()}
+        {manual ? (
+          <div className="si-next">מצב לפי דרישה — דוח חדש נוצר בלחיצה על "הפק דוח חדש".</div>
+        ) : (
+          (() => {
+            const next = nextReportDue();
+            return (
+              <div className="si-next">
+                הדוח {NEXT_LABEL[next.period]} הבא: {heDate(next.date)}
+              </div>
+            );
+          })()
+        )}
       </div>
     </div>
   );

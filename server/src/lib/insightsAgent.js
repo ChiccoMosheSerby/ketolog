@@ -1,11 +1,14 @@
-// Automatic AI insight reports over the user's keto log. A weekly report is
-// generated once a week (for each completed Sun–Sat week) and a monthly report
-// once a month (for each completed calendar month). The user never triggers a
-// run — when they open the app after a period has completed, the server kicks
-// off generation IN THE BACKGROUND (so the request never blocks on the ~minute
-// Claude call), stores it as a new unseen report, and it shows up highlighted
-// the next time the panel loads. Reuses the shared keto "brain" (ketoRules) and
-// the resilient JSON parser from anthropic.js.
+// AI insight reports over the user's keto log. In the default 'auto' mode a
+// weekly report is generated once a week (for each completed Sun–Sat week) and
+// a monthly report once a month (for each completed calendar month) — the user
+// never triggers a run: when they open the app after a period has completed,
+// the server kicks off generation IN THE BACKGROUND (so the request never
+// blocks on the ~minute Claude call), stores it as a new unseen report, and it
+// shows up highlighted the next time the panel loads. Accounts in 'manual'
+// insightsMode instead click a button that runs an on-demand report over the
+// last 7 days (runOnDemandReport) — nothing generates by itself. Reuses the
+// shared keto "brain" (ketoRules) and the resilient JSON parser from
+// anthropic.js.
 import { getClient, CHAT_MODEL, ketoRules, parseJsonReply } from './anthropic.js';
 import { keyErrorCode, flagKeyError, clearKeyError } from './aiAccess.js';
 import { recordAnthropicUsage } from './usage.js';
@@ -13,6 +16,7 @@ import {
   buildDigest,
   lastCompletedWeek,
   lastCompletedMonth,
+  onDemandPeriod,
   periodHasData,
 } from './insightsDigest.js';
 import Insight from '../models/Insight.js';
@@ -28,7 +32,7 @@ const SYSTEM = `${ketoRules()}
 
 מעבר לכך, אתה גם אנליסט/ית אישי/ת של יומן הקטו של המשתמש/ת באפליקציית KetoLog. תקבל/י:
 1. "digest" — סיכום מספרי של הנתונים (ממוצעים, רצפים, פירוק שבועי/חודשי, מגמת משקל, קטגוריות, שעות שיא, קפה, ימים חריגים, והימים האחרונים עם פירוט הארוחות).
-2. ציון התקופה (שבוע או חודש) שעליה יש להתמקד.
+2. ציון התקופה (שבוע, חודש, או דוח לפי דרישה על הימים האחרונים) שעליה יש להתמקד.
 3. "priorInsights" (אופציונלי) — הדוחות הקודמים שלך לאותו סוג תקופה, מהחדש לישן. זהו הזיכרון שלך.
 
 תפקידך: להפיק דוח תובנות אישי לאותה תקופה — לא סיכום מספרים יבש, אלא **סיפור של מגמה**.
@@ -137,7 +141,12 @@ function genderInstruction(gender) {
 // is the per-user resolved key (env for the owner, the user's own otherwise).
 export async function generateReport(digest, focus, prior = [], gender = '', userId = null, apiKey = null) {
   const client = getClient(apiKey);
-  const periodName = focus.period === 'weekly' ? 'השבועי' : 'החודשי';
+  const periodIntro =
+    focus.period === 'weekly'
+      ? 'זהו הדוח השבועי.'
+      : focus.period === 'monthly'
+        ? 'זהו הדוח החודשי.'
+        : 'זהו דוח לפי דרישה — סקירה של שבעת הימים האחרונים, שהמשתמש/ת ביקש/ה להפיק עכשיו.';
   const priorBlock = prior.length
     ? `\n\nהדוחות הקודמים שלך (priorInsights, מהחדש לישן) — התבסס/י עליהם לתיאור המגמה:\n${JSON.stringify(prior)}`
     : '\n\n(אין דוחות קודמים — זהו הדוח הראשון מסוגו.)';
@@ -150,7 +159,7 @@ export async function generateReport(digest, focus, prior = [], gender = '', use
       {
         role: 'user',
         content:
-          `זהו הדוח ${periodName}. התמקד/י בתקופה "${focus.label}" (מ-${focus.start} עד ${focus.end}), ` +
+          `${periodIntro} התמקד/י בתקופה "${focus.label}" (מ-${focus.start} עד ${focus.end}), ` +
           `והשתמש/י בשאר ה-digest כהקשר. ${genderInstruction(gender)} הפק/י את הדוח לפי הסכמה.\n\n` +
           `digest:\n${JSON.stringify(digest)}${priorBlock}`,
       },
@@ -173,19 +182,22 @@ async function runGeneration(userId, days, opts, focus) {
   const digest = buildDigest(days, opts);
   const prior = await getPriorContext(userId, focus.period, focus.end);
   const result = await generateReport(digest, focus, prior, gender, userId, opts.apiKey);
+  const set = {
+    periodStart: focus.start,
+    periodEnd: focus.end,
+    label: focus.label,
+    result,
+    model: CHAT_MODEL(),
+    promptVersion: PROMPT_VERSION,
+    gender,
+  };
+  // An on-demand run is user-requested fresh content — re-highlight it as
+  // "new" even when it overwrites the same day's earlier report. Silent
+  // prompt-version refreshes of auto reports keep their seenAt untouched.
+  if (focus.period === 'ondemand') set.seenAt = null;
   await Insight.findOneAndUpdate(
     { user: userId, period: focus.period, periodKey: focus.key },
-    {
-      $set: {
-        periodStart: focus.start,
-        periodEnd: focus.end,
-        label: focus.label,
-        result,
-        model: CHAT_MODEL(),
-        promptVersion: PROMPT_VERSION,
-        gender,
-      },
-    },
+    { $set: set },
     { upsert: true }
   );
 }
@@ -264,6 +276,43 @@ export async function ensureDueReports(userId, days, opts) {
     })();
   }
   return { enoughData: true, generating: [...new Set(generating)] };
+}
+
+// Periods currently generating for this user (in this process) — lets the GET
+// endpoint report a pending on-demand run without re-kicking anything.
+export function pendingPeriods(userId) {
+  const out = new Set();
+  for (const k of inFlight) {
+    if (k.startsWith(`${userId}:`)) out.add(k.split(':')[1]);
+  }
+  return [...out];
+}
+
+// A user-triggered on-demand report (insightsMode 'manual'): generate the
+// last-7-days report in the background, keyed by the run date. Idempotent per
+// click — a second click while one is running just reports it as generating.
+export function runOnDemandReport(userId, days, opts) {
+  if (!enoughData(days)) return { enoughData: false, generating: [] };
+  const focus = onDemandPeriod(opts.today);
+  if (!periodHasData(days, focus.start, focus.end)) {
+    return { enoughData: true, generating: [], noRecentData: true };
+  }
+  const flightKey = `${userId}:${focus.period}:${focus.key}`;
+  if (!inFlight.has(flightKey)) {
+    inFlight.add(flightKey);
+    (async () => {
+      try {
+        await runGeneration(userId, days, opts, focus);
+        clearKeyError(userId);
+      } catch (err) {
+        console.error('on-demand insight failed:', focus.key, err?.message);
+        flagKeyError(userId, keyErrorCode(err));
+      } finally {
+        inFlight.delete(flightKey);
+      }
+    })();
+  }
+  return { enoughData: true, generating: ['ondemand'] };
 }
 
 // Newest-first list of the user's reports (weekly + monthly interleaved by the

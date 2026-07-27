@@ -20,7 +20,14 @@ import { estimateMealCached } from '../lib/estimateCache.js';
 import { fetchProductByBarcode, rawKeto } from '../lib/openfoodfacts.js';
 import { runChatTurn } from '../lib/chatAgent.js';
 import { israelTimeHM } from '../lib/logMeal.js';
-import { ensureDueReports, listReports, markSeen } from '../lib/insightsAgent.js';
+import {
+  ensureDueReports,
+  runOnDemandReport,
+  pendingPeriods,
+  listReports,
+  markSeen,
+} from '../lib/insightsAgent.js';
+import { rateLimit } from '../middleware/rateLimit.js';
 import { transcribeAudio, transcribeConfigured, TRANSCRIBE_MODEL } from '../lib/transcribe.js';
 import { recordOpenAIUsage } from '../lib/usage.js';
 import { asyncHandler } from '../lib/http.js';
@@ -431,7 +438,7 @@ const serverToday = () => new Date().toISOString().slice(0, 10);
 router.get('/insights', asyncHandler(async (req, res) => {
   const today = ISO_RE.test(req.query.today || '') ? req.query.today : serverToday();
   const [user, days] = await Promise.all([
-    User.findById(req.userId).select('dailyCarbTarget ketoGoalMonths gender').lean(),
+    User.findById(req.userId).select('dailyCarbTarget ketoGoalMonths gender insightsMode').lean(),
     Day.find({ user: req.userId }).lean(),
   ]);
   const opts = {
@@ -442,8 +449,15 @@ router.get('/insights', asyncHandler(async (req, res) => {
     apiKey: req.ai.apiKey, // per-user key; generation is skipped when AI is off
   };
 
-  let due = { enoughData: days.some((d) => (d.meals || []).length > 0), generating: [] };
-  if (req.ai.enabled) {
+  // In 'manual' insights mode nothing auto-generates — this GET only lists
+  // reports and surfaces a still-running on-demand generation (started by
+  // POST /insights/run) so the client can keep polling until it lands.
+  const manual = user?.insightsMode === 'manual';
+  let due = {
+    enoughData: days.some((d) => (d.meals || []).length > 0),
+    generating: manual ? pendingPeriods(req.userId) : [],
+  };
+  if (req.ai.enabled && !manual) {
     try {
       due = await ensureDueReports(req.userId, days, opts);
     } catch (err) {
@@ -460,6 +474,45 @@ router.get('/insights', asyncHandler(async (req, res) => {
     aiConfigured: req.ai.enabled,
     // why generation may be silently failing ('auth' | 'no_credit' | '') — set
     // by background runs so the panel can explain instead of just going quiet
+    aiKeyError: req.user.aiKeyError || '',
+  });
+}));
+
+// POST /api/ai/insights/run -> user-triggered on-demand report ('manual'
+// insights mode only): kick off generation of a last-7-days report in the
+// background and return the same shape as GET /insights, with the run listed
+// under `generating` so the client polls until the report lands. Each run is
+// one Claude call on the account's key — modestly rate-limited.
+const insightsRunLimiter = rateLimit({ name: 'insights-run', windowMs: 10 * 60_000, max: 6 });
+router.post('/insights/run', insightsRunLimiter, asyncHandler(async (req, res) => {
+  if (!req.ai.enabled) return res.status(503).json(AI_OFF);
+  const today = ISO_RE.test(req.body?.today || '') ? req.body.today : serverToday();
+  const [user, days] = await Promise.all([
+    User.findById(req.userId).select('dailyCarbTarget ketoGoalMonths gender insightsMode').lean(),
+    Day.find({ user: req.userId }).lean(),
+  ]);
+  if (user?.insightsMode !== 'manual') {
+    return res.status(400).json({ error: 'הפקה בלחיצה זמינה רק במצב "לפי דרישה" (בהגדרות)' });
+  }
+  const out = runOnDemandReport(req.userId, days, {
+    target: user?.dailyCarbTarget ?? 20,
+    ketoGoalMonths: user?.ketoGoalMonths ?? 0,
+    gender: user?.gender ?? '',
+    today,
+    apiKey: req.ai.apiKey,
+  });
+  if (!out.enoughData) {
+    return res.status(400).json({ error: 'צריך עוד כמה ימי רישום כדי להפיק דוח — המשיכו לתעד ונסו שוב' });
+  }
+  if (out.noRecentData) {
+    return res.status(400).json({ error: 'אין ארוחות מתועדות בשבעת הימים האחרונים — אין ממה להפיק דוח' });
+  }
+  const reports = await listReports(req.userId);
+  res.json({
+    enoughData: true,
+    reports,
+    generating: out.generating,
+    aiConfigured: true,
     aiKeyError: req.user.aiKeyError || '',
   });
 }));

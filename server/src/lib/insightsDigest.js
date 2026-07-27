@@ -349,6 +349,19 @@ export function lastCompletedWeek(today) {
   return { period: 'weekly', key: start, start, end, label };
 }
 
+// The window an on-demand ("manual" insights mode) report covers: the last 7
+// days ending today, keyed by the run date — so re-running on the same day
+// regenerates the same report instead of stacking duplicates.
+export function onDemandPeriod(today) {
+  const start = addDaysISO(today, -6);
+  const end = today;
+  const [, sm, sd] = start.split('-').map(Number);
+  const [, em, ed] = end.split('-').map(Number);
+  const label =
+    sm === em ? `${sd}–${ed} ב${HE_MONTHS[em - 1]}` : `${sd} ב${HE_MONTHS[sm - 1]} – ${ed} ב${HE_MONTHS[em - 1]}`;
+  return { period: 'ondemand', key: today, start, end, label };
+}
+
 // The most recent fully-completed calendar month before `today`.
 export function lastCompletedMonth(today) {
   const firstOfThis = `${today.slice(0, 7)}-01`;

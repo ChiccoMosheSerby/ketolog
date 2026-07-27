@@ -50,6 +50,11 @@ const userSchema = new mongoose.Schema(
     // kcal figures on the card, and show a ☕ counter of the day's coffees.
     cardShowKcal: { type: Boolean, default: true },
     cardShowCoffee: { type: Boolean, default: false },
+    // How smart-insight reports are produced (AI accounts only). 'auto' (the
+    // default) = weekly/monthly reports generate themselves when a period
+    // completes; 'manual' = nothing runs on its own — the user clicks a button
+    // in the תובנות panel to generate an on-demand report over recent days.
+    insightsMode: { type: String, enum: ['auto', 'manual'], default: 'auto' },
   },
   { timestamps: true }
 );

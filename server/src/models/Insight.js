@@ -1,16 +1,18 @@
 import mongoose from 'mongoose';
 
-// A history of auto-generated insight reports. One document per (user, period,
+// A history of generated insight reports. One document per (user, period,
 // periodKey) — e.g. the weekly report for the week starting 2026-06-21, or the
-// monthly report for 2026-06. Reports are generated automatically (lazily, in
-// the background) once a period completes; the user never triggers them. The
-// unique index makes generation idempotent under concurrent requests. `seenAt`
-// stays null until the user opens the report, which drives the "new" highlight.
+// monthly report for 2026-06. In the default 'auto' mode reports are generated
+// automatically (lazily, in the background) once a period completes; accounts
+// in 'manual' mode instead trigger an 'ondemand' report (last 7 days, keyed by
+// the run date) with a button. The unique index makes generation idempotent
+// under concurrent requests. `seenAt` stays null until the user opens the
+// report, which drives the "new" highlight.
 const insightSchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    period: { type: String, enum: ['weekly', 'monthly'], required: true },
-    periodKey: { type: String, required: true }, // 'YYYY-MM-DD' (week start) or 'YYYY-MM'
+    period: { type: String, enum: ['weekly', 'monthly', 'ondemand'], required: true },
+    periodKey: { type: String, required: true }, // 'YYYY-MM-DD' (week start / run date) or 'YYYY-MM'
     periodStart: { type: String, required: true }, // ISO date
     periodEnd: { type: String, required: true }, // ISO date (inclusive)
     label: { type: String, default: '' }, // human label, e.g. "21–27 ביוני"

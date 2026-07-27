@@ -82,6 +82,36 @@ export default function SettingsModal({
   const monthUsd = aiUsage?.monthUsd || 0;
   const budgetRatio = budgetUsd > 0 ? monthUsd / budgetUsd : 0;
 
+  // ---- smart-insights generation mode (AI accounts only) --------------------
+  // 'auto' (default): weekly/monthly reports write themselves when a period
+  // completes. 'manual': nothing runs on its own — a "run now" button in the
+  // תובנות panel generates an on-demand report. Saved immediately on click,
+  // like the other AI-section controls.
+  const [insightsMode, setInsightsMode] = useState('auto');
+  useEffect(() => {
+    if (open) setInsightsMode(user?.insightsMode === 'manual' ? 'manual' : 'auto');
+  }, [open, user]);
+
+  async function saveInsightsMode(mode) {
+    if (mode === insightsMode || aiBusy) return;
+    const prev = insightsMode;
+    setInsightsMode(mode);
+    setAiBusy(true);
+    try {
+      await updateProfile({ insightsMode: mode });
+      toast(
+        mode === 'manual'
+          ? 'דוחות תובנות יופקו בלחיצה — הכפתור מחכה בלשונית "תובנות"'
+          : 'דוחות תובנות יופקו אוטומטית מדי שבוע וחודש'
+      );
+    } catch (e) {
+      setInsightsMode(prev);
+      toast(e.message || 'השמירה נכשלה');
+    } finally {
+      setAiBusy(false);
+    }
+  }
+
   // ---- keto chat bubble: hide from the main screen, open from here instead --
   const [hideChat, setHideChat] = useState(isChatHidden);
   useEffect(() => {
@@ -490,6 +520,35 @@ export default function SettingsModal({
                 </div>
               )}
             </>
+          )}
+
+          {/* how insight reports are produced: automatic weekly/monthly (the
+              default) or on-demand with a button in the תובנות panel */}
+          {ai.enabled && (
+            <div className="settings-insights-mode" style={{ marginTop: 10 }} data-tour="set-insights-mode">
+              <div className="settings-lab">דוחות תובנות חכמות</div>
+              <span className="settings-seg">
+                <button
+                  className={insightsMode === 'auto' ? 'active' : ''}
+                  disabled={aiBusy}
+                  onClick={() => saveInsightsMode('auto')}
+                >
+                  אוטומטי (שבועי/חודשי)
+                </button>
+                <button
+                  className={insightsMode === 'manual' ? 'active' : ''}
+                  disabled={aiBusy}
+                  onClick={() => saveInsightsMode('manual')}
+                >
+                  לפי דרישה (בלחיצה)
+                </button>
+              </span>
+              <div className="export-hint">
+                {insightsMode === 'manual'
+                  ? 'דוחות לא ייווצרו מעצמם — כפתור "הפק דוח חדש" בלשונית "תובנות" מפיק דוח על שבעת הימים האחרונים, מתי שרוצים.'
+                  : 'ברירת המחדל: דוח שבועי נכתב אוטומטית בתום כל שבוע ודוח חודשי בתום כל חודש.'}
+              </div>
+            </div>
           )}
 
           {/* the chat bubble can be tucked away; the chat then opens from here */}
