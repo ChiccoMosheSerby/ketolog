@@ -55,6 +55,11 @@ const userSchema = new mongoose.Schema(
     // completes; 'manual' = nothing runs on its own — the user clicks a button
     // in the תובנות panel to generate an on-demand report over recent days.
     insightsMode: { type: String, enum: ['auto', 'manual'], default: 'auto' },
+    // "תובנות" tab layout: custom section order (empty = default order) and
+    // the ids of sections the user chose to hide. Order is set by dragging
+    // sections on the tab itself; visibility from settings → לשונית "תובנות".
+    insightsOrder: { type: [String], default: [] },
+    insightsHidden: { type: [String], default: [] },
   },
   { timestamps: true }
 );

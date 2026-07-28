@@ -55,6 +55,9 @@ const userPayload = (u) => {
     // Insight-report generation mode ('auto' = weekly/monthly by themselves,
     // 'manual' = on-demand button). Only meaningful when ai.enabled.
     insightsMode: u.insightsMode === 'manual' ? 'manual' : 'auto',
+    // "תובנות" tab layout — custom section order (empty = default) + hidden ids.
+    insightsOrder: Array.isArray(u.insightsOrder) ? u.insightsOrder : [],
+    insightsHidden: Array.isArray(u.insightsHidden) ? u.insightsHidden : [],
     isAdmin: isAdmin(u),
     // The client gates every AI-facing control on this block (never the key itself).
     ai: {
@@ -74,7 +77,7 @@ const userPayload = (u) => {
 };
 
 const PROFILE_FIELDS =
-  'email name gender dailyCarbTarget monthlyLossTarget heightCm birthYear ketoStartDate ketoGoalMonths whatsappPhone anthropicApiKey aiOptOut aiKeyError aiMonthlyBudgetUsd cardShowKcal cardShowCoffee insightsMode';
+  'email name gender dailyCarbTarget monthlyLossTarget heightCm birthYear ketoStartDate ketoGoalMonths whatsappPhone anthropicApiKey aiOptOut aiKeyError aiMonthlyBudgetUsd cardShowKcal cardShowCoffee insightsMode insightsOrder insightsHidden';
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 // Base URL for the approval link in the email.
@@ -358,6 +361,23 @@ router.patch('/me', requireAuth, asyncHandler(async (req, res) => {
       return res.status(400).json({ error: 'מצב דוחות תובנות לא תקין' });
     }
     update.insightsMode = v;
+  }
+  // "תובנות" tab layout: arrays of short section ids. The client owns the id
+  // set (unknown ids are simply ignored on render), so validation only bounds
+  // shape/size. Deduped so a glitchy client can't grow the arrays.
+  const sectionIds = (v) =>
+    Array.isArray(v) && v.length <= 30 && v.every((x) => typeof x === 'string' && /^[a-z][a-z-]{0,23}$/.test(x))
+      ? [...new Set(v)]
+      : null;
+  if (req.body.insightsOrder != null) {
+    const ids = sectionIds(req.body.insightsOrder);
+    if (!ids) return res.status(400).json({ error: 'סדר סקשנים לא תקין' });
+    update.insightsOrder = ids;
+  }
+  if (req.body.insightsHidden != null) {
+    const ids = sectionIds(req.body.insightsHidden);
+    if (!ids) return res.status(400).json({ error: 'רשימת סקשנים מוסתרים לא תקינה' });
+    update.insightsHidden = ids;
   }
   if (req.body.whatsappPhone != null) {
     // Normalize to bare E.164 digits so it compares equal to what Twilio sends.

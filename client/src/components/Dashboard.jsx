@@ -1,8 +1,10 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { buildAnalytics } from '../lib/analytics.js';
 import { dayKcal, fmt, heDate, kcalZone, zoneInfo, TARGET } from '../lib/helpers.js';
 import { DEFAULT_LOSS_TARGET } from '../lib/energyBalance.js';
 import { useMediaQuery, MOBILE_QUERY } from '../lib/useMediaQuery.js';
+import { useAuth } from '../lib/auth.jsx';
+import { INSIGHT_SECTIONS, normalizeInsightsOrder } from '../lib/insightSections.js';
 import CarbRing from './CarbRing.jsx';
 import EnergyBalance from './EnergyBalance.jsx';
 import './Dashboard.scss';
@@ -364,6 +366,64 @@ function Coffee({ coffee }) {
   );
 }
 
+// ---- section shell: shared header (↑/↓ move buttons + fold chevron) around
+// each dashboard section. Folded state hides the body; the arrows swap the
+// section with its previous/next visible neighbor (handled by the Dashboard).
+const SECTION_TITLE = Object.fromEntries(INSIGHT_SECTIONS.map((s) => [s.id, s.title]));
+
+function InsightSection({ id, folded, onToggleFold, onMove, canUp, canDown, children }) {
+  return (
+    <section className={'panel d-panel d-sec' + (folded ? ' folded' : '')}>
+      <div className="d-sec-head">
+        <h2>{SECTION_TITLE[id]}</h2>
+        <span className="d-sec-tools">
+          <button
+            type="button"
+            className="d-sec-move"
+            aria-label="העברת הסקשן למעלה"
+            title="העברה למעלה"
+            disabled={!canUp}
+            onClick={() => onMove(-1)}
+          >
+            ↑
+          </button>
+          <button
+            type="button"
+            className="d-sec-move"
+            aria-label="העברת הסקשן למטה"
+            title="העברה למטה"
+            disabled={!canDown}
+            onClick={() => onMove(1)}
+          >
+            ↓
+          </button>
+          <button
+            type="button"
+            className="d-sec-fold"
+            aria-expanded={!folded}
+            aria-label={folded ? 'הרחבת הסקשן' : 'כיווץ הסקשן'}
+            onClick={onToggleFold}
+          >
+            <span className="chev" />
+          </button>
+        </span>
+      </div>
+      {!folded && <div className="d-sec-body">{children}</div>}
+    </section>
+  );
+}
+
+// Folded sections are a per-device preference (unlike order/visibility, which
+// live on the profile) — a phone and a desktop can fold differently.
+const FOLD_KEY = 'ketolog:insightsFolded';
+const loadFolded = () => {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(FOLD_KEY) || '[]'));
+  } catch {
+    return new Set();
+  }
+};
+
 export default function Dashboard({
   days,
   target = TARGET,
@@ -374,6 +434,8 @@ export default function Dashboard({
   profile,
   children,
 }) {
+  const { user, updateProfile } = useAuth();
+
   const a = useMemo(
     () => buildAnalytics(days, target, { today, ketoGoal: { months: ketoMonths } }),
     [days, target, today, ketoMonths]
@@ -398,6 +460,64 @@ export default function Dashboard({
     return { series, best, worst, avg, avgDays: pool.length };
   }, [days, today]);
 
+  // ---- section layout: order + hidden live on the profile (cross-device),
+  // folded is per-device (localStorage). Order changes with the ↑/↓ buttons.
+  const hidden = useMemo(() => new Set(user?.insightsHidden || []), [user]);
+  const [order, setOrder] = useState(() => normalizeInsightsOrder(user?.insightsOrder));
+  const [folded, setFolded] = useState(loadFolded);
+
+  // Saves are serialized (rapid clicks fire one PATCH after another, in click
+  // order) and counted, so the resync effect below never snaps the UI back to
+  // a stale server order between two in-flight saves.
+  const saveChain = useRef(Promise.resolve());
+  const pendingSaves = useRef(0);
+
+  // Re-sync when the saved order changes elsewhere (e.g. settings "reset
+  // order", or another device) — but not while our own saves are in flight.
+  const savedOrderKey = (user?.insightsOrder || []).join(',');
+  useEffect(() => {
+    if (pendingSaves.current === 0) setOrder(normalizeInsightsOrder(user?.insightsOrder));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedOrderKey]);
+
+  function toggleFold(id) {
+    setFolded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      try {
+        localStorage.setItem(FOLD_KEY, JSON.stringify([...next]));
+      } catch {
+        /* storage unavailable — folding just won't survive a reload */
+      }
+      return next;
+    });
+  }
+
+  // Swap the section with its previous (-1) / next (+1) *visible* neighbor.
+  // Hidden sections keep their slot in the full order array untouched.
+  function moveSection(id, dir) {
+    const vis = order.filter((s) => !hidden.has(s));
+    const i = vis.indexOf(id);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= vis.length) return;
+    const next = [...order];
+    const a = next.indexOf(id);
+    const b = next.indexOf(vis[j]);
+    next[a] = vis[j];
+    next[b] = id;
+    setOrder(next);
+    pendingSaves.current += 1;
+    saveChain.current = saveChain.current
+      .then(() => updateProfile({ insightsOrder: next }))
+      .catch(() => {
+        /* save failed — the new order still applies for this session */
+      })
+      .finally(() => {
+        pendingSaves.current -= 1;
+      });
+  }
+
   if (!a.hasData) {
     return (
       <div className="dashboard" data-tour="insights">
@@ -409,11 +529,11 @@ export default function Dashboard({
     );
   }
 
-  return (
-    <div className="dashboard" data-tour="insights">
-      {/* daily average + streaks — kept at the top of the tab */}
-      <div className="panel d-panel">
-        <h2>ממוצע יומי ורצפים</h2>
+  // ---- section bodies, keyed by the shared registry ids ----
+  const content = {
+    // daily average + streaks
+    summary: (
+      <>
         <div className="d-tiles">
           <div className="d-tile d-ring">
             <CarbRing consumed={a.avg} target={target} size={66} stroke={7}>
@@ -428,132 +548,134 @@ export default function Dashboard({
         {a.span && (
           <div className="d-span">{a.loggedDays} ימים מתועדים · {heDate(a.span.from)} – {heDate(a.span.to)}</div>
         )}
+      </>
+    ),
+
+    // AI insights slot — SmartInsights brings its own panel; the section CSS
+    // flattens it so it doesn't double-frame inside the shell
+    ai: children,
+
+    // keto-period goal progress
+    keto: a.keto ? (
+      <KetoProgress keto={a.keto} />
+    ) : (
+      <div className="d-note">
+        להגדרת יעד לתקופת הקיטו (למשל 3 חודשים), פתח/י את ההגדרות ובחר/י מספר חודשים. הספירה תתחיל מהיום הראשון ביומן.
       </div>
+    ),
 
-      {/* AI insights slot — rendered right under the daily-average summary */}
-      {children}
+    // net-carbs progress trend
+    trend: a.series.length >= 2 ? (
+      <TrendChart series={a.series} target={target} best={a.best} worst={a.worst} />
+    ) : (
+      <div className="d-note">צריך לפחות יומיים מתועדים כדי להציג את מגמת ההתקדמות.</div>
+    ),
 
-      {/* keto-period goal progress */}
-      <div className="panel d-panel">
-        <h2>תקופת הקיטו</h2>
-        {a.keto ? (
-          <KetoProgress keto={a.keto} />
-        ) : (
-          <div className="d-note">
-            להגדרת יעד לתקופת הקיטו (למשל 3 חודשים), פתח/י את ההגדרות ובחר/י מספר חודשים. הספירה תתחיל מהיום הראשון ביומן.
-          </div>
-        )}
-      </div>
-
-      {/* progress trend — sits under the keto-period timeline */}
-      <div className="panel d-panel">
-        <h2>התקדמות</h2>
-        {a.series.length >= 2 ? (
-          <TrendChart series={a.series} target={target} best={a.best} worst={a.worst} />
-        ) : (
-          <div className="d-note">צריך לפחות יומיים מתועדים כדי להציג את מגמת ההתקדמות.</div>
-        )}
-      </div>
-
-      {/* daily calories trend — colored by the kcal target when one is set */}
-      <div className="panel d-panel">
-        <h2>קלוריות יומיות</h2>
-        {kcal.series.length >= 2 ? (
-          <>
-            <div className="kcal-hero">
-              <span
-                className="kcal-num"
-                style={{ color: kcalZone(kcal.avg, kcalTarget)?.color }}
-                title={kcalZone(kcal.avg, kcalTarget)?.cap}
-              >
-                ~{kcal.avg.toLocaleString()}
-              </span>
-              <span className="kcal-lab">
-                ממוצע קק"ל ליום · מתוך {kcal.avgDays} ימים
-                {kcalTarget ? ` · יעד ${kcalTarget.toLocaleString()}` : ''}
-              </span>
-            </div>
-            <TrendChart
-              series={kcal.series}
-              target={kcalTarget}
-              best={kcal.best}
-              worst={kcal.worst}
-              unit='קק"ל'
-              seriesLabel='קק"ל ליום'
-              zone={kcalZone}
-              gid="kcalFill"
-              ariaLabel="גרף קלוריות יומיות"
-            />
-            {!kcalTarget && (
-              <div className="d-note">
-                קו היעד וצביעת הימים (ירוק/כתום/אדום) יופיעו אוטומטית ברגע שתחושב שריפת
-                הקלוריות שלך — ראו "מאזן אנרגיה" למטה.
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="d-note">
-            צריך לפחות יומיים עם פירוט מאקרו (שומן/חלבון) כדי להציג את גרף הקלוריות.
-          </div>
-        )}
-      </div>
-
-      {/* energy balance: measured TDEE + surplus/deficit grading */}
-      <div className="panel d-panel">
-        <h2>מאזן אנרגיה ושריפת קלוריות</h2>
-        <EnergyBalance days={days} today={today} lossTarget={lossTarget} profile={profile} />
-      </div>
-
-      {/* 1 · average macro balance */}
-      <div className="panel d-panel">
-        <h2>איזון מאקרו ממוצע</h2>
-        {a.macroAvg ? (
-          <MacroBalance macroAvg={a.macroAvg} />
-        ) : (
-          <div className="d-note">אין עדיין ארוחות עם פירוט שומן/חלבון לחישוב האיזון.</div>
-        )}
-      </div>
-
-      {/* records (best / worst day) */}
-      <div className="panel d-panel">
-        <h2>שיאים</h2>
-        <div className="d-records">
-          {a.best && (
-            <div className="rec good">
-              <span className="rec-cap">היום הנקי ביותר</span>
-              <span className="rec-val">{fmt(a.best.total)} ג'</span>
-              <span className="rec-date">{heDate(a.best.date)}</span>
-            </div>
-          )}
-          {a.worst && (
-            <div className="rec bad">
-              <span className="rec-cap">היום הגבוה ביותר</span>
-              <span className="rec-val">{fmt(a.worst.total)} ג'</span>
-              <span className="rec-date">{heDate(a.worst.date)}</span>
-            </div>
-          )}
+    // daily calories trend — colored by the kcal target when one is set
+    kcal: kcal.series.length >= 2 ? (
+      <>
+        <div className="kcal-hero">
+          <span
+            className="kcal-num"
+            style={{ color: kcalZone(kcal.avg, kcalTarget)?.color }}
+            title={kcalZone(kcal.avg, kcalTarget)?.cap}
+          >
+            ~{kcal.avg.toLocaleString()}
+          </span>
+          <span className="kcal-lab">
+            ממוצע קק"ל ליום · מתוך {kcal.avgDays} ימים
+            {kcalTarget ? ` · יעד ${kcalTarget.toLocaleString()}` : ''}
+          </span>
         </div>
+        <TrendChart
+          series={kcal.series}
+          target={kcalTarget}
+          best={kcal.best}
+          worst={kcal.worst}
+          unit='קק"ל'
+          seriesLabel='קק"ל ליום'
+          zone={kcalZone}
+          gid="kcalFill"
+          ariaLabel="גרף קלוריות יומיות"
+        />
+        {!kcalTarget && (
+          <div className="d-note">
+            קו היעד וצביעת הימים (ירוק/כתום/אדום) יופיעו אוטומטית ברגע שתחושב שריפת
+            הקלוריות שלך — ראו "מאזן אנרגיה" למטה.
+          </div>
+        )}
+      </>
+    ) : (
+      <div className="d-note">
+        צריך לפחות יומיים עם פירוט מאקרו (שומן/חלבון) כדי להציג את גרף הקלוריות.
       </div>
+    ),
 
-      {/* 4 · peak carb hours */}
-      <div className="panel d-panel">
-        <h2>השעות העתירות בפחמימות</h2>
-        {a.peakHours.length ? (
-          <HoursBars peakHours={a.peakHours} />
-        ) : (
-          <div className="d-note">אין מספיק ארוחות עם שעת רישום כדי לחשב את התפלגות השעות.</div>
+    // energy balance: measured TDEE + surplus/deficit grading
+    energy: <EnergyBalance days={days} today={today} lossTarget={lossTarget} profile={profile} />,
+
+    // average macro balance
+    macro: a.macroAvg ? (
+      <MacroBalance macroAvg={a.macroAvg} />
+    ) : (
+      <div className="d-note">אין עדיין ארוחות עם פירוט שומן/חלבון לחישוב האיזון.</div>
+    ),
+
+    // records (best / worst day)
+    records: (
+      <div className="d-records">
+        {a.best && (
+          <div className="rec good">
+            <span className="rec-cap">היום הנקי ביותר</span>
+            <span className="rec-val">{fmt(a.best.total)} ג'</span>
+            <span className="rec-date">{heDate(a.best.date)}</span>
+          </div>
+        )}
+        {a.worst && (
+          <div className="rec bad">
+            <span className="rec-cap">היום הגבוה ביותר</span>
+            <span className="rec-val">{fmt(a.worst.total)} ג'</span>
+            <span className="rec-date">{heDate(a.worst.date)}</span>
+          </div>
         )}
       </div>
+    ),
 
-      {/* 5 · coffee per day */}
-      <div className="panel d-panel">
-        <h2>ממוצע קפה ליום</h2>
-        {a.coffee.total ? (
-          <Coffee coffee={a.coffee} />
-        ) : (
-          <div className="d-note">לא זוהו ארוחות קפה (שחור · אספרסו · נס) ביומן.</div>
-        )}
-      </div>
+    // peak carb hours
+    hours: a.peakHours.length ? (
+      <HoursBars peakHours={a.peakHours} />
+    ) : (
+      <div className="d-note">אין מספיק ארוחות עם שעת רישום כדי לחשב את התפלגות השעות.</div>
+    ),
+
+    // coffee per day
+    coffee: a.coffee.total ? (
+      <Coffee coffee={a.coffee} />
+    ) : (
+      <div className="d-note">לא זוהו ארוחות קפה (שחור · אספרסו · נס) ביומן.</div>
+    ),
+  };
+
+  const visible = order.filter((id) => !hidden.has(id));
+
+  return (
+    <div className="dashboard" data-tour="insights">
+      {visible.map((id, i) => (
+        <InsightSection
+          key={id}
+          id={id}
+          folded={folded.has(id)}
+          onToggleFold={() => toggleFold(id)}
+          onMove={(dir) => moveSection(id, dir)}
+          canUp={i > 0}
+          canDown={i < visible.length - 1}
+        >
+          {content[id]}
+        </InsightSection>
+      ))}
+      {visible.length === 0 && (
+        <div className="empty">כל הסקשנים מוסתרים — אפשר להחזיר אותם בהגדרות ⚙️</div>
+      )}
     </div>
   );
 }

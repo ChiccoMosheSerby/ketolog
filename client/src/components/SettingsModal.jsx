@@ -6,6 +6,7 @@ import { useTheme } from '../lib/theme.js';
 import { useFocusTrap } from '../lib/useFocusTrap.js';
 import { todayISO } from '../lib/helpers.js';
 import { CHAT_HIDDEN_KEY, isChatHidden } from './ChatWidget.jsx';
+import { INSIGHT_SECTIONS } from '../lib/insightSections.js';
 import WeighIn from './WeighIn.jsx';
 import './SettingsModal.scss';
 
@@ -86,7 +87,7 @@ export default function SettingsModal({
   // 'auto' (default): weekly/monthly reports write themselves when a period
   // completes. 'manual': nothing runs on its own — a "run now" button in the
   // תובנות panel generates an on-demand report. Saved immediately on click,
-  // like the other AI-section controls.
+  // from the לשונית "תובנות" section below.
   const [insightsMode, setInsightsMode] = useState('auto');
   useEffect(() => {
     if (open) setInsightsMode(user?.insightsMode === 'manual' ? 'manual' : 'auto');
@@ -109,6 +110,45 @@ export default function SettingsModal({
       toast(e.message || 'השמירה נכשלה');
     } finally {
       setAiBusy(false);
+    }
+  }
+
+  // ---- "תובנות" tab layout: which sections show + the custom drag order -----
+  // Both live on the profile (cross-device) and save immediately on click,
+  // like the other toggles below the main Save button.
+  const [hiddenIns, setHiddenIns] = useState([]);
+  const [layoutBusy, setLayoutBusy] = useState(false);
+  useEffect(() => {
+    if (open) setHiddenIns(user?.insightsHidden || []);
+  }, [open, user]);
+
+  async function toggleInsightSection(id) {
+    if (layoutBusy) return;
+    const prev = hiddenIns;
+    const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
+    setHiddenIns(next);
+    setLayoutBusy(true);
+    try {
+      await updateProfile({ insightsHidden: next });
+    } catch (e) {
+      setHiddenIns(prev);
+      toast(e.message || 'השמירה נכשלה');
+    } finally {
+      setLayoutBusy(false);
+    }
+  }
+
+  const hasCustomOrder = (user?.insightsOrder || []).length > 0;
+  async function resetInsightsOrder() {
+    if (layoutBusy) return;
+    setLayoutBusy(true);
+    try {
+      await updateProfile({ insightsOrder: [] });
+      toast('סדר הסקשנים אופס לברירת המחדל');
+    } catch (e) {
+      toast(e.message || 'האיפוס נכשל');
+    } finally {
+      setLayoutBusy(false);
     }
   }
 
@@ -416,6 +456,67 @@ export default function SettingsModal({
 
         <div className="settings-divider" />
 
+        {/* לשונית "תובנות": which sections show, order reset, and (for AI
+            accounts) how insight reports are produced. Saves immediately. */}
+        <div className="settings-insights" data-tour="set-insights">
+          <div className="settings-lab">לשונית "תובנות"</div>
+          <div className="export-hint">
+            בוחרים כאן אילו סקשנים יוצגו בלשונית. את הסדר משנים בחיצי ה-↑/↓ שבראש כל
+            סקשן, והחץ מכווץ/מרחיב. השינויים נשמרים מיד.
+          </div>
+          {INSIGHT_SECTIONS.map((s) => (
+            <label className="settings-check" key={s.id}>
+              <input
+                type="checkbox"
+                checked={!hiddenIns.includes(s.id)}
+                onChange={() => toggleInsightSection(s.id)}
+              />
+              <span>{s.title}</span>
+            </label>
+          ))}
+          {hasCustomOrder && (
+            <button
+              className="btn ghost mini"
+              style={{ marginTop: 8 }}
+              onClick={resetInsightsOrder}
+              disabled={layoutBusy}
+            >
+              ↩️ איפוס סדר הסקשנים לברירת המחדל
+            </button>
+          )}
+
+          {/* how insight reports are produced: automatic weekly/monthly (the
+              default) or on-demand with a button in the תובנות panel */}
+          {ai.enabled && (
+            <div className="settings-insights-mode" style={{ marginTop: 12 }} data-tour="set-insights-mode">
+              <div className="settings-lab">דוחות תובנות חכמות</div>
+              <span className="settings-seg">
+                <button
+                  className={insightsMode === 'auto' ? 'active' : ''}
+                  disabled={aiBusy}
+                  onClick={() => saveInsightsMode('auto')}
+                >
+                  אוטומטי (שבועי/חודשי)
+                </button>
+                <button
+                  className={insightsMode === 'manual' ? 'active' : ''}
+                  disabled={aiBusy}
+                  onClick={() => saveInsightsMode('manual')}
+                >
+                  לפי דרישה (בלחיצה)
+                </button>
+              </span>
+              <div className="export-hint">
+                {insightsMode === 'manual'
+                  ? 'דוחות לא ייווצרו מעצמם — כפתור "הפק דוח חדש" בלשונית "תובנות" מפיק דוח על שבעת הימים האחרונים, מתי שרוצים.'
+                  : 'ברירת המחדל: דוח שבועי נכתב אוטומטית בתום כל שבוע ודוח חודשי בתום כל חודש.'}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="settings-divider" />
+
         {/* AI features: status + BYO Anthropic key (or the owner's preview toggle) */}
         <div className="settings-ai" data-tour="set-ai">
           <div className="settings-lab">
@@ -520,35 +621,6 @@ export default function SettingsModal({
                 </div>
               )}
             </>
-          )}
-
-          {/* how insight reports are produced: automatic weekly/monthly (the
-              default) or on-demand with a button in the תובנות panel */}
-          {ai.enabled && (
-            <div className="settings-insights-mode" style={{ marginTop: 10 }} data-tour="set-insights-mode">
-              <div className="settings-lab">דוחות תובנות חכמות</div>
-              <span className="settings-seg">
-                <button
-                  className={insightsMode === 'auto' ? 'active' : ''}
-                  disabled={aiBusy}
-                  onClick={() => saveInsightsMode('auto')}
-                >
-                  אוטומטי (שבועי/חודשי)
-                </button>
-                <button
-                  className={insightsMode === 'manual' ? 'active' : ''}
-                  disabled={aiBusy}
-                  onClick={() => saveInsightsMode('manual')}
-                >
-                  לפי דרישה (בלחיצה)
-                </button>
-              </span>
-              <div className="export-hint">
-                {insightsMode === 'manual'
-                  ? 'דוחות לא ייווצרו מעצמם — כפתור "הפק דוח חדש" בלשונית "תובנות" מפיק דוח על שבעת הימים האחרונים, מתי שרוצים.'
-                  : 'ברירת המחדל: דוח שבועי נכתב אוטומטית בתום כל שבוע ודוח חודשי בתום כל חודש.'}
-              </div>
-            </div>
           )}
 
           {/* the chat bubble can be tucked away; the chat then opens from here */}

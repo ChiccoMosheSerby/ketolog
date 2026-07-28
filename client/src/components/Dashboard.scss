@@ -12,6 +12,98 @@
   }
 }
 
+/* ---- section shell: shared header (title · ↑/↓ move · fold chevron) ---- */
+.d-sec {
+  .d-sec-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    h2 {
+      margin: 0; /* body spacing moves to .d-sec-body */
+      flex: 1;
+      min-width: 0;
+    }
+  }
+
+  .d-sec-tools {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    flex: none;
+  }
+
+  .d-sec-move,
+  .d-sec-fold {
+    appearance: none;
+    background: none;
+    border: 0;
+    border-radius: 8px;
+    padding: 4px 7px;
+    min-height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ink-soft);
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background: var(--tint);
+      color: var(--ink);
+    }
+  }
+
+  .d-sec-move {
+    font-size: 14px;
+    line-height: 1;
+    font-family: inherit;
+
+    &:disabled {
+      opacity: 0.3;
+      cursor: default;
+    }
+  }
+
+  /* closed points down (base .chev), open points up — same as the journal fold */
+  .d-sec-fold .chev {
+    transform: rotate(-135deg);
+    margin-bottom: -3px;
+  }
+  &.folded .d-sec-fold .chev {
+    transform: rotate(45deg);
+    margin-bottom: 3px;
+  }
+
+  .d-sec-body {
+    margin-top: 16px;
+  }
+
+  &.folded {
+    padding-block: 12px;
+  }
+}
+
+/* The AI slot (SmartInsights) brings its own .panel — flatten it inside the
+   section shell so it doesn't double-frame, and drop its inner title (the
+   shell header already names the section). */
+.d-sec-body > .si-panel {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 0;
+  margin-bottom: 0;
+
+  .si-title {
+    display: none;
+  }
+  /* the top row keeps its run-button / "מעדכן…" status; hide it only when the
+     (now hidden) title was its sole content, so no empty flex-gap remains */
+  .si-top:not(:has(button, .si-gen)) {
+    display: none;
+  }
+}
+
 /* ---- stat tiles ---- */
 /* Always a single row (ring + the two streak tiles) on every screen size. */
 .d-tiles {
